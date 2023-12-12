@@ -158,6 +158,7 @@ src/addons/wiiext.cpp
 src/addons/input_macro.cpp
 src/addons/snes_input.cpp
 src/addons/inputhistory.cpp
+src/addons/haptics.cpp
 src/gamepad/GamepadDebouncer.cpp
 src/gamepad/GamepadDescriptors.cpp
 src/addons/tilt.cpp
@@ -191,6 +192,7 @@ SNESpad
 pico_mbedtls
 TinyUSB_Gamepad
 nanopb
+DRV2605L
 )
 
 target_include_directories(${PROJECT_NAME} PUBLIC
