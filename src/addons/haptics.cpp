@@ -10,12 +10,12 @@ bool HapticFeedback::available()
 
 void HapticFeedback::setup()
 {
-	// Implement the setup() method
-	// For example, you might initialize the DRV2605L device
-	drv2605l.begin();
+	PeripheralI2C *i2c = PeripheralManager::getInstance().getI2C(0);
+drv2605l = new DRV2605L(i2c,0x5A)
+drv2605l->begin();
 }
 
 void HapticFeedback::process()
 {
-	drv2605l.go();
+
 }
