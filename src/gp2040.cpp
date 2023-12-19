@@ -116,34 +116,46 @@ void GP2040::setup()
 		break;
 	}
 
-	case BootAction::SET_INPUT_MODE_HID:
-	case BootAction::SET_INPUT_MODE_SWITCH:
-	case BootAction::SET_INPUT_MODE_XINPUT:
-	case BootAction::SET_INPUT_MODE_PS4:
-	case BootAction::SET_INPUT_MODE_KEYBOARD:
-	case BootAction::NONE:
-	{
-		InputMode inputMode = gamepad->getOptions().inputMode;
-		if (bootAction == BootAction::SET_INPUT_MODE_HID)
-		{
-			inputMode = INPUT_MODE_HID;
-		}
-		else if (bootAction == BootAction::SET_INPUT_MODE_SWITCH)
-		{
-			inputMode = INPUT_MODE_SWITCH;
-		}
-		else if (bootAction == BootAction::SET_INPUT_MODE_XINPUT)
-		{
-			inputMode = INPUT_MODE_XINPUT;
-		}
-		else if (bootAction == BootAction::SET_INPUT_MODE_PS4)
-		{
-			inputMode = INPUT_MODE_PS4;
-		}
-		else if (bootAction == BootAction::SET_INPUT_MODE_KEYBOARD)
-		{
-			inputMode = INPUT_MODE_KEYBOARD;
-		}
+		case BootAction::SET_INPUT_MODE_HID:
+		case BootAction::SET_INPUT_MODE_SWITCH:
+		case BootAction::SET_INPUT_MODE_XINPUT:
+		case BootAction::SET_INPUT_MODE_PS4:
+		case BootAction::SET_INPUT_MODE_KEYBOARD:
+		case BootAction::SET_INPUT_MODE_NEOGEO:
+		case BootAction::SET_INPUT_MODE_MDMINI:
+		case BootAction::SET_INPUT_MODE_PCEMINI:
+		case BootAction::SET_INPUT_MODE_EGRET:
+		case BootAction::SET_INPUT_MODE_ASTRO:
+		case BootAction::SET_INPUT_MODE_PSCLASSIC:
+		case BootAction::SET_INPUT_MODE_XBOXORIGINAL:
+		case BootAction::NONE:
+			{
+				InputMode inputMode = gamepad->getOptions().inputMode;
+				if (bootAction == BootAction::SET_INPUT_MODE_HID) {
+					inputMode = INPUT_MODE_HID;
+				} else if (bootAction == BootAction::SET_INPUT_MODE_SWITCH) {
+					inputMode = INPUT_MODE_SWITCH;
+				} else if (bootAction == BootAction::SET_INPUT_MODE_XINPUT) {
+					inputMode = INPUT_MODE_XINPUT;
+				} else if (bootAction == BootAction::SET_INPUT_MODE_PS4) {
+					inputMode = INPUT_MODE_PS4;
+				} else if (bootAction == BootAction::SET_INPUT_MODE_KEYBOARD) {
+					inputMode = INPUT_MODE_KEYBOARD;
+				} else if (bootAction == BootAction::SET_INPUT_MODE_NEOGEO) {
+					inputMode = INPUT_MODE_NEOGEO;
+				} else if (bootAction == BootAction::SET_INPUT_MODE_MDMINI) {
+					inputMode = INPUT_MODE_MDMINI;
+				} else if (bootAction == BootAction::SET_INPUT_MODE_PCEMINI) {
+					inputMode = INPUT_MODE_PCEMINI;
+				} else if (bootAction == BootAction::SET_INPUT_MODE_EGRET) {
+					inputMode = INPUT_MODE_EGRET;
+				} else if (bootAction == BootAction::SET_INPUT_MODE_ASTRO) {
+					inputMode = INPUT_MODE_ASTRO;
+				} else if (bootAction == BootAction::SET_INPUT_MODE_PSCLASSIC) {
+					inputMode = INPUT_MODE_PSCLASSIC;
+				} else if (bootAction == BootAction::SET_INPUT_MODE_XBOXORIGINAL) {
+					inputMode = INPUT_MODE_XBOXORIGINAL;
+				}
 
 		if (inputMode != gamepad->getOptions().inputMode)
 		{
@@ -310,38 +322,30 @@ GP2040::BootAction GP2040::getBootAction()
 		bool webConfigLocked = forcedSetupOptions.mode == FORCED_SETUP_MODE_LOCK_WEB_CONFIG ||
 													 forcedSetupOptions.mode == FORCED_SETUP_MODE_LOCK_BOTH;
 
-		if (gamepad->pressedS1() && gamepad->pressedS2() && gamepad->pressedUp())
-		{
-			return BootAction::ENTER_USB_MODE;
-		}
-		else if (!webConfigLocked && gamepad->pressedS2())
-		{
-			return BootAction::ENTER_WEBCONFIG_MODE;
-		}
-		else
-		{
-			if (!modeSwitchLocked)
-			{
-				if (auto search = bootActions.find(gamepad->state.buttons); search != bootActions.end())
-				{
-					switch (search->second)
-					{
-					case INPUT_MODE_XINPUT:
-						return BootAction::SET_INPUT_MODE_XINPUT;
-					case INPUT_MODE_SWITCH:
-						return BootAction::SET_INPUT_MODE_SWITCH;
-					case INPUT_MODE_HID:
-						return BootAction::SET_INPUT_MODE_HID;
-					case INPUT_MODE_KEYBOARD:
-						return BootAction::SET_INPUT_MODE_KEYBOARD;
-					case INPUT_MODE_PS4:
-						return BootAction::SET_INPUT_MODE_PS4;
-					default:
-						return BootAction::NONE;
-					}
-				}
-			}
-		}
+				if (gamepad->pressedS1() && gamepad->pressedS2() && gamepad->pressedUp()) {
+					return BootAction::ENTER_USB_MODE;
+				} else if (!webConfigLocked && gamepad->pressedS2()) {
+					return BootAction::ENTER_WEBCONFIG_MODE;
+                } else {
+                    if (!modeSwitchLocked) {
+                        if (auto search = bootActions.find(gamepad->state.buttons); search != bootActions.end()) {
+                            switch (search->second) {
+                                case INPUT_MODE_XINPUT:
+                                    return BootAction::SET_INPUT_MODE_XINPUT;
+                                case INPUT_MODE_SWITCH:
+                                    return BootAction::SET_INPUT_MODE_SWITCH;
+                                case INPUT_MODE_HID:
+                                    return BootAction::SET_INPUT_MODE_HID;
+                                case INPUT_MODE_KEYBOARD:
+                                    return BootAction::SET_INPUT_MODE_KEYBOARD;
+                                case INPUT_MODE_PS4:
+                                    return BootAction::SET_INPUT_MODE_PS4;
+                                default:
+                                    return BootAction::NONE;
+                            }
+                        }
+                    }
+                }
 
 		break;
 	}
