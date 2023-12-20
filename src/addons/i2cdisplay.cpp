@@ -1018,7 +1018,7 @@ void I2CDisplayAddon::drawStatusBar(Gamepad * gamepad)
 		case INPUT_MODE_SWITCH: statusBar += "SWITCH"; break;
 		case INPUT_MODE_XINPUT: statusBar += "XINPUT"; break;
 		case INPUT_MODE_MDMINI: statusBar += "GEN/MD"; break;
-		case INPUT_MODE_NEOGEO: statusBar += "NEOGEO"; break;
+		case INPUT_MODE_NEOGEO: statusBar += "NGMINI"; break;
 		case INPUT_MODE_PCEMINI: statusBar += "PCE/TG"; break;
 		case INPUT_MODE_EGRET: statusBar += "EGRET"; break;
 		case INPUT_MODE_ASTRO: statusBar += "ASTRO"; break;
@@ -1037,6 +1037,7 @@ void I2CDisplayAddon::drawStatusBar(Gamepad * gamepad)
 					statusBar += "PS5   ";
 			}
 			break;
+		case INPUT_MODE_XBONE:    statusBar += "XBONE"; break;
 		case INPUT_MODE_KEYBOARD: statusBar += "HID-KB"; break;
 		case INPUT_MODE_CONFIG: statusBar += "CONFIG"; break;
 	}

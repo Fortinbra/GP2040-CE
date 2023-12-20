@@ -18,6 +18,7 @@ const INPUT_MODES = [
 	{ labelKey: 'input-mode-options.ps3', value: 2, group: 'primary' },
 	{ labelKey: 'input-mode-options.keyboard', value: 3, group: 'primary' },
 	{ labelKey: 'input-mode-options.ps4', value: PS4Mode, group: 'primary', optional: ['usb','ps4auth','ps4mode'] },
+	{ labelKey: 'input-mode-options.xbone', value: 5, group: 'primary', required: ['usb','xboxone'] },
 	{ labelKey: 'input-mode-options.mdmini', value: 6, group: 'mini' },
 	{ labelKey: 'input-mode-options.neogeo', value: 7, group: 'mini' },
 	{ labelKey: 'input-mode-options.pcemini', value: 8, group: 'mini' },
@@ -34,6 +35,7 @@ const INPUT_BOOT_MODES = [
 	{ labelKey: 'input-mode-options.ps3', value: 2, group: 'primary' },
 	{ labelKey: 'input-mode-options.keyboard', value: 3, group: 'primary' },
 	{ labelKey: 'input-mode-options.ps4', value: PS4Mode, group: 'primary', optional: ['usb','ps4auth','ps4mode'] },
+	{ labelKey: 'input-mode-options.xbone', value: 5, group: 'primary', required: ['usb','xboxone'] },
 	{ labelKey: 'input-mode-options.mdmini', value: 6, group: 'mini' },
 	{ labelKey: 'input-mode-options.neogeo', value: 7, group: 'mini' },
 	{ labelKey: 'input-mode-options.pcemini', value: 8, group: 'mini' },
@@ -274,7 +276,7 @@ const FormContext = ({ setButtonLabels }) => {
 };
 
 export default function SettingsPage() {
-	const { buttonLabels, setButtonLabels, getAvailablePeripherals, getSelectedPeripheral, getAvailableAddons, updatePeripherals } = useContext(AppContext);
+	const { buttonLabels, setButtonLabels, getAvailablePeripherals, getSelectedPeripheral, getAvailableAddons, updateAddons, updatePeripherals } = useContext(AppContext);
 	const [saveMessage, setSaveMessage] = useState('');
 	const [warning, setWarning] = useState({ show: false, acceptText: '' });
 
@@ -362,6 +364,7 @@ export default function SettingsPage() {
 	const { t } = useTranslation('');
 
     useEffect(() => {
+        updateAddons();
         updatePeripherals();
     }, []);
 

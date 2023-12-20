@@ -8,7 +8,7 @@
 
 #include "enums.pb.h"
 
-#define BOARD_CONFIG_LABEL "Pico"
+#define BOARD_CONFIG_LABEL "Haute 42"
 
 // This is the main pin definition section.
 // This will let you specify which GPIO pin each button is assigned too. 
@@ -68,6 +68,9 @@
 #define DEFAULT_DPAD_MODE DPAD_MODE_DIGITAL  //DPAD_MODE_DIGITAL, DPAD_MODE_LEFT_ANALOG, DPAD_MODE_RIGHT_ANALOG, 
 
 #define DEFAULT_PS4CONTROLLER_TYPE PS4_CONTROLLER
+
+// Input Mode additions section.
+#define DEFAULT_INPUT_MODE_R1 INPUT_MODE_XBONE
 
 // This is the LEDs section.
 // The default `TURBO_LED_PIN` pin is set to `15` ( it is recommended to run through 3V3(OUT) with a resistor)
@@ -319,6 +322,8 @@
 #define USB_PERIPHERAL_PIN_ORDER 0
 
 #define PSPASSTHROUGH_ENABLED 1
+
+#define XBONEPASSTHROUGH_ENABLED 1
 
 #define INPUT_HISTORY_ENABLED 0
 #define INPUT_HISTORY_LENGTH 20
