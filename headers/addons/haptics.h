@@ -1,7 +1,7 @@
 #ifndef _Haptics_H
 #define _Haptics_H
 
-#include "<DRV2605L>"
+#include "DRV2605L.h"
 #include "gpaddon.h"
 #include "GamepadEnums.h"
 #include "peripheralmanager.h"
@@ -18,3 +18,4 @@ public:
 private:
 	DRV2605L *drv2605l;
 };
+#endif

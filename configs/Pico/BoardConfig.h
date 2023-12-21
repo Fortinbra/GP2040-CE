@@ -11,7 +11,7 @@
 #define BOARD_CONFIG_LABEL "Pico"
 
 // This is the main pin definition section.
-// This will let you specify which GPIO pin each button is assigned too. 
+// This will let you specify which GPIO pin each button is assigned too.
 // You can set any of the main pins as `-1` to disable it.
 // The Turbo pin and LS + RS slider pins can also be set to `-1` to disable that functionality.
 // Please note that only when `PIN_BUTTON_TURBO` is set to `-1` will the `T##` be removed from a connected display.
@@ -65,7 +65,7 @@
 #define DEFAULT_LOCK_HOTKEYS false // or true
 
 #define DEFAULT_INPUT_MODE INPUT_MODE_XINPUT //INPUT_MODE_XINPUT (XInput), INPUT_MODE_SWITCH (Nintendo Switch), INPUT_MODE_HID (D-Input), INPUT_MODE_KEYBOARD (Keyboard)
-#define DEFAULT_DPAD_MODE DPAD_MODE_DIGITAL  //DPAD_MODE_DIGITAL, DPAD_MODE_LEFT_ANALOG, DPAD_MODE_RIGHT_ANALOG, 
+#define DEFAULT_DPAD_MODE DPAD_MODE_DIGITAL  //DPAD_MODE_DIGITAL, DPAD_MODE_LEFT_ANALOG, DPAD_MODE_RIGHT_ANALOG,
 
 #define DEFAULT_PS4CONTROLLER_TYPE PS4_CONTROLLER
 
@@ -77,7 +77,7 @@
 // The board LED pin will allow you to connect addressible RGB LEDs on the Pico.
 // Addressible RGB LEDs should be connected to the `VBUS` pin (#40), an avalible ground pin and the defined `BOARD_LEDS_PIN`.
 // Special note - You should only ever use addressible RGB LEDs that are rated for 5v operation on the Pico.
-// The defualt `LED_BRIGHTNESS_MAXIMUM` value is `50`.  
+// The defualt `LED_BRIGHTNESS_MAXIMUM` value is `50`.
 // This will change how bright the LEDs are with `0` being off and `100` being full brightness.
 // The minimum `LED_BRIGHTNESS_MAXIMUM` value is `0`.
 // The maximum `LED_BRIGHTNESS_MAXIMUM` value is `100`.
@@ -113,15 +113,15 @@
 #define LEDS_BUTTON_R2   10
 #define LEDS_BUTTON_L2   11
 
-// This is the Player LED section.  
+// This is the Player LED section.
 // In this section you can specify if Player LEDs will be active, and, if active, which pins will be used for them.
 // The defualt is `PLED_TYPE_NONE` which will turn the Player LEDs off.
-// The default pin for each Player LED is `-1` which disables it.  
-// To enable a `PLED#_PIN`, replace the `-1` with the GPIO pin number that is desired. 
+// The default pin for each Player LED is `-1` which disables it.
+// To enable a `PLED#_PIN`, replace the `-1` with the GPIO pin number that is desired.
 // There are three options for `PLED_TYPE` currently:
 // 1 - `PLED_TYPE_NONE` - This will disable the Player LEDs
 // 2 - `PLED_TYPE_PWM` - This will enable the Player LEDs ( it is recommended to run through 3V3(OUT) with a resistor)
-// 3 - `PLED_TYPE_RGB` - This will enable the Player LEDs as addressible RGB LEDs (please not that this has not been implemented yet) 
+// 3 - `PLED_TYPE_RGB` - This will enable the Player LEDs as addressible RGB LEDs (please not that this has not been implemented yet)
 
 #define PLED_TYPE PLED_TYPE_NONE
 #define PLED1_PIN -1
@@ -133,7 +133,7 @@
 // This is the Analog section.
 // In this section you can specify if Analog is enabled, and, if endabled, which pins will be used for it.
 // The default for `ANALOG_ADC_VRX` and `ANALOG_ADC_VRY` is `-1` which disables them.
-// To enable a `ANALOG_ADC_VRX` and `ANALOG_ADC_VRY`, replace the `-1` with the GPIO pin numbers that are desired. 
+// To enable a `ANALOG_ADC_VRX` and `ANALOG_ADC_VRY`, replace the `-1` with the GPIO pin numbers that are desired.
 
 #define ANALOG_ADC_1_VRX -1
 #define ANALOG_ADC_1_VRY -1
@@ -150,9 +150,9 @@
 // To disable the display you can change `HAS_I2C_DISPLAY` to `-1`.
 // The default `I2C_SDA_PIN` is `0`.
 // The defualt `I2C_SCL_PIN` is `1`.
-// The defualt `I2C_BLOCK` is `12c0`.  
+// The defualt `I2C_BLOCK` is `12c0`.
 // If you change the `I2C_SDA_PIN` and `I2C_SCL_PIN` pin mapping, you may need to change the `I2C_BLOCK` as well.
-// The defualt `I2C_SPEED` is `400000`.  
+// The defualt `I2C_SPEED` is `400000`.
 // This should be more than fast enough for most displays.
 // Some smaller displays (like 0.96" and 1.31") can go up to `800000` or even `1000000`.
 // The default `DISPLAY_FLIP` is `0`.
@@ -183,7 +183,7 @@
 // 9 - BUTTON_LAYOUT_NOIR8 - This is the standard 8 button Noir layout
 // 10 - BUTTON_LAYOUT_KEYBOARDB - This is a WASD keyboard layout that is straight
 // 11 - BUTTON_LAYOUT_DANCEPADB - This is a dance pad layout (must be used with `BUTTON_LAYOUT_DANCEPADA` in `BUTTON_LAYOUT`)
-// The default `SPLASH_MODE` is `NOSPLASH`.  
+// The default `SPLASH_MODE` is `NOSPLASH`.
 // There are four options for `SPLASH_MODE` currently:
 // 1 - `STATICSPLASH` - This will display the static splash image
 // 2 - `CLOSEIN` - This will display the static splash image as a top and bottom coming together animation
@@ -192,8 +192,8 @@
 // Special note - All of the splash screen images can be changed via `include/bitmaps.h`
 
 #define HAS_I2C_DISPLAY 0
-#define I2C_SDA_PIN 0
-#define I2C_SCL_PIN 1
+#define I2C_SDA_PIN 20
+#define I2C_SCL_PIN 21
 #define I2C_BLOCK i2c0
 #define I2C_SPEED 400000
 #define DISPLAY_FLIP 0
@@ -262,11 +262,11 @@
 // BOOTSEL Button Add-on setting
 #define BOOTSEL_BUTTON_MASK 0 // 0 means none, get other mask from GamepadState.h
 
-// This is the Buzzer Speaker section.  
+// This is the Buzzer Speaker section.
 // In this section you can specify if Buzzer Speaker will be active, and, if active, which pin will be used for them.
 // The default is `BUZZER_ENABLED` which will turn the Buzzer Speaker off.
-// The default pin for Buzzer Speaker is `-1` which will turn the Buzzer Speaker off.  
-// The default volume for Buzzer Speaker is 100 (max).  
+// The default pin for Buzzer Speaker is `-1` which will turn the Buzzer Speaker off.
+// The default volume for Buzzer Speaker is 100 (max).
 #define BUZZER_ENABLED 0
 #define BUZZER_PIN -1
 #define BUZZER_VOLUME 100
