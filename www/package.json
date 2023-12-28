@@ -51,7 +51,7 @@
 		"nodemon": "^2.0.22",
 		"pako": "^2.1.0",
 		"prettier": "^3.0.1",
-		"sass": "^1.62.1",
+		"sass": "^1.69.5",
 		"source-map-explorer": "^2.5.3",
 		"typescript": "^5.3.3",
 		"vite": "^4.3.9"
