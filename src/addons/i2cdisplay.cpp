@@ -6,12 +6,11 @@
 #include "addons/i2cdisplay.h"
 #include "GamepadState.h"
 #include "enums.h"
-#include "helper.h"
 #include "storagemanager.h"
 #include "pico/stdlib.h"
 #include "bitmaps.h"
 #include "ps4_driver.h"
-#include "helper.h"
+#include "version.h"
 #include "config.pb.h"
 #include "usb_driver.h"
 
@@ -45,10 +44,6 @@ void I2CDisplayAddon::setup() {
 	clearScreen(1);
 	gamepad = Storage::getInstance().GetGamepad();
 	pGamepad = Storage::getInstance().GetProcessedGamepad();
-
-	const FocusModeOptions& focusModeOptions = Storage::getInstance().getAddonOptions().focusModeOptions;
-	isFocusModeEnabled = focusModeOptions.enabled && focusModeOptions.oledLockEnabled &&
-		isValidPin(focusModeOptions.pin);
 	prevButtonState = 0;
 	displaySaverTimer = options.displaySaverTimeout;
 	displaySaverTimeout = displaySaverTimer;
@@ -68,33 +63,20 @@ bool I2CDisplayAddon::isDisplayPowerOff()
 		if (!displayIsPowerOn) setDisplayPower(1);
 	}
 
-	if (!displaySaverTimeout && !isFocusModeEnabled) return false;
+	if (!displaySaverTimeout) return false;
 
 	float diffTime = getMillis() - prevMillis;
 	displaySaverTimer -= diffTime;
-	if (!!displaySaverTimeout && (gamepad->state.buttons || gamepad->state.dpad) && !focusModePrevState) {
+	if (!!displaySaverTimeout && (gamepad->state.buttons || gamepad->state.dpad) ) {
 		displaySaverTimer = displaySaverTimeout;
 		setDisplayPower(1);
 	} else if (!!displaySaverTimeout && displaySaverTimer <= 0) {
 		setDisplayPower(0);
 	}
 
-	if (isFocusModeEnabled) {
-		const FocusModeOptions& focusModeOptions = Storage::getInstance().getAddonOptions().focusModeOptions;
-		bool isFocusModeActive = !gpio_get(focusModeOptions.pin);
-		if (focusModePrevState != isFocusModeActive) {
-			focusModePrevState = isFocusModeActive;
-			if (isFocusModeActive) {
-				setDisplayPower(0);
-			} else {
-				setDisplayPower(1);
-			}
-		}
-	}
-
 	prevMillis = getMillis();
 
-	return (isFocusModeEnabled && focusModePrevState) || (!!displaySaverTimeout && displaySaverTimer <= 0);
+	return (!!displaySaverTimeout && displaySaverTimer <= 0);
 }
 
 void I2CDisplayAddon::setDisplayPower(uint8_t status)
@@ -1018,6 +1000,13 @@ void I2CDisplayAddon::drawStatusBar(Gamepad * gamepad)
 		case INPUT_MODE_HID:    statusBar += "DINPUT"; break;
 		case INPUT_MODE_SWITCH: statusBar += "SWITCH"; break;
 		case INPUT_MODE_XINPUT: statusBar += "XINPUT"; break;
+		case INPUT_MODE_MDMINI: statusBar += "GEN/MD"; break;
+		case INPUT_MODE_NEOGEO: statusBar += "NGMINI"; break;
+		case INPUT_MODE_PCEMINI: statusBar += "PCE/TG"; break;
+		case INPUT_MODE_EGRET: statusBar += "EGRET"; break;
+		case INPUT_MODE_ASTRO: statusBar += "ASTRO"; break;
+		case INPUT_MODE_PSCLASSIC: statusBar += "PSC"; break;
+		case INPUT_MODE_XBOXORIGINAL: statusBar += "OGXBOX"; break;
 		case INPUT_MODE_PS4:
 			if ( PS4Data::getInstance().ps4ControllerType == PS4ControllerType::PS4_CONTROLLER ) {
 				if (PS4Data::getInstance().authsent == true )
@@ -1031,6 +1020,7 @@ void I2CDisplayAddon::drawStatusBar(Gamepad * gamepad)
 					statusBar += "PS5   ";
 			}
 			break;
+		case INPUT_MODE_XBONE:    statusBar += "XBONE"; break;
 		case INPUT_MODE_KEYBOARD: statusBar += "HID-KB"; break;
 		case INPUT_MODE_CONFIG: statusBar += "CONFIG"; break;
 	}

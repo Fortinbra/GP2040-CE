@@ -18,6 +18,9 @@
 // PS5 compatibility
 #include "ps4_driver.h"
 
+// Xbox One compatibility
+#include "xbone_driver.h"
+
 // MUST BE DEFINED for mpgs
 uint32_t getMillis() {
 	return to_ms_since_boot(get_absolute_time());
@@ -86,8 +89,125 @@ static XInputReport xinputReport
 	._reserved = { },
 };
 
+static NeogeoReport neogeoReport
+{
+	.buttons = 0,
+	.hat = 0xf,
+	.const0 = 0x80,
+	.const1 = 0x80,
+	.const2 = 0x80,
+	.const3 = 0x80,
+	.const4 = 0,	
+	.const5 = 0,	
+	.const6 = 0,	
+	.const7 = 0,	
+	.const8 = 0,	
+	.const9 = 0,	
+	.const10 = 0,	
+	.const11 = 0,	
+	.const12 = 0,	
+	.const13 = 0,	
+	.const14 = 0,	
+	.const15 = 0,	
+	.const16 = 0,	
+	.const17 = 0,	
+};
+
+static MDMiniReport mdminiReport
+{
+	.id = 0x01,
+	.notuse1 = 0x7f,
+	.notuse2 = 0x7f,
+	.lx = 0x7f,
+	.ly = 0x7f,
+	.buttons = 0x0f,
+	.notuse3 = 0x00,
+};
+
+static PCEngineReport pcengineReport
+{
+	.buttons = 0,
+	.hat = 0xf,
+	.const0 = 0x80,
+	.const1 = 0x80,
+	.const2 = 0x80,
+	.const3 = 0x80,
+	.const4 = 0,	
+};
+
+static AstroReport astroReport
+{
+	.id = 1,
+	.notuse1 = 0x7f,
+	.notuse2 = 0x7f,
+	.lx = 0x7f,
+	.ly = 0x7f,
+	.buttons = 0xf,
+	.notuse3 = 0,	
+};
+
+static EgretReport egretReport
+{
+	.buttons = 0,
+	.lx = EGRET_JOYSTICK_MID,
+	.ly = EGRET_JOYSTICK_MID,
+};
+
+static PSClassicReport psClassicReport
+{
+	.buttons = 0x0014
+};
+
+static XboxOriginalReport xboxOriginalReport
+{
+    .dButtons = 0,
+    .A = 0,
+    .B = 0,
+    .X = 0,
+    .Y = 0,
+    .BLACK = 0,
+    .WHITE = 0,
+    .L = 0,
+    .R = 0,
+    .leftStickX = 0,
+    .leftStickY = 0,
+    .rightStickX = 0,
+    .rightStickY = 0,
+};
+
+#define XBONE_KEEPALIVE_TIMER 15000
+
+static XboxOneGamepad_Data_t xboneReport
+{
+	.sync = 0,
+	.guide = 0,
+	.start = 0,
+	.back = 0,
+	.a = 0,
+	.b = 0,
+	.x = 0,
+	.y = 0,
+	.dpadUp = 0,
+	.dpadDown = 0,
+	.dpadLeft = 0,
+	.dpadRight = 0,
+	.leftShoulder = 0,
+	.rightShoulder = 0,
+	.leftThumbClick = 0,
+	.rightThumbClick = 0,
+	.leftTrigger = 0,
+	.rightTrigger = 0,
+	.leftStickX = GAMEPAD_JOYSTICK_MID,
+	.leftStickY = GAMEPAD_JOYSTICK_MID,
+	.rightStickX = GAMEPAD_JOYSTICK_MID,
+	.rightStickY = GAMEPAD_JOYSTICK_MID,
+	.reserved = {}
+};
+
+static uint16_t xboneReportSize;
+
+// Xbox One & PS4/PS5 Timing
 static TouchpadData touchpadData;
-static uint8_t last_report_counter = 0;
 
 static KeyboardReport keyboardReport
 {
@@ -161,6 +281,15 @@ void Gamepad::setup()
 
 	// setup PS5 compatibility
 	PS4Data::getInstance().ps4ControllerType = gamepadOptions.ps4ControllerType;
+	last_report_counter = 0;
+	last_axis_counter = 0;
+
+	// Xbox One Keep-Alive
+	keep_alive_timer = to_ms_since_boot(get_absolute_time());
+	keep_alive_sequence = 1;
+	virtual_keycode_sequence = 0;
+	xb1_guide_pressed = false;
+	xboneReportSize = sizeof(XboxOneGamepad_Data_t);
 }
 
 /**
@@ -449,8 +578,32 @@ void * Gamepad::getReport()
 		case INPUT_MODE_PS4:
 			return getPS4Report();
 
+		case INPUT_MODE_XBONE:
+			return getXBOneReport();
+
 		case INPUT_MODE_KEYBOARD:
 			return getKeyboardReport();
+
+		case INPUT_MODE_NEOGEO:
+			return getNeogeoReport();
+
+		case INPUT_MODE_MDMINI:
+			return getMDMiniReport();
+
+		case INPUT_MODE_PCEMINI:
+			return getPCEngineReport();
+
+		case INPUT_MODE_EGRET:
+			return getEgretReport();
+
+		case INPUT_MODE_ASTRO:
+			return getAstroReport();
+
+		case INPUT_MODE_PSCLASSIC:
+			return getPSClassicReport();
+
+		case INPUT_MODE_XBOXORIGINAL:
+			return getXboxOriginalReport();
 
 		default:
 			return getHIDReport();
@@ -471,14 +624,37 @@ uint16_t Gamepad::getReportSize()
 		case INPUT_MODE_PS4:
 			return sizeof(PS4Report);
 
+		case INPUT_MODE_XBONE:
+			return xboneReportSize;
+
 		case INPUT_MODE_KEYBOARD:
 			return sizeof(KeyboardReport);
+
+		case INPUT_MODE_NEOGEO:
+			return sizeof(NeogeoReport);
+
+		case INPUT_MODE_MDMINI:
+			return sizeof(MDMiniReport);
+
+		case INPUT_MODE_PCEMINI:
+			return sizeof(PCEngineReport);
+
+		case INPUT_MODE_EGRET:
+			return sizeof(EgretReport);
+
+		case INPUT_MODE_ASTRO:
+			return sizeof(AstroReport);
+
+		case INPUT_MODE_PSCLASSIC:
+			return sizeof(PSClassicReport);
+
+		case INPUT_MODE_XBOXORIGINAL:
+			return sizeof(XboxOriginalReport);
 
 		default:
 			return sizeof(HIDReport);
 	}
 }
-
 
 HIDReport *Gamepad::getHIDReport()
 {
@@ -602,6 +778,137 @@ XInputReport *Gamepad::getXInputReport()
 	return &xinputReport;
 }
 
+static uint8_t xb1_guide_on[] = { 0x01, 0x5b };
+static uint8_t xb1_guide_off[] = { 0x00, 0x5b };
+static uint8_t xboneIdle[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff,
+					   0x00, 0x00, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
+					   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+					   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
+// On Send report Success
+void Gamepad::sendReportSuccess() {
+	switch( (options.inputMode) ) {
+		case INPUT_MODE_PS4:
+			last_report_counter = (last_report_counter+1) & 0x3F; 	// 6-bit number roll-over
+			last_axis_counter = last_axis_counter++; 				// this can roll over on 16-bit
+			break;
+		case INPUT_MODE_XBONE:
+			if ( xboneReport.Header.command == GIP_KEEPALIVE) {
+				keep_alive_timer = to_ms_since_boot(get_absolute_time());
+				keep_alive_sequence++; // will rollover
+				if ( keep_alive_sequence == 0 )
+					keep_alive_sequence = 1;
+			} else if ( xboneReport.Header.command == GIP_INPUT_REPORT ) {
+				// Successfully sent report, actually increment last report counter!
+				if ( memcmp(&last_report[4], &((uint8_t*)&xboneReport)[4], xboneReportSize-4) != 0) {
+					last_report_counter++;
+					if (last_report_counter == 0)
+						last_report_counter = 1;
+					memcpy(last_report, &xboneReport, xboneReportSize);
+				}
+			}
+			break;
+		default:
+			break;
+	};
+}
+
+XboxOneGamepad_Data_t *Gamepad::getXBOneReport()
+{
+	// No input until auth is ready
+	if ( XboxOneData::getInstance().getAuthCompleted() == false ) {
+		GIP_HEADER((&xboneReport), GIP_INPUT_REPORT, false, last_report_counter);
+		memcpy((void*)&((uint8_t*)&xboneReport)[4], xboneIdle, sizeof(xboneIdle));
+		xboneReportSize = sizeof(XboxOneGamepad_Data_t);
+		return &xboneReport;
+	}
+
+	uint32_t now = to_ms_since_boot(get_absolute_time());
+	// Send Keep-Alive every 15 seconds (keep_alive_timer updates if send is successful)
+	if ( (now - keep_alive_timer) > XBONE_KEEPALIVE_TIMER) {
+		memset(&xboneReport.Header, 0, sizeof(GipHeader_t));
+		GIP_HEADER((&xboneReport), GIP_KEEPALIVE, 1, keep_alive_sequence);
+		xboneReport.Header.length = 4;
+		static uint8_t keepAlive[] = { 0x80, 0x00, 0x00, 0x00 };
+		memcpy(&((uint8_t*)&xboneReport)[4], &keepAlive, sizeof(keepAlive));
+		xboneReportSize = sizeof(GipHeader_t) + sizeof(keepAlive);
+		return &xboneReport;
+	}
+	
+	// Virtual Keycode for Guide Button
+	if ( pressedA1() || xb1_guide_pressed == true ) {
+		// In a change-state
+		if ( (pressedA1() && xb1_guide_pressed == false) ||
+			(!pressedA1() && xb1_guide_pressed == true)) {
+			virtual_keycode_sequence++; // will rollover
+			if ( virtual_keycode_sequence == 0 )
+				virtual_keycode_sequence = 1;
+			GIP_HEADER((&xboneReport), GIP_VIRTUAL_KEYCODE, 1, virtual_keycode_sequence);
+			xboneReport.Header.length = sizeof(xb1_guide_on);
+			if ( pressedA1() ) {
+				xb1_guide_pressed = true;
+				memcpy(&((uint8_t*)&xboneReport)[4], &xb1_guide_on, sizeof(xb1_guide_on));
+			} else {
+				xb1_guide_pressed = false;
+				memcpy(&((uint8_t*)&xboneReport)[4], &xb1_guide_off, sizeof(xb1_guide_off));
+			}
+		}
+		xboneReportSize = sizeof(GipHeader_t) + sizeof(xb1_guide_on);
+		return &xboneReport;
+	}
+
+	// Only change xbox one input report if we have different inputs!
+	XboxOneGamepad_Data_t newInputReport;
+
+	// This is due to our tusb_driver.cpp checking memcmp(last_report, report, size)
+	memset(&newInputReport, 0, sizeof(XboxOneGamepad_Data_t));
+	GIP_HEADER((&newInputReport), GIP_INPUT_REPORT, false, last_report_counter);
+
+	newInputReport.a = pressedB1();
+	newInputReport.b = pressedB2();
+	newInputReport.x = pressedB3();
+	newInputReport.y = pressedB4();
+	newInputReport.leftShoulder = pressedL1();
+	newInputReport.rightShoulder = pressedR1();
+	newInputReport.leftThumbClick = pressedL3();
+	newInputReport.rightThumbClick = pressedR3();
+	newInputReport.start = pressedS2();
+	newInputReport.back = pressedS1();
+	newInputReport.guide = 0; // always 0
+	newInputReport.sync = 0; 
+	newInputReport.dpadUp = pressedUp();
+	newInputReport.dpadDown = pressedDown();
+	newInputReport.dpadLeft = pressedLeft();
+	newInputReport.dpadRight = pressedRight();
+
+	newInputReport.leftStickX = static_cast<int16_t>(state.lx) + INT16_MIN;
+	newInputReport.leftStickY = static_cast<int16_t>(~state.ly) + INT16_MIN;
+	newInputReport.rightStickX = static_cast<int16_t>(state.rx) + INT16_MIN;
+	newInputReport.rightStickY = static_cast<int16_t>(~state.ry) + INT16_MIN;
+
+	if (hasAnalogTriggers)
+	{
+		newInputReport.leftTrigger = pressedL2() ? 0x03FF : state.lt;
+		newInputReport.rightTrigger = pressedR2() ? 0x03FF : state.rt;
+	}
+	else
+	{
+		newInputReport.leftTrigger = pressedL2() ? 0x03FF : 0;
+		newInputReport.rightTrigger = pressedR2() ? 0x03FF : 0;
+	}
+
+	// We changed inputs since generating our last report, increment last report counter (but don't update until success)
+	if ( memcmp(&last_report[4], &((uint8_t*)&newInputReport)[4], sizeof(XboxOneGamepad_Data_t)-4) != 0 ) {
+		xboneReportSize = sizeof(XboxOneGamepad_Data_t);
+		memcpy(&xboneReport, &newInputReport, xboneReportSize);
+		xboneReport.Header.sequence = last_report_counter + 1;
+		if ( xboneReport.Header.sequence == 0 )
+			xboneReport.Header.sequence = 1;
+	}
+
+	return &xboneReport;
+}
+
 
 PS4Report *Gamepad::getPS4Report()
 {
@@ -633,9 +940,11 @@ PS4Report *Gamepad::getPS4Report()
 	ps4Report.button_home     = pressedA1();
 	ps4Report.button_touchpad = options.switchTpShareForDs4 ? pressedS1() : pressedA2();
 
-	// report counter is 6 bits
-	last_report_counter = (last_report_counter+1) & 63;
-	ps4Report.report_counter = last_report_counter;
+	
+	if ( !options.ps4ReportHack ) {
+		ps4Report.report_counter = last_report_counter; 	// report counter is 6 bits
+		ps4Report.axis_timing = last_axis_counter; 			// axis counter is 16 bits
+	}
 
 	ps4Report.left_stick_x = static_cast<uint8_t>(state.lx >> 8);
 	ps4Report.left_stick_y = static_cast<uint8_t>(state.ly >> 8);
@@ -652,6 +961,8 @@ PS4Report *Gamepad::getPS4Report()
 		ps4Report.left_trigger = pressedL2() ? 0xFF : 0;
 		ps4Report.right_trigger = pressedR2() ? 0xFF : 0;
 	}
+
+
 
 	// set touchpad to nothing
 	touchpadData.p1.unpressed = 1;
@@ -729,4 +1040,224 @@ KeyboardReport *Gamepad::getKeyboardReport()
 	if(pressedA1()) 	{ pressKey(keyboardMapping.keyButtonA1); }
 	if(pressedA2()) 	{ pressKey(keyboardMapping.keyButtonA2); }
 	return &keyboardReport;
+}
+
+PCEngineReport *Gamepad::getPCEngineReport()
+{
+
+	switch (state.dpad & GAMEPAD_MASK_DPAD)
+	{
+		case GAMEPAD_MASK_UP:                        pcengineReport.hat = PCENGINE_HAT_UP;        break;
+		case GAMEPAD_MASK_UP | GAMEPAD_MASK_RIGHT:   pcengineReport.hat = PCENGINE_HAT_UPRIGHT;   break;
+		case GAMEPAD_MASK_RIGHT:                     pcengineReport.hat = PCENGINE_HAT_RIGHT;     break;
+		case GAMEPAD_MASK_DOWN | GAMEPAD_MASK_RIGHT: pcengineReport.hat = PCENGINE_HAT_DOWNRIGHT; break;
+		case GAMEPAD_MASK_DOWN:                      pcengineReport.hat = PCENGINE_HAT_DOWN;      break;
+		case GAMEPAD_MASK_DOWN | GAMEPAD_MASK_LEFT:  pcengineReport.hat = PCENGINE_HAT_DOWNLEFT;  break;
+		case GAMEPAD_MASK_LEFT:                      pcengineReport.hat = PCENGINE_HAT_LEFT;      break;
+		case GAMEPAD_MASK_UP | GAMEPAD_MASK_LEFT:    pcengineReport.hat = PCENGINE_HAT_UPLEFT;    break;
+		default:                                     pcengineReport.hat = PCENGINE_HAT_NOTHING;   break;
+	}
+
+	pcengineReport.buttons = 0x0
+		| (pressedB1() ? PCENGINE_MASK_1       : 0)
+		| (pressedB2() ? PCENGINE_MASK_2       : 0)
+		| (pressedS1() ? PCENGINE_MASK_SELECT  : 0)
+		| (pressedS2() ? PCENGINE_MASK_RUN     : 0)
+	;
+
+	return &pcengineReport;
+}
+
+NeogeoReport *Gamepad::getNeogeoReport()
+{
+
+	switch (state.dpad & GAMEPAD_MASK_DPAD)
+	{
+		case GAMEPAD_MASK_UP:                        neogeoReport.hat = NEOGEO_HAT_UP;        break;
+		case GAMEPAD_MASK_UP | GAMEPAD_MASK_RIGHT:   neogeoReport.hat = NEOGEO_HAT_UPRIGHT;   break;
+		case GAMEPAD_MASK_RIGHT:                     neogeoReport.hat = NEOGEO_HAT_RIGHT;     break;
+		case GAMEPAD_MASK_DOWN | GAMEPAD_MASK_RIGHT: neogeoReport.hat = NEOGEO_HAT_DOWNRIGHT; break;
+		case GAMEPAD_MASK_DOWN:                      neogeoReport.hat = NEOGEO_HAT_DOWN;      break;
+		case GAMEPAD_MASK_DOWN | GAMEPAD_MASK_LEFT:  neogeoReport.hat = NEOGEO_HAT_DOWNLEFT;  break;
+		case GAMEPAD_MASK_LEFT:                      neogeoReport.hat = NEOGEO_HAT_LEFT;      break;
+		case GAMEPAD_MASK_UP | GAMEPAD_MASK_LEFT:    neogeoReport.hat = NEOGEO_HAT_UPLEFT;    break;
+		default:                                     neogeoReport.hat = NEOGEO_HAT_NOTHING;   break;
+	}
+
+	neogeoReport.buttons = 0x0
+		| (pressedB3() ? NEOGEO_MASK_A       : 0)
+		| (pressedB1() ? NEOGEO_MASK_B       : 0)
+		| (pressedB4() ? NEOGEO_MASK_C       : 0)
+		| (pressedB2() ? NEOGEO_MASK_D       : 0)
+		| (pressedS1() ? NEOGEO_MASK_SELECT  : 0)
+		| (pressedS2() ? NEOGEO_MASK_START   : 0)
+	;
+
+	return &neogeoReport;
+}
+
+
+MDMiniReport *Gamepad::getMDMiniReport()
+{
+	mdminiReport.lx = 0x7f;
+	mdminiReport.ly = 0x7f;
+
+	if (pressedLeft()) { mdminiReport.lx = MDMINI_MASK_LEFT; }
+	if (pressedRight()) { mdminiReport.lx = MDMINI_MASK_RIGHT; }
+
+	if (pressedUp()) { mdminiReport.ly = MDMINI_MASK_UP; }
+	if (pressedDown()) { mdminiReport.ly = MDMINI_MASK_DOWN; }
+
+	mdminiReport.buttons = 0x0F
+		| (pressedB1()    ? MDMINI_MASK_A     : 0)
+		| (pressedB2()    ? MDMINI_MASK_B     : 0)
+		| (pressedB3()    ? MDMINI_MASK_X     : 0)
+		| (pressedB4()    ? MDMINI_MASK_Y     : 0)
+		| (pressedR1()    ? MDMINI_MASK_Z     : 0)
+		| (pressedR2()    ? MDMINI_MASK_C     : 0)
+		| (pressedS2()    ? MDMINI_MASK_START : 0)
+		| (pressedS1()    ? MDMINI_MASK_MODE  : 0)
+	;
+
+	return &mdminiReport;
+}
+
+AstroReport *Gamepad::getAstroReport()
+{
+	astroReport.lx = 0x7f;
+	astroReport.ly = 0x7f;
+
+	switch (state.dpad & GAMEPAD_MASK_DPAD)
+	{
+		case GAMEPAD_MASK_UP:                        astroReport.lx = ASTRO_JOYSTICK_MID; astroReport.ly = ASTRO_JOYSTICK_MIN; break;
+		case GAMEPAD_MASK_UP | GAMEPAD_MASK_RIGHT:   astroReport.lx = ASTRO_JOYSTICK_MAX; astroReport.ly = ASTRO_JOYSTICK_MIN; break;
+		case GAMEPAD_MASK_RIGHT:                     astroReport.lx = ASTRO_JOYSTICK_MAX; astroReport.ly = ASTRO_JOYSTICK_MID; break;
+		case GAMEPAD_MASK_DOWN | GAMEPAD_MASK_RIGHT: astroReport.lx = ASTRO_JOYSTICK_MAX; astroReport.ly = ASTRO_JOYSTICK_MAX; break;
+		case GAMEPAD_MASK_DOWN:                      astroReport.lx = ASTRO_JOYSTICK_MID; astroReport.ly = ASTRO_JOYSTICK_MAX; break;
+		case GAMEPAD_MASK_DOWN | GAMEPAD_MASK_LEFT:  astroReport.lx = ASTRO_JOYSTICK_MIN; astroReport.ly = ASTRO_JOYSTICK_MAX; break;
+		case GAMEPAD_MASK_LEFT:                      astroReport.lx = ASTRO_JOYSTICK_MIN; astroReport.ly = ASTRO_JOYSTICK_MID; break;
+		case GAMEPAD_MASK_UP | GAMEPAD_MASK_LEFT:    astroReport.lx = ASTRO_JOYSTICK_MIN; astroReport.ly = ASTRO_JOYSTICK_MIN; break;
+		default:                                     astroReport.lx = ASTRO_JOYSTICK_MID; astroReport.ly = ASTRO_JOYSTICK_MID; break;
+	}
+
+
+	astroReport.buttons = 0x0F
+		| (pressedB1() ? ASTRO_MASK_A       : 0)
+		| (pressedB2() ? ASTRO_MASK_B       : 0)
+		| (pressedB3() ? ASTRO_MASK_D       : 0)
+		| (pressedB4() ? ASTRO_MASK_E       : 0)
+		| (pressedR1() ? ASTRO_MASK_F       : 0)
+		| (pressedR2() ? ASTRO_MASK_C       : 0)
+		| (pressedS1() ? ASTRO_MASK_CREDIT  : 0)
+		| (pressedS2() ? ASTRO_MASK_START   : 0)
+	;
+
+	return &astroReport;
+}
+
+EgretReport *Gamepad::getEgretReport()
+{
+	switch (state.dpad & GAMEPAD_MASK_DPAD)
+	{
+		case GAMEPAD_MASK_UP:                        egretReport.lx = EGRET_JOYSTICK_MID; egretReport.ly = EGRET_JOYSTICK_MIN; break;
+		case GAMEPAD_MASK_UP | GAMEPAD_MASK_RIGHT:   egretReport.lx = EGRET_JOYSTICK_MAX; egretReport.ly = EGRET_JOYSTICK_MIN; break;
+		case GAMEPAD_MASK_RIGHT:                     egretReport.lx = EGRET_JOYSTICK_MAX; egretReport.ly = EGRET_JOYSTICK_MID; break;
+		case GAMEPAD_MASK_DOWN | GAMEPAD_MASK_RIGHT: egretReport.lx = EGRET_JOYSTICK_MAX; egretReport.ly = EGRET_JOYSTICK_MAX; break;
+		case GAMEPAD_MASK_DOWN:                      egretReport.lx = EGRET_JOYSTICK_MID; egretReport.ly = EGRET_JOYSTICK_MAX; break;
+		case GAMEPAD_MASK_DOWN | GAMEPAD_MASK_LEFT:  egretReport.lx = EGRET_JOYSTICK_MIN; egretReport.ly = EGRET_JOYSTICK_MAX; break;
+		case GAMEPAD_MASK_LEFT:                      egretReport.lx = EGRET_JOYSTICK_MIN; egretReport.ly = EGRET_JOYSTICK_MID; break;
+		case GAMEPAD_MASK_UP | GAMEPAD_MASK_LEFT:    egretReport.lx = EGRET_JOYSTICK_MIN; egretReport.ly = EGRET_JOYSTICK_MIN; break;
+		default:                                     egretReport.lx = EGRET_JOYSTICK_MID; egretReport.ly = EGRET_JOYSTICK_MID; break;
+	}
+
+
+	egretReport.buttons = 0
+		| (pressedB1() ? EGRET_MASK_A       : 0)
+		| (pressedB2() ? EGRET_MASK_B       : 0)
+		| (pressedB3() ? EGRET_MASK_D       : 0)
+		| (pressedB4() ? EGRET_MASK_E       : 0)
+		| (pressedR1() ? EGRET_MASK_F       : 0)
+		| (pressedR2() ? EGRET_MASK_C       : 0)
+		| (pressedS1() ? EGRET_MASK_CREDIT  : 0)
+		| (pressedS2() ? EGRET_MASK_START   : 0)
+		| (pressedA1() ? EGRET_MASK_MENU    : 0)
+	;
+
+	return &egretReport;
+}
+
+PSClassicReport *Gamepad::getPSClassicReport()
+{
+    psClassicReport.buttons = PSCLASSIC_MASK_CENTER;
+
+	switch (state.dpad & GAMEPAD_MASK_DPAD)
+	{
+		case GAMEPAD_MASK_UP:                        psClassicReport.buttons = PSCLASSIC_MASK_UP; break;
+		case GAMEPAD_MASK_UP | GAMEPAD_MASK_RIGHT:   psClassicReport.buttons = PSCLASSIC_MASK_UP_RIGHT; break;
+		case GAMEPAD_MASK_RIGHT:                     psClassicReport.buttons = PSCLASSIC_MASK_RIGHT; break;
+		case GAMEPAD_MASK_DOWN | GAMEPAD_MASK_RIGHT: psClassicReport.buttons = PSCLASSIC_MASK_DOWN_RIGHT; break;
+		case GAMEPAD_MASK_DOWN:                      psClassicReport.buttons = PSCLASSIC_MASK_DOWN; break;
+		case GAMEPAD_MASK_DOWN | GAMEPAD_MASK_LEFT:  psClassicReport.buttons = PSCLASSIC_MASK_DOWN_LEFT; break;
+		case GAMEPAD_MASK_LEFT:                      psClassicReport.buttons = PSCLASSIC_MASK_LEFT; break;
+		case GAMEPAD_MASK_UP | GAMEPAD_MASK_LEFT:    psClassicReport.buttons = PSCLASSIC_MASK_UP_LEFT; break;
+		default:                                     psClassicReport.buttons = PSCLASSIC_MASK_CENTER; break;
+	}
+
+	psClassicReport.buttons |=
+          (pressedS2()    ? PSCLASSIC_MASK_SELECT   : 0)
+		| (pressedS1()    ? PSCLASSIC_MASK_START    : 0)
+		| (pressedB1()    ? PSCLASSIC_MASK_CROSS    : 0)
+		| (pressedB2()    ? PSCLASSIC_MASK_CIRCLE   : 0)
+		| (pressedB3()    ? PSCLASSIC_MASK_SQUARE   : 0)
+		| (pressedB4()    ? PSCLASSIC_MASK_TRIANGLE : 0)
+		| (pressedL1()    ? PSCLASSIC_MASK_L1       : 0)
+		| (pressedR1()    ? PSCLASSIC_MASK_R1       : 0)
+		| (pressedL2()    ? PSCLASSIC_MASK_L2       : 0)
+		| (pressedR2()    ? PSCLASSIC_MASK_R2       : 0)
+	;
+
+	return &psClassicReport;
+}
+
+XboxOriginalReport *Gamepad::getXboxOriginalReport()
+{
+    // digital buttons
+	xboxOriginalReport.dButtons = 0
+		| (pressedUp()    ? XID_DUP    : 0)
+		| (pressedDown()  ? XID_DDOWN  : 0)
+		| (pressedLeft()  ? XID_DLEFT  : 0)
+		| (pressedRight() ? XID_DRIGHT : 0)
+		| (pressedS2()    ? XID_START  : 0)
+		| (pressedS1()    ? XID_BACK   : 0)
+		| (pressedL3()    ? XID_LS     : 0)
+		| (pressedR3()    ? XID_RS     : 0)
+	;
+
+    // analog buttons - convert to digital
+    xboxOriginalReport.A     = (pressedB1() ? 0xFF : 0);
+    xboxOriginalReport.B     = (pressedB2() ? 0xFF : 0);
+    xboxOriginalReport.X     = (pressedB3() ? 0xFF : 0);
+    xboxOriginalReport.Y     = (pressedB4() ? 0xFF : 0);
+    xboxOriginalReport.BLACK = (pressedL1() ? 0xFF : 0);
+    xboxOriginalReport.WHITE = (pressedR1() ? 0xFF : 0);
+
+    // analog triggers
+	if (hasAnalogTriggers)
+	{
+		xboxOriginalReport.L = pressedL2() ? 0xFF : state.lt;
+		xboxOriginalReport.R = pressedR2() ? 0xFF : state.rt;
+	}
+	else
+	{
+		xboxOriginalReport.L = pressedL2() ? 0xFF : 0;
+		xboxOriginalReport.R = pressedR2() ? 0xFF : 0;
+	}
+
+    // analog sticks
+	xboxOriginalReport.leftStickX = static_cast<int16_t>(state.lx) + INT16_MIN;
+	xboxOriginalReport.leftStickY = static_cast<int16_t>(~state.ly) + INT16_MIN;
+	xboxOriginalReport.rightStickX = static_cast<int16_t>(state.rx) + INT16_MIN;
+	xboxOriginalReport.rightStickY = static_cast<int16_t>(~state.ry) + INT16_MIN;
+
+    return &xboxOriginalReport;
 }

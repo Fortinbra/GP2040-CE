@@ -7,49 +7,37 @@ import * as yup from 'yup';
 
 import Section from '../Components/Section';
 
-import FormControl from '../Components/FormControl';
-
-export const psPassthroughScheme = {
-	PSPassthroughAddonEnabled: yup
+export const xbonePassthroughScheme = {
+	XBOnePassthroughAddonEnabled: yup
 		.number()
 		.required()
-		.label('PS Passthrough Add-On Enabled'),
-	psPassthroughPinDplus: yup
-		.number()
-		.label('PS Passthrough D+ Pin')
-		.validatePinWhenValue('PSPassthroughAddonEnabled'),
-	psPassthroughPin5V: yup
-		.number()
-		.label('PS Passthrough 5V Power Pin')
-		.validatePinWhenValue('PSPassthroughAddonEnabled'),
+		.label('Xbox One Passthrough Add-On Enabled')
 };
 
-export const psPassthroughState = {
-	PSPassthroughAddonEnabled: -1,
-	psPassthroughPinDplus: 0,
-	psPassthroughPin5V: -1,
+export const xbonePassthroughState = {
+	XBOnePassthroughAddonEnabled: -1
 };
 
-const PSPassthrough = ({ values, errors, handleChange, handleCheckbox }) => {
+const XBOnePassthrough = ({ values, errors, handleChange, handleCheckbox }) => {
 	const { t } = useTranslation();
     const { getAvailablePeripherals } = useContext(AppContext);
 	return (
-		<Section title={t('AddonsConfig:pspassthrough-header-text')}>
+		<Section title={t('AddonsConfig:xbonepassthrough-header-text')}>
 			<div
-				id="PSPassthroughAddonOptions"
-				hidden={!values.PSPassthroughAddonEnabled}
+				id="XBOnePassthroughAddonOptions"
+				hidden={!values.XBOnePassthroughAddonEnabled}
 			>
 			</div>
             {getAvailablePeripherals('usb') ?
 			<FormCheck
 				label={t('Common:switch-enabled')}
 				type="switch"
-				id="PSPassthroughAddonButton"
+				id="XBOnePassthroughAddonButton"
 				reverse
 				isInvalid={false}
-				checked={Boolean(values.PSPassthroughAddonEnabled)}
+				checked={Boolean(values.XBOnePassthroughAddonEnabled)}
 				onChange={(e) => {
-					handleCheckbox('PSPassthroughAddonEnabled', values);
+					handleCheckbox('XBOnePassthroughAddonEnabled', values);
 					handleChange(e);
 				}}
 			/>
@@ -60,4 +48,4 @@ const PSPassthrough = ({ values, errors, handleChange, handleCheckbox }) => {
 	);
 };
 
-export default PSPassthrough;
+export default XBOnePassthrough;

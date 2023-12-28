@@ -17,6 +17,8 @@
 #include "hid_driver.h"
 #include "xinput_driver.h"
 #include "ps4_driver.h"
+#include "xid_driver/xid_driver.h"
+#include "xbone_driver.h"
 
 UsbMode usb_mode = USB_MODE_HID;
 InputMode input_mode = INPUT_MODE_XINPUT;
@@ -60,6 +62,11 @@ bool send_report(void *report, uint16_t report_size)
 {
 	static uint8_t previous_report[CFG_TUD_ENDPOINT0_SIZE] = { };
 
+    uint8_t xIndex = 0;
+    if (input_mode == INPUT_MODE_XBOXORIGINAL) {
+        xIndex = xid_get_index_by_type(0, XID_TYPE_GAMECONTROLLER);
+    }
+
 	bool sent = false;
 
 	if (tud_suspended())
@@ -69,13 +76,18 @@ bool send_report(void *report, uint16_t report_size)
 	{
 		switch (input_mode)
 		{
+			case INPUT_MODE_XBOXORIGINAL:
+				sent = xid_send_report(xIndex, report, report_size);
+				break;
 			case INPUT_MODE_XINPUT:
 				sent = send_xinput_report(report, report_size);
+				break;
+			case INPUT_MODE_XBONE:
+				sent = send_xbone_report(report, report_size);
 				break;
 			case INPUT_MODE_KEYBOARD:
 				sent = send_keyboard_report(report);
 				break;
-
 			default:
 				sent = send_hid_report(0, report, report_size);
 				break;
@@ -84,8 +96,20 @@ bool send_report(void *report, uint16_t report_size)
 		if (sent)
 			memcpy(previous_report, report, report_size);
 	}
-	
+
 	return sent;
+}
+
+// Some input drivers need their own process/update logic
+void update_input_driver() {
+	switch (input_mode)
+	{
+		case INPUT_MODE_XBONE:
+			xbone_driver_update();
+			break;
+		default:
+			break;
+	};
 }
 
 /* USB Driver Callback (Required for XInput) */
@@ -108,6 +132,12 @@ const usbd_class_driver_t *usbd_app_driver_get_cb(uint8_t *driver_count)
 			case INPUT_MODE_PS4:
 				return &ps4_driver;
 
+			case INPUT_MODE_XBOXORIGINAL:
+				return xid_get_driver();
+
+			case INPUT_MODE_XBONE:
+				return &xbone_driver;
+
 			default:
 				return &hid_driver;
 		}
@@ -129,11 +159,41 @@ uint16_t tud_hid_get_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t
 	HIDReport hid_report;
 	KeyboardReport keyboard_report;
 	PS4Report ps4_report;
+	NeogeoReport neogeo_report;
+	MDMiniReport mdmini_report;
+	PCEngineReport pcengine_report;
+	EgretReport egret_report;
+	AstroReport astro_report;
+	PSClassicReport psclassic_report;
 	switch (input_mode)
 	{
 		case INPUT_MODE_SWITCH:
 			report_size = sizeof(SwitchReport);
 			memcpy(buffer, &switch_report, report_size);
+			break;
+		case INPUT_MODE_NEOGEO:
+			report_size = sizeof(NeogeoReport);
+			memcpy(buffer, &neogeo_report, report_size);
+			break;
+		case INPUT_MODE_MDMINI:
+			report_size = sizeof(MDMiniReport);
+			memcpy(buffer, &mdmini_report, report_size);
+			break;
+		case INPUT_MODE_PCEMINI:
+			report_size = sizeof(PCEngineReport);
+			memcpy(buffer, &pcengine_report, report_size);
+			break;
+		case INPUT_MODE_EGRET:
+			report_size = sizeof(EgretReport);
+			memcpy(buffer, &egret_report, report_size);
+			break;
+		case INPUT_MODE_ASTRO:
+			report_size = sizeof(AstroReport);
+			memcpy(buffer, &astro_report, report_size);
+			break;
+		case INPUT_MODE_PSCLASSIC:
+			report_size = sizeof(PSClassicReport);
+			memcpy(buffer, &psclassic_report, report_size);
 			break;
 		case INPUT_MODE_KEYBOARD:
 			report_size = report_id == KEYBOARD_KEY_REPORT_ID ? sizeof(KeyboardReport::keycode) : sizeof(KeyboardReport::multimedia);
@@ -170,6 +230,8 @@ void tud_hid_set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t rep
 				set_ps4_report(report_id, buffer, bufsize);
 			}
 			break;
+		default:
+			break;
 	}
 
 	// echo back anything we received from host
@@ -204,4 +266,23 @@ void tud_suspend_cb(bool remote_wakeup_en)
 void tud_resume_cb(void)
 {
 	usb_suspended = false;
+}
+
+// Vendor Controlled XFER occured
+bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage,
+                                tusb_control_request_t const *request)
+{
+	bool ret = false;
+	switch (input_mode)
+	{
+    case INPUT_MODE_XBOXORIGINAL:
+      ret |= xid_get_driver()->control_xfer_cb(rhport, stage, request);
+      break;
+		case INPUT_MODE_XBONE:
+			ret = xbone_vendor_control_xfer_cb(rhport, stage, request);
+			break;
+		default:
+			break;
+	}
+	return ret;
 }

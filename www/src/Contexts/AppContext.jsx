@@ -174,6 +174,7 @@ export const AppContextProvider = ({ children, ...props }) => {
 
 	const [usedPins, setUsedPins] = useState([]);
     const [availablePeripherals, setAvailablePeripherals] = useState(basePeripheralMapping);
+    const [availableAddons, setAvailableAddons] = useState({});
 
 	const updateUsedPins = async () => {
 		const data = await WebApi.getUsedPins(setLoading);
@@ -225,9 +226,25 @@ export const AppContextProvider = ({ children, ...props }) => {
     };
 
     useEffect(() => {
-        console.log(checkPeripherals);
-        //checkPeripherals
+
     }, [availablePeripherals, setAvailablePeripherals]);
+
+    useEffect(() => {
+		async function fetchData() {
+			const data = await WebApi.getAddonsOptions(setLoading);
+			setAvailableAddons(data);
+		}
+		fetchData();
+    }, []);
+
+    const updateAddons = async () => {
+        const data = await WebApi.getAddonsOptions(setLoading);
+        setAvailableAddons(data);
+    };
+
+    const getAvailableAddons = () => {
+        return availableAddons;
+    };
 
 	const [savedColorScheme, _setSavedColorScheme] = useState(
 		localStorage.getItem('savedColorScheme') || 'auto',
@@ -260,6 +277,8 @@ export const AppContextProvider = ({ children, ...props }) => {
 				usedPins,
                 availablePeripherals,
                 getAvailablePeripherals,
+                getAvailableAddons,
+                updateAddons,
                 getSelectedPeripheral,
 				setButtonLabels,
 				setGradientNormalColor1,
@@ -269,6 +288,7 @@ export const AppContextProvider = ({ children, ...props }) => {
 				setSavedColors,
 				setUsedPins,
                 setAvailablePeripherals,
+                updatePeripherals,
 				updateUsedPins,
 				savedColorScheme,
 				setSavedColorScheme,
