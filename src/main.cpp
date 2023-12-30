@@ -13,26 +13,31 @@
 #include <cstdlib>
 
 // Custom implementation of __gnu_cxx::__verbose_terminate_handler() to reduce binary size
-namespace __gnu_cxx {
-void __verbose_terminate_handler()
+namespace __gnu_cxx
 {
-	abort();
-}
+	void __verbose_terminate_handler()
+	{
+		abort();
+	}
 }
 
 // Launch our second core with additional modules loaded in
-void core1() {
+void core1()
+{
 	multicore_lockout_victim_init(); // block core 1
 
 	// Create GP2040 w/ Additional Modules for Core 1
-	GP2040Aux * gp2040Core1 = new GP2040Aux();
+	GP2040Aux *gp2040Core1 = new GP2040Aux();
 	gp2040Core1->setup();
 	gp2040Core1->run();
 }
 
-int main() {
+int main()
+{
+	stdio_init_all();
+	printf("Main\r\n");
 	// Create GP2040 Main Core (core0), Core1 is dependent on Core0
-	GP2040 * gp2040 = new GP2040();
+	GP2040 *gp2040 = new GP2040();
 	gp2040->setup();
 
 	// Create GP2040 Thread for Core1

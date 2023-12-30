@@ -6,13 +6,14 @@ bool HapticFeedback::available()
 {
 	// Implement the available() method
 	// For example, you might check if the DRV2605L device is connected and ready
-	return true;
+	return (true && PeripheralManager::getInstance().isI2CEnabled(0));
 }
 
 void HapticFeedback::setup()
 {
 	PeripheralI2C *i2c = PeripheralManager::getInstance().getI2C(0);
 	drv2605l = new DRV2605L(i2c, 0x5A);
+	printf("haptic setup\r\n");
 	drv2605l->begin();
 }
 

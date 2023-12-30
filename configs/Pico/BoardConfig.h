@@ -9,7 +9,6 @@
 #include "enums.pb.h"
 
 #define BOARD_CONFIG_LABEL "Pico"
-
 // Main pin mapping Configuration
 //                          // GP2040 | Xinput | Switch  | PS3/4/5  | Dinput | Arcade |
 #define PIN_DPAD_UP     2   // UP     | UP     | UP      | UP       | UP     | UP     |
@@ -53,5 +52,11 @@
 #define KEY_BUTTON_A1   HID_KEY_9             // A1     | Guide  | Home    | PS       | 13     | ~      |
 #define KEY_BUTTON_A2   HID_KEY_F2            // A2     | ~      | Capture | ~        | 14     | ~      |
 #define KEY_BUTTON_FN   -1                    // Hotkey Function                                        |
+
+#define HAS_I2C_DISPLAY 1
+#define I2C_SDA_PIN 16
+#define I2C_SCL_PIN 17
+#define I2C_BLOCK i2c0
+#define I2C_SPEED 400000
 
 #endif
