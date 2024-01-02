@@ -15,7 +15,7 @@
 #define PIN_DPAD_DOWN   3   // DOWN   | DOWN   | DOWN    | DOWN     | DOWN   | DOWN   | 
 #define PIN_DPAD_RIGHT  4   // RIGHT  | RIGHT  | RIGHT   | RIGHT    | RIGHT  | RIGHT  | 
 #define PIN_DPAD_LEFT   5   // LEFT   | LEFT   | LEFT    | LEFT     | LEFT   | LEFT   | 
-#define PIN_BUTTON_B1   6   // B1     | A      | B       | Cross    | 2      | K1     |
+#define PIN_BUTTON_B1   -1   // B1     | A      | B       | Cross    | 2      | K1     |
 #define PIN_BUTTON_B2   7   // B2     | B      | A       | Circle   | 3      | K2     |
 #define PIN_BUTTON_R2   8   // R2     | RT     | ZR      | R2       | 8      | K3     |
 #define PIN_BUTTON_L2   9   // L2     | LT     | ZL      | L2       | 7      | K4     |
@@ -23,8 +23,8 @@
 #define PIN_BUTTON_B4   11  // B4     | Y      | X       | Triangle | 4      | P2     |
 #define PIN_BUTTON_R1   12  // R1     | RB     | R       | R1       | 6      | P3     |
 #define PIN_BUTTON_L1   13  // L1     | LB     | L       | L1       | 5      | P4     |
-#define PIN_BUTTON_S1   16  // S1     | Back   | Minus   | Select   | 9      | Coin   |
-#define PIN_BUTTON_S2   17  // S2     | Start  | Plus    | Start    | 10     | Start  |
+#define PIN_BUTTON_S1   6  // S1     | Back   | Minus   | Select   | 9      | Coin   |
+#define PIN_BUTTON_S2   7  // S2     | Start  | Plus    | Start    | 10     | Start  |
 #define PIN_BUTTON_L3   18  // L3     | LS     | LS      | L3       | 11     | LS     |
 #define PIN_BUTTON_R3   19  // R3     | RS     | RS      | R3       | 12     | RS     |
 #define PIN_BUTTON_A1   20  // A1     | Guide  | Home    | PS       | 13     | ~      |
@@ -53,7 +53,7 @@
 #define KEY_BUTTON_A2   HID_KEY_F2            // A2     | ~      | Capture | ~        | 14     | ~      |
 #define KEY_BUTTON_FN   -1                    // Hotkey Function                                        |
 
-#define HAS_I2C_DISPLAY 1
+#define HAS_I2C_DISPLAY 0
 #define I2C_SDA_PIN 16
 #define I2C_SCL_PIN 17
 #define I2C_BLOCK i2c0

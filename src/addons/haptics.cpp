@@ -6,7 +6,8 @@ bool HapticFeedback::available()
 {
 	// Implement the available() method
 	// For example, you might check if the DRV2605L device is connected and ready
-	return (true && PeripheralManager::getInstance().isI2CEnabled(0));
+	const DisplayOptions &displayOptions = Storage::getInstance().getDisplayOptions();
+	return (!displayOptions.enabled && true && PeripheralManager::getInstance().isI2CEnabled(0));
 }
 
 void HapticFeedback::setup()
