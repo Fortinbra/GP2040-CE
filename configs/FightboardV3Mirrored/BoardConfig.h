@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: MIT
- * SPDX-FileCopyrightText: Copyright (c) 2021 Jason Skuby (mytechtoybox.com)
+ * SPDX-FileCopyrightText: Copyright (c) 2024 OpenStickCommunity (gp2040-ce.info)
  */
 
 #ifndef PICO_BOARD_CONFIG_H_
@@ -11,33 +11,32 @@
 #define BOARD_CONFIG_LABEL "Fightboard V3 Mirrored"
 
 // Main pin mapping Configuration
-//                          // GP2040 | Xinput | Switch  | PS3/4/5  | Dinput | Arcade |
-#define PIN_DPAD_UP     0   // UP     | UP     | UP      | UP       | UP     | UP     |
-#define PIN_DPAD_DOWN   2   // DOWN   | DOWN   | DOWN    | DOWN     | DOWN   | DOWN   | 
-#define PIN_DPAD_RIGHT  3   // RIGHT  | RIGHT  | RIGHT   | RIGHT    | RIGHT  | RIGHT  | 
-#define PIN_DPAD_LEFT   1   // LEFT   | LEFT   | LEFT    | LEFT     | LEFT   | LEFT   | 
-#define PIN_BUTTON_B1   9   // B1     | A      | B       | Cross    | 2      | K1     |
-#define PIN_BUTTON_B2   12  // B2     | B      | A       | Circle   | 3      | K2     |
-#define PIN_BUTTON_R2   13  // R2     | RT     | ZR      | R2       | 8      | K3     |
-#define PIN_BUTTON_L2   14  // L2     | LT     | ZL      | L2       | 7      | K4     |
-#define PIN_BUTTON_B3   15  // B3     | X      | Y       | Square   | 1      | P1     |
-#define PIN_BUTTON_B4   28  // B4     | Y      | X       | Triangle | 4      | P2     |
-#define PIN_BUTTON_R1   27  // R1     | RB     | R       | R1       | 6      | P3     |
-#define PIN_BUTTON_L1   26  // L1     | LB     | L       | L1       | 5      | P4     |
-#define PIN_BUTTON_S1   7   // S1     | Back   | Minus   | Select   | 9      | Coin   |
-#define PIN_BUTTON_S2   5   // S2     | Start  | Plus    | Start    | 10     | Start  |
-#define PIN_BUTTON_L3   8   // L3     | LS     | LS      | L3       | 11     | LS     |
-#define PIN_BUTTON_R3   4   // R3     | RS     | RS      | R3       | 12     | RS     |
-#define PIN_BUTTON_A1   6   // A1     | Guide  | Home    | PS       | 13     | ~      |
-#define PIN_BUTTON_A2   17  // A2     | ~      | Capture | ~        | 14     | ~      |
-#define PIN_BUTTON_FN   -1  // Hotkey Function                                        |
+//                                                  // GP2040 | Xinput | Switch  | PS3/4/5  | Dinput | Arcade |
+#define GPIO_PIN_00 GpioAction::BUTTON_PRESS_UP     // UP     | UP     | UP      | UP       | UP     | UP     |
+#define GPIO_PIN_02 GpioAction::BUTTON_PRESS_DOWN   // DOWN   | DOWN   | DOWN    | DOWN     | DOWN   | DOWN   |
+#define GPIO_PIN_03 GpioAction::BUTTON_PRESS_RIGHT  // RIGHT  | RIGHT  | RIGHT   | RIGHT    | RIGHT  | RIGHT  |
+#define GPIO_PIN_01 GpioAction::BUTTON_PRESS_LEFT   // LEFT   | LEFT   | LEFT    | LEFT     | LEFT   | LEFT   |
+#define GPIO_PIN_09 GpioAction::BUTTON_PRESS_B1     // B1     | A      | B       | Cross    | 2      | K1     |
+#define GPIO_PIN_12 GpioAction::BUTTON_PRESS_B2     // B2     | B      | A       | Circle   | 3      | K2     |
+#define GPIO_PIN_13 GpioAction::BUTTON_PRESS_R2     // R2     | RT     | ZR      | R2       | 8      | K3     |
+#define GPIO_PIN_14 GpioAction::BUTTON_PRESS_L2     // L2     | LT     | ZL      | L2       | 7      | K4     |
+#define GPIO_PIN_15 GpioAction::BUTTON_PRESS_B3     // B3     | X      | Y       | Square   | 1      | P1     |
+#define GPIO_PIN_28 GpioAction::BUTTON_PRESS_B4     // B4     | Y      | X       | Triangle | 4      | P2     |
+#define GPIO_PIN_27 GpioAction::BUTTON_PRESS_R1     // R1     | RB     | R       | R1       | 6      | P3     |
+#define GPIO_PIN_26 GpioAction::BUTTON_PRESS_L1     // L1     | LB     | L       | L1       | 5      | P4     |
+#define GPIO_PIN_07 GpioAction::BUTTON_PRESS_S1     // S1     | Back   | Minus   | Select   | 9      | Coin   |
+#define GPIO_PIN_05 GpioAction::BUTTON_PRESS_S2     // S2     | Start  | Plus    | Start    | 10     | Start  |
+#define GPIO_PIN_08 GpioAction::BUTTON_PRESS_L3     // L3     | LS     | LS      | L3       | 11     | LS     |
+#define GPIO_PIN_04 GpioAction::BUTTON_PRESS_R3     // R3     | RS     | RS      | R3       | 12     | RS     |
+#define GPIO_PIN_06 GpioAction::BUTTON_PRESS_A1     // A1     | Guide  | Home    | PS       | 13     | ~      |
+#define GPIO_PIN_17 GpioAction::BUTTON_PRESS_A2     // A2     | ~      | Capture | ~        | 14     | ~      |
 
 // Keyboard Mapping Configuration
 //                                            // GP2040 | Xinput | Switch  | PS3/4/5  | Dinput | Arcade |
 #define KEY_DPAD_UP     HID_KEY_ARROW_UP      // UP     | UP     | UP      | UP       | UP     | UP     |
-#define KEY_DPAD_DOWN   HID_KEY_ARROW_DOWN    // DOWN   | DOWN   | DOWN    | DOWN     | DOWN   | DOWN   | 
-#define KEY_DPAD_RIGHT  HID_KEY_ARROW_RIGHT   // RIGHT  | RIGHT  | RIGHT   | RIGHT    | RIGHT  | RIGHT  | 
-#define KEY_DPAD_LEFT   HID_KEY_ARROW_LEFT    // LEFT   | LEFT   | LEFT    | LEFT     | LEFT   | LEFT   | 
+#define KEY_DPAD_DOWN   HID_KEY_ARROW_DOWN    // DOWN   | DOWN   | DOWN    | DOWN     | DOWN   | DOWN   |
+#define KEY_DPAD_RIGHT  HID_KEY_ARROW_RIGHT   // RIGHT  | RIGHT  | RIGHT   | RIGHT    | RIGHT  | RIGHT  |
+#define KEY_DPAD_LEFT   HID_KEY_ARROW_LEFT    // LEFT   | LEFT   | LEFT    | LEFT     | LEFT   | LEFT   |
 #define KEY_BUTTON_B1   HID_KEY_SHIFT_LEFT    // B1     | A      | B       | Cross    | 2      | K1     |
 #define KEY_BUTTON_B2   HID_KEY_Z             // B2     | B      | A       | Circle   | 3      | K2     |
 #define KEY_BUTTON_R2   HID_KEY_X             // R2     | RT     | ZR      | R2       | 8      | K3     |
@@ -58,7 +57,6 @@
 
 #define LED_BRIGHTNESS_MAXIMUM 50
 #define LED_BRIGHTNESS_STEPS 5
-#define LED_FORMAT LED_FORMAT_GRB
 #define LEDS_PER_PIXEL 1
 #define LEDS_BASE_ANIMATION_INDEX 3
 #define LEDS_THEME_INDEX 19
@@ -82,13 +80,7 @@
 #define I2C_SDA_PIN 10
 #define I2C_SCL_PIN 11
 #define I2C_BLOCK i2c1
-#define I2C_SPEED 400000
-#define DISPLAY_FLIP 0
-#define DISPLAY_INVERT 0
 #define BUTTON_LAYOUT BUTTON_LAYOUT_FIGHTBOARD_MIRRORED
 #define BUTTON_LAYOUT_RIGHT BUTTON_LAYOUT_FIGHTBOARD_STICK_MIRRORED
-#define SPLASH_MODE SPLASH_MODE_NONE
-#define SPLASH_CHOICE SPLASH_CHOICE_MAIN
-#define SPLASH_DURATION 7500 
 
 #endif

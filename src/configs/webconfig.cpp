@@ -491,7 +491,7 @@ std::string getDisplayOptions() // Manually set Document Attributes for the disp
 	writeDoc(doc, "enabled", displayOptions.enabled ? 1 : 0);
 	writeDoc(doc, "i2cAddress", displayOptions.i2cAddress);
 	writeDoc(doc, "i2cBlock", displayOptions.i2cBlock);
-	writeDoc(doc, "flipDisplay", displayOptions.flip ? 1 : 0);
+	writeDoc(doc, "flipDisplay", displayOptions.flip);
 	writeDoc(doc, "invertDisplay", displayOptions.invert ? 1 : 0);
 	writeDoc(doc, "buttonLayout", displayOptions.buttonLayout);
 	writeDoc(doc, "buttonLayoutRight", displayOptions.buttonLayoutRight);
@@ -889,6 +889,10 @@ std::string setCustomTheme()
 	options.customThemeR3Pressed	= readDocDefaultToZero("R3", "d");
 	options.customThemeA1Pressed	= readDocDefaultToZero("A1", "d");
 	options.customThemeA2Pressed	= readDocDefaultToZero("A2", "d");
+	
+	uint32_t pressCooldown = 0;
+	readDoc(pressCooldown, doc, "customThemeCooldownTimeInMs");
+	options.customThemeCooldownTimeInMs = pressCooldown;
 
 	AnimationStation::SetOptions(options);
 	AnimationStore.save();
@@ -938,6 +942,7 @@ std::string getCustomTheme()
 	writeDoc(doc, "L3", "d", options.customThemeL3Pressed);
 	writeDoc(doc, "R3", "u", options.customThemeR3);
 	writeDoc(doc, "R3", "d", options.customThemeR3Pressed);
+	writeDoc(doc, "customThemeCooldownTimeInMs", options.customThemeCooldownTimeInMs);
 
 	return serialize_json(doc);
 }
@@ -1253,7 +1258,6 @@ std::string setAddonOptions()
 	docToValue(onBoardLedOptions.enabled, doc, "BoardLedAddonEnabled");
 
     TurboOptions& turboOptions = Storage::getInstance().getAddonOptions().turboOptions;
-	docToPin(turboOptions.buttonPin, doc, "turboPin");
 	docToPin(turboOptions.ledPin, doc, "turboPinLED");
 	docToValue(turboOptions.shotCount, doc, "turboShotCount");
 	docToValue(turboOptions.shmupModeEnabled, doc, "shmupMode");
@@ -1647,7 +1651,6 @@ std::string getAddonOptions()
 	writeDoc(doc, "BoardLedAddonEnabled", onBoardLedOptions.enabled);
 
     const TurboOptions& turboOptions = Storage::getInstance().getAddonOptions().turboOptions;
-	writeDoc(doc, "turboPin", cleanPin(turboOptions.buttonPin));
 	writeDoc(doc, "turboPinLED", cleanPin(turboOptions.ledPin));
 	writeDoc(doc, "turboShotCount", turboOptions.shotCount);
 	writeDoc(doc, "shmupMode", turboOptions.shmupModeEnabled);
