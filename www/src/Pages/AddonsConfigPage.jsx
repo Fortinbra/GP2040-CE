@@ -11,6 +11,7 @@ import { AppContext } from '../Contexts/AppContext';
 
 import WebApi from '../Services/WebApi';
 import Analog, { analogScheme, analogState } from '../Addons/Analog';
+import Analog1256, { analog1256Scheme, analog1256State } from '../Addons/Analog1256';
 import Bootsel, { bootselScheme, bootselState } from '../Addons/Bootsel';
 import Buzzer, { buzzerScheme, buzzerState } from '../Addons/Buzzer';
 import DualDirection, {
@@ -31,11 +32,6 @@ import Reverse, { reverseScheme, reverseState } from '../Addons/Reverse';
 import SOCD, { socdScheme, socdState } from '../Addons/SOCD';
 import Tilt, { tiltScheme, tiltState } from '../Addons/Tilt';
 import Turbo, { turboScheme, turboState } from '../Addons/Turbo';
-import Ps4, { ps4Scheme, ps4State } from '../Addons/Ps4';
-import PSPassthrough, {
-	psPassthroughScheme,
-	psPassthroughState,
-} from '../Addons/PSPassthrough';
 import Wii, { wiiScheme, wiiState } from '../Addons/Wii';
 import SNES, { snesState } from '../Addons/SNES';
 import FocusMode, {
@@ -44,13 +40,11 @@ import FocusMode, {
 } from '../Addons/FocusMode';
 import Keyboard, { keyboardScheme, keyboardState } from '../Addons/Keyboard';
 import InputHistory, { inputHistoryScheme, inputHistoryState } from '../Addons/InputHistory';
-import XBOnePassthrough, {
-	xbonePassthroughScheme,
-	xbonePassthroughState,
-} from '../Addons/XBOnePassthrough';
+import Rotary, { rotaryScheme, rotaryState } from '../Addons/Rotary';
 
 const schema = yup.object().shape({
 	...analogScheme,
+	...analog1256Scheme,
 	...bootselScheme,
 	...onBoardLedScheme,
 	...turboScheme,
@@ -62,17 +56,16 @@ const schema = yup.object().shape({
 	...buzzerScheme,
 	...playerNumberScheme,
 	...socdScheme,
-	...ps4Scheme,
-	...psPassthroughScheme,
-	...xbonePassthroughScheme,
 	...wiiScheme,
 	...focusModeScheme,
 	...keyboardScheme,
 	...inputHistoryScheme,
+	...rotaryScheme,
 });
 
 const defaultValues = {
 	...analogState,
+	...analog1256State,
 	...bootselState,
 	...onBoardLedState,
 	...turboState,
@@ -84,14 +77,12 @@ const defaultValues = {
 	...buzzerState,
 	...playerNumberState,
 	...socdState,
-	...ps4State,
-	...psPassthroughState,
-	...xbonePassthroughState,
 	...wiiState,
 	...snesState,
 	...focusModeState,
 	...keyboardState,
 	...inputHistoryState,
+	...rotaryState,
 };
 
 const ADDONS = [
@@ -102,19 +93,18 @@ const ADDONS = [
 	Joystick,
 	Reverse,
 	I2CAnalog1219,
+	Analog1256,
 	DualDirection,
 	Tilt,
 	Buzzer,
 	PlayerNumber,
 	SOCD,
-	Ps4,
-	PSPassthrough,
-	XBOnePassthrough,
 	Wii,
 	SNES,
 	FocusMode,
 	Keyboard,
-	InputHistory
+	InputHistory,
+    Rotary
 ];
 
 const FormContext = ({ setStoredData }) => {

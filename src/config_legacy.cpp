@@ -110,6 +110,9 @@ namespace ConfigLegacy
         BUTTON_LAYOUT_FIGHTBOARD_MIRRORED,
         BUTTON_LAYOUT_CUSTOMA,
         BUTTON_LAYOUT_OPENCORE0WASDA,
+        BUTTON_LAYOUT_STICKLESS_13,
+        BUTTON_LAYOUT_STICKLESS_16,
+        BUTTON_LAYOUT_STICKLESS_14,
     };
 
     enum ButtonLayoutRight
@@ -133,6 +136,9 @@ namespace ConfigLegacy
         BUTTON_LAYOUT_CUSTOMB,
         BUTTON_LAYOUT_KEYBOARD8B,
         BUTTON_LAYOUT_OPENCORE0WASDB,
+        BUTTON_LAYOUT_STICKLESS_13B,
+        BUTTON_LAYOUT_STICKLESS_16B,
+        BUTTON_LAYOUT_STICKLESS_14B,
     };
 
     enum SplashMode
@@ -481,6 +487,8 @@ static bool isValidInputMode(ConfigLegacy::InputMode inputMode)
         case INPUT_MODE_KEYBOARD:
         case INPUT_MODE_PS4:
             return true;
+        default:
+            break;
     }
     return false;
 }
@@ -551,6 +559,9 @@ static bool isValidButtonLayout(ConfigLegacy::ButtonLayout buttonLayout)
         case BUTTON_LAYOUT_FIGHTBOARD_MIRRORED:
         case BUTTON_LAYOUT_CUSTOMA:
         case BUTTON_LAYOUT_OPENCORE0WASDA:
+        case BUTTON_LAYOUT_STICKLESS_13:
+        case BUTTON_LAYOUT_STICKLESS_16:
+        case BUTTON_LAYOUT_STICKLESS_14:
             return true;
     }
     return false;
@@ -579,6 +590,9 @@ static bool isValidButtonLayoutRight(ConfigLegacy::ButtonLayoutRight buttonLayou
         case BUTTON_LAYOUT_CUSTOMB:
         case BUTTON_LAYOUT_KEYBOARD8B:
         case BUTTON_LAYOUT_OPENCORE0WASDB:
+        case BUTTON_LAYOUT_STICKLESS_13B:
+        case BUTTON_LAYOUT_STICKLESS_16B:        
+        case BUTTON_LAYOUT_STICKLESS_14B:
             return true;
     }
     return false;
@@ -973,7 +987,8 @@ bool ConfigUtils::fromLegacyStorage(Config& config)
         {
             SET_PROPERTY(dualDirectionalOptions, dpadMode, static_cast<DpadMode>(legacyAddonOptions.dualDirDpadMode));
         }
-        SET_PROPERTY(dualDirectionalOptions, combineMode, legacyAddonOptions.dualDirCombineMode);
+        SET_PROPERTY(dualDirectionalOptions, combineMode,
+                static_cast<DualDirectionalCombinationMode>(legacyAddonOptions.dualDirCombineMode));
 
         ExtraButtonOptions& extraButtonOptions = config.addonOptions.deprecatedExtraButtonOptions;
         config.addonOptions.has_deprecatedExtraButtonOptions = true;

@@ -5,7 +5,6 @@ import React, {
 	useMemo,
 	useState,
 } from 'react';
-import Select from 'react-select';
 import { NavLink } from 'react-router-dom';
 import { Alert, Button, Form, Tab, Tabs } from 'react-bootstrap';
 import { Trans, useTranslation } from 'react-i18next';
@@ -14,17 +13,19 @@ import omit from 'lodash/omit';
 import zip from 'lodash/zip';
 
 import { AppContext } from '../Contexts/AppContext';
-import Section from '../Components/Section';
 import usePinStore from '../Store/usePinStore';
+import useProfilesStore from '../Store/useProfilesStore';
 
+import Section from '../Components/Section';
+import CustomSelect from '../Components/CustomSelect';
 import CaptureButton from '../Components/CaptureButton';
+
 import { getButtonLabels } from '../Data/Buttons';
 import {
 	BUTTON_ACTIONS,
 	NON_SELECTABLE_BUTTON_ACTIONS,
 	PinActionValues,
 } from '../Data/Pins';
-import useProfilesStore from '../Store/useProfilesStore';
 
 type PinCell = [string, PinActionValues];
 type PinRow = [PinCell, PinCell];
@@ -34,7 +35,7 @@ const isNonSelectable = (value) =>
 	NON_SELECTABLE_BUTTON_ACTIONS.includes(value);
 
 const options = Object.entries(BUTTON_ACTIONS)
-	.filter(([_, value]) => !isNonSelectable(value))
+	.filter(([, value]) => !isNonSelectable(value))
 	.map(([key, value]) => ({
 		label: key,
 		value,
@@ -49,9 +50,10 @@ type PinsFormTypes = {
 	savePins: () => void;
 	pins: { [key: string]: PinActionValues };
 	setPinAction: (pin: string, action: PinActionValues) => void;
+	onCopy?: () => void;
 };
 
-const PinsForm = ({ savePins, pins, setPinAction }: PinsFormTypes) => {
+const PinsForm = ({ savePins, pins, setPinAction, onCopy }: PinsFormTypes) => {
 	const { buttonLabels, updateUsedPins } = useContext(AppContext);
 	const [saveMessage, setSaveMessage] = useState('');
 
@@ -86,9 +88,8 @@ const PinsForm = ({ savePins, pins, setPinAction }: PinsFormTypes) => {
 				<div className="d-flex align-items-center" style={{ width: '4rem' }}>
 					<label htmlFor={pin}>{pin.toUpperCase()}</label>
 				</div>
-				<Select
+				<CustomSelect
 					inputId={pin}
-					className="text-primary flex-grow-1"
 					isClearable
 					isSearchable
 					options={options}
@@ -98,7 +99,8 @@ const PinsForm = ({ savePins, pins, setPinAction }: PinsFormTypes) => {
 						const labelKey = option.label.split('BUTTON_PRESS_').pop();
 						// Need to fallback as some button actions are not part of button names
 						return (
-							buttonNames[labelKey] || t(`PinMapping:actions.${option.label}`)
+							(labelKey && buttonNames[labelKey]) ||
+							t(`PinMapping:actions.${option.label}`)
 						);
 					}}
 					onChange={(change) =>
@@ -115,20 +117,29 @@ const PinsForm = ({ savePins, pins, setPinAction }: PinsFormTypes) => {
 
 	return (
 		<Form onSubmit={handleSubmit}>
-			<div className="py-3">
-				<CaptureButton
-					labels={Object.values(buttonNames)}
-					onChange={(label, pin) =>
-						setPinAction(
-							// Convert getHeldPins format to setPinMappings format
-							parseInt(pin) < 10 ? `pin0${pin}` : `pin${pin}`,
-							// Maps current mode buttons to actions
-							BUTTON_ACTIONS[
-								`BUTTON_PRESS_${invert(buttonNames)[label].toUpperCase()}`
-							],
-						)
-					}
-				/>
+			<div className="d-flex">
+				<div className="py-3">
+					<CaptureButton
+						labels={Object.values(buttonNames)}
+						onChange={(label, pin) =>
+							setPinAction(
+								// Convert getHeldPins format to setPinMappings format
+								parseInt(pin) < 10 ? `pin0${pin}` : `pin${pin}`,
+								// Maps current mode buttons to actions
+								BUTTON_ACTIONS[
+									`BUTTON_PRESS_${invert(buttonNames)[label].toUpperCase()}`
+								],
+							)
+						}
+					/>
+				</div>
+				{onCopy && (
+					<div className="py-3 mx-3">
+						<Button variant="secondary" onClick={() => onCopy()}>
+							{t(`PinMapping:profile-copy-base`)}
+						</Button>
+					</div>
+				)}
 			</div>
 			<div className="gx-3">
 				{pinList.map(([cell1, cell2], i) => (
@@ -148,8 +159,13 @@ const PinsForm = ({ savePins, pins, setPinAction }: PinsFormTypes) => {
 
 export default function PinMappingPage() {
 	const { fetchPins, pins, savePins, setPinAction } = usePinStore();
-	const { fetchProfiles, profiles, saveProfiles, setProfileAction } =
-		useProfilesStore();
+	const {
+		fetchProfiles,
+		profiles,
+		saveProfiles,
+		setProfileAction,
+		setProfile,
+	} = useProfilesStore();
 
 	const [pressedPin, setPressedPin] = useState<number | null>(null);
 
@@ -212,6 +228,9 @@ export default function PinMappingPage() {
 								savePins={saveAll}
 								setPinAction={(pin, action) => {
 									setProfileAction(profileIndex, pin, action);
+								}}
+								onCopy={() => {
+									setProfile(profileIndex, pins);
 								}}
 							/>
 						</Tab>

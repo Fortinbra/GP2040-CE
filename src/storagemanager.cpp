@@ -15,39 +15,16 @@
 #include "CRC32.h"
 #include "types.h"
 
-#include "addons/analog.h"
-#include "addons/board_led.h"
-#include "addons/bootsel_button.h"
-#include "addons/buzzerspeaker.h"
-#include "addons/dualdirectional.h"
-#include "addons/i2canalog1219.h"
-#include "addons/i2cdisplay.h"
-#include "addons/jslider.h"
-#include "addons/neopicoleds.h"
-#include "addons/playernum.h"
-#include "addons/ps4mode.h"
-#include "addons/pleds.h"
-#include "addons/reverse.h"
-#include "addons/turbo.h"
-#include "addons/slider_socd.h"
-#include "addons/wiiext.h"
-#include "addons/input_macro.h"
-#include "addons/snes_input.h"
-#include "addons/tilt.h"
-
 #include "config_utils.h"
 
 #include "bitmaps.h"
 
 #include "helper.h"
 
-Storage::Storage()
-{
+void Storage::init() {
 	EEPROM.start();
 	critical_section_init(&animationOptionsCs);
 	ConfigUtils::load(config);
-
-	setFunctionalPinMappings();
 }
 
 bool Storage::save()
@@ -103,7 +80,7 @@ static void updateAnimationOptionsProto(const AnimationOptions& options)
 	optionsProto.customThemeA2Pressed		= options.customThemeA2Pressed;
 	optionsProto.customThemeL3Pressed		= options.customThemeL3Pressed;
 	optionsProto.customThemeR3Pressed		= options.customThemeR3Pressed;
-	optionsProto.customThemeCooldownTimeInMs = options.customThemeCooldownTimeInMs;	
+	optionsProto.buttonPressColorCooldownTimeInMs = options.buttonPressColorCooldownTimeInMs;	
 }
 
 void Storage::performEnqueuedSaves()
@@ -262,7 +239,7 @@ AnimationOptions AnimationStorage::getAnimationOptions()
 	options.customThemeA2Pressed	= optionsProto.customThemeA2Pressed;
 	options.customThemeL3Pressed	= optionsProto.customThemeL3Pressed;
 	options.customThemeR3Pressed	= optionsProto.customThemeR3Pressed;
-	options.customThemeCooldownTimeInMs = optionsProto.customThemeCooldownTimeInMs;		
+	options.buttonPressColorCooldownTimeInMs = optionsProto.buttonPressColorCooldownTimeInMs;		
 
 	return options;
 }

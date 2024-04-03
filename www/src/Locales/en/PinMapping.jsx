@@ -8,6 +8,7 @@ export default {
 	'pin-header-label': 'Pin',
 	'profile-pins-warning':
 		'Try to avoid changing the buttons and/or directions used for the switch profile hotkeys. Otherwise, it will be difficult to understand what profile is being selected!',
+	'profile-copy-base': 'Copy base profile',
 	errors: {
 		conflict: 'Pin {{pin}} is already assigned to {{conflictedMappings}}',
 		required: '{{button}} is required',
@@ -51,5 +52,12 @@ export default {
 		SUSTAIN_SOCD_MODE_FIRST_WIN: 'First Win SOCD Cleaning',
 		SUSTAIN_SOCD_MODE_BYPASS: 'SOCD Cleaning Off',
 		BUTTON_PRESS_TURBO: 'Turbo',
+		BUTTON_PRESS_MACRO: 'Macro Button',
+		BUTTON_PRESS_MACRO_1: 'Macro 1',
+		BUTTON_PRESS_MACRO_2: 'Macro 2',
+		BUTTON_PRESS_MACRO_3: 'Macro 3',
+		BUTTON_PRESS_MACRO_4: 'Macro 4',
+		BUTTON_PRESS_MACRO_5: 'Macro 5',
+		BUTTON_PRESS_MACRO_6: 'Macro 6',
 	},
 };
