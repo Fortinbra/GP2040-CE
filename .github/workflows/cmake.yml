@@ -11,6 +11,7 @@ on:
 
 env:
   BUILD_TYPE: Release
+  IS_ACTION: TRUE
 
 jobs:
   call-node-workflow:

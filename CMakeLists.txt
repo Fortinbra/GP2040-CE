@@ -1,3 +1,5 @@
+set(IS_ACTION $ENV{IS_ACTION})
+if(NOT IS_ACTION)
 # == DO NEVER EDIT THE NEXT LINES for Raspberry Pi Pico VS Code Extension to work ==
 if(WIN32)
    set(USERHOME $ENV{USERPROFILE})
@@ -21,11 +23,10 @@ if(PICO_TOOLCHAIN_PATH MATCHES "RISCV")
     endif()
 endif()
 # ====================================================================================
+endif()
+
 cmake_minimum_required(VERSION 3.13)
 include(CMakePrintHelpers)
-
-
-
 
 # initialize the SDK based on PICO_SDK_PATH
 # note: this must happen before project()
