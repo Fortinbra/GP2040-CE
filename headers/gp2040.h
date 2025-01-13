@@ -15,12 +15,13 @@
 
 #include "pico/types.h"
 
-class GP2040 {
+class GP2040
+{
 public:
-    GP2040(){}
-    ~GP2040(){}
-    void setup();           // setup core0
-    void run();             // loop core0
+    GP2040() {}
+    ~GP2040() {}
+    void setup(); // setup core0
+    void run();   // loop core0
 private:
     Gamepad snapshot;
     AddonManager addons;
@@ -29,9 +30,10 @@ private:
     Mask_t buttonGpios;
     uint32_t gpioDebounceTime[NUM_BANK0_GPIOS];
 
-    struct RebootHotkeys {
+    struct RebootHotkeys
+    {
         RebootHotkeys();
-        void process(Gamepad* gamepad, bool configMode);
+        void process(Gamepad *gamepad, bool configMode);
 
         bool active;
 
@@ -42,7 +44,8 @@ private:
     };
     RebootHotkeys rebootHotkeys;
 
-    enum class BootAction {
+    enum class BootAction
+    {
         NONE,
         ENTER_WEBCONFIG_MODE,
         ENTER_USB_MODE,
@@ -60,10 +63,11 @@ private:
         SET_INPUT_MODE_EGRET,
         SET_INPUT_MODE_ASTRO,
         SET_INPUT_MODE_PSCLASSIC,
-        SET_INPUT_MODE_XBOXORIGINAL
+        SET_INPUT_MODE_XBOXORIGINAL,
+        SET_INPUT_MODE_BLUETOOTH_HID
     };
     BootAction getBootAction();
-    void getReinitGamepad(Gamepad * gamepad);
+    void getReinitGamepad(Gamepad *gamepad);
 
     // GPIO manipulation for setup and profile reinit
     void initializeStandardGpio();
