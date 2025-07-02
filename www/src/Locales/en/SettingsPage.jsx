@@ -23,10 +23,15 @@ export default {
 		psclassic: 'Playstation Classic',
 		xboxoriginal: 'Original Xbox',
 		xbone: 'Xbox One',
+		'bt-ps4': 'Bluetooth PS4',
+		'bt-ps5': 'Bluetooth PS5',
+		'bt-switch': 'Bluetooth Nintendo Switch',
+		'bt-xinput': 'Bluetooth Xbox',
 	},
 	'input-mode-group': {
 		primary: 'Primary Input Modes',
 		mini: 'Mini/Classic Console Modes',
+		bluetooth: 'Bluetooth Wireless Modes',
 	},
 	'boot-input-mode-label': 'Boot Input Modes',
 	'ps4-mode-options': {

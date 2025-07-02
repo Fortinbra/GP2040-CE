@@ -296,6 +296,20 @@ pico_mbedtls
 nanopb
 )
 
+# Conditional compilation for Bluetooth support
+if(GP2040_BOARDCONFIG STREQUAL "PicoWBluetooth")
+    target_compile_definitions(${PROJECT_NAME} PRIVATE BLUETOOTH_ENABLED=1)
+    target_sources(${PROJECT_NAME} PRIVATE
+        src/bluetooth/BluetoothDriver.cpp
+        src/bluetooth/BluetoothPS4Driver.cpp
+    )
+    target_link_libraries(${PROJECT_NAME} 
+        pico_btstack_ble
+        pico_btstack_classic
+        pico_cyw43_arch_none
+    )
+endif()
+
 target_include_directories(${PROJECT_NAME} PUBLIC
 headers
 headers/addons

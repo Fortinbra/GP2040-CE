@@ -16,6 +16,11 @@
 #include "drivers/xboxog/XboxOriginalDriver.h"
 #include "drivers/xinput/XInputDriver.h"
 
+// Bluetooth drivers (conditional)
+#ifdef BLUETOOTH_ENABLED
+#include "bluetooth/BluetoothPS4Driver.h"
+#endif
+
 #include "usbhostmanager.h"
 
 void DriverManager::setup(InputMode mode) {
@@ -68,6 +73,14 @@ void DriverManager::setup(InputMode mode) {
         case INPUT_MODE_XINPUT:
             driver = new XInputDriver();
             break;
+#ifdef BLUETOOTH_ENABLED
+        case INPUT_MODE_BT_PS4:
+            driver = new BluetoothPS4Driver();
+            break;
+        case INPUT_MODE_BT_PS5:
+            driver = new BluetoothPS4Driver(); // Same driver, different descriptor
+            break;
+#endif
         default:
             return;
     }

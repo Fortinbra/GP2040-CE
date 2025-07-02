@@ -166,6 +166,11 @@ const INPUT_MODES = [
 	{ labelKey: 'input-mode-options.astro', value: 10, group: 'mini' },
 	{ labelKey: 'input-mode-options.psclassic', value: 11, group: 'mini' },
 	{ labelKey: 'input-mode-options.xboxoriginal', value: 12, group: 'primary' },
+	// Bluetooth modes
+	{ labelKey: 'input-mode-options.bt-ps4', value: 15, group: 'bluetooth' },
+	{ labelKey: 'input-mode-options.bt-ps5', value: 16, group: 'bluetooth' },
+	{ labelKey: 'input-mode-options.bt-switch', value: 17, group: 'bluetooth' },
+	{ labelKey: 'input-mode-options.bt-xinput', value: 18, group: 'bluetooth' },
 ];
 
 const INPUT_BOOT_MODES = [
@@ -209,6 +214,7 @@ const INPUT_BOOT_MODES = [
 const INPUT_MODE_GROUPS = [
 	{ labelKey: 'input-mode-group.primary', value: 0, group: 'primary' },
 	{ labelKey: 'input-mode-group.mini', value: 1, group: 'mini' },
+	{ labelKey: 'input-mode-group.bluetooth', value: 2, group: 'bluetooth' },
 ];
 
 const DPAD_MODES = [
