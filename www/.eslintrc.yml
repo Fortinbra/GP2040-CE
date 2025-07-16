@@ -19,6 +19,10 @@ settings:
 plugins:
   - react-refresh
   - i18next
+globals:
+  __PICO_BOARD__: readonly
+  __GP2040_BOARDCONFIG__: readonly
+  __BUILD_BLUETOOTH_ENABLED__: readonly
 rules:
   react-refresh/only-export-components: warn
   react/prop-types: off

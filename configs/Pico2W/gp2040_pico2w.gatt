@@ -1,0 +1,20 @@
+// GATT database for GP2040-CE Pico2W Bluetooth HID gamepad functionality
+// This file defines the GATT services and characteristics using BTStack format
+
+// GAP Service - Generic Access Profile
+PRIMARY_SERVICE, GAP_SERVICE
+CHARACTERISTIC, GAP_DEVICE_NAME, READ, "GP2040-CE Pico2 Gamepad"
+CHARACTERISTIC, GAP_APPEARANCE, READ, 03C4  // HID Gamepad appearance
+
+// GATT Service - Generic Attribute Profile  
+PRIMARY_SERVICE, GATT_SERVICE
+CHARACTERISTIC, GATT_DATABASE_HASH, READ,
+
+// Battery Service
+#import <battery_service.gatt>
+
+// Device Information Service
+#import <device_information_service.gatt>
+
+// HID Service for gamepad functionality
+#import <hids.gatt>

@@ -105,7 +105,9 @@ else()
       if(NOT NPM_CI_RESULT EQUAL "0")
         message(FATAL_ERROR "npm ci failed with ${NPM_CI_RESULT}")
       endif()
-      execute_process(COMMAND ${NPM_EXECUTABLE} run build
+      
+      message(STATUS "Building web component for PICO_BOARD=${PICO_BOARD}, GP2040_BOARDCONFIG=${GP2040_BOARDCONFIG}")
+      execute_process(COMMAND ${CMAKE_COMMAND} -E env "VITE_PICO_BOARD=${PICO_BOARD}" "VITE_GP2040_BOARDCONFIG=${GP2040_BOARDCONFIG}" ${NPM_EXECUTABLE} run build
                       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/www
                       RESULT_VARIABLE NPM_BUILD_RESULT)
       if(NOT NPM_BUILD_RESULT EQUAL "0")
@@ -302,11 +304,15 @@ nanopb
 # This section conditionally includes additional libraries based on the PICO_BOARD setting.
 # Currently supported: 
 #   - pico_w: Adds CYW43 and Bluetooth libraries for Pico W
+#   - pico2_w: Adds CYW43 and Bluetooth libraries for Pico 2 W
 #   - pico: Standard Pico (default, no additional libraries)
+#   - pico2: Standard Pico 2 (no additional libraries)
 # 
 # Example usage:
 #   set PICO_BOARD=pico_w        (Windows)
+#   set PICO_BOARD=pico2_w       (Windows)
 #   export PICO_BOARD=pico_w     (Linux/Mac)
+#   export PICO_BOARD=pico2_w    (Linux/Mac)
 #   cmake --build build
 # ====================================================================================
 
@@ -335,6 +341,30 @@ if(PICO_BOARD STREQUAL "pico_w")
         )
         message(STATUS "Generated GATT header for PicoW Bluetooth")
     endif()
+elseif(PICO_BOARD STREQUAL "pico2_w")
+    message(STATUS "Pico 2 W board detected - adding CYW43 and Bluetooth libraries")
+    target_link_libraries(${PROJECT_NAME}
+        pico_cyw43_arch_none
+        pico_btstack_ble
+        pico_btstack_cyw43
+    )
+    target_compile_definitions(${PROJECT_NAME} PUBLIC
+        PICO2_W_ENABLED=1
+        CYW43_ENABLE_BLUETOOTH=1
+    )
+    
+    # Add BTStack configuration include directory
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${CMAKE_SOURCE_DIR}/configs/Pico2W
+    )
+    
+    # Generate GATT header for Pico2W configuration
+    if(GP2040_BOARDCONFIG STREQUAL "Pico2W")
+        pico_btstack_make_gatt_header(${PROJECT_NAME} PRIVATE
+            ${CMAKE_SOURCE_DIR}/configs/Pico2W/gp2040_pico2w.gatt
+        )
+        message(STATUS "Generated GATT header for Pico2W Bluetooth")
+    endif()
 else()
     message(STATUS "Standard Pico board (${PICO_BOARD}) detected - using base libraries")
 endif()
@@ -347,6 +377,9 @@ message(STATUS "Building for GP2040_BOARDCONFIG: ${GP2040_BOARDCONFIG}")
 if(GP2040_BOARDCONFIG STREQUAL "PicoW" AND PICO_BOARD STREQUAL "pico_w")
     message(STATUS "Including PicoW configuration with GATT support")
     add_subdirectory(configs/PicoW)
+elseif(GP2040_BOARDCONFIG STREQUAL "Pico2W" AND PICO_BOARD STREQUAL "pico2_w")
+    message(STATUS "Including Pico2W configuration with GATT support")
+    add_subdirectory(configs/Pico2W)
 endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC
