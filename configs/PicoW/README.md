@@ -1,8 +1,40 @@
-# GP2040 Configuration for Raspberry Pi Pico
+# GP2040 Configuration for Raspberry Pi Pico W with Bluetooth
 
 ![Pin Mapping](assets/PinMapping.png)
 
-Basic pin setup for a stock Raspberry Pi Pico. Combine with a simple GPIO breakout/screw terminal board for an easy DIY arcade stick.
+Configuration for Raspberry Pi Pico W with integrated WiFi/Bluetooth chip (CYW43). This configuration includes Bluetooth GATT support for wireless connectivity.
+
+## Features
+
+- **Bluetooth HID Support**: Connect wirelessly to devices supporting Bluetooth HID
+- **GATT Services**: Custom GATT profile for gamepad functionality
+- **Battery Level Reporting**: Bluetooth battery level indication
+- **Device Information**: Standard device information over Bluetooth
+- **Standard GPIO Layout**: Same pin mapping as standard Pico for compatibility
+
+## Bluetooth Configuration
+
+When built with `PICO_BOARD=pico_w`, this configuration automatically includes:
+- CYW43 wireless chip drivers
+- BTStack Bluetooth Low Energy support
+- Custom GATT database for gamepad services
+- Bluetooth device pairing support
+
+## Build Instructions
+
+To build with Bluetooth support:
+
+```bash
+# Set environment variables
+export PICO_BOARD=pico_w
+export GP2040_BOARDCONFIG=PicoW
+
+# Configure and build
+cmake -B build
+cmake --build build
+```
+
+Or using VS Code tasks with the pre-configured environment.
 
 ## Main Pin Mapping Configuration
 
@@ -26,3 +58,16 @@ Basic pin setup for a stock Raspberry Pi Pico. Combine with a simple GPIO breako
 | GPIO_PIN_19| GpioAction::BUTTON_PRESS_R3   | R3     | RS     | RS      | R3      | 12     | RS     |
 | GPIO_PIN_20| GpioAction::BUTTON_PRESS_A1   | A1     | Guide  | Home    | PS      | 13     | ~      |
 | GPIO_PIN_21| GpioAction::BUTTON_PRESS_A2   | A2     | ~      | Capture | ~       | 14     | ~      |
+
+## Reserved Pins - DO NOT USE
+
+**IMPORTANT**: The following GPIO pins are reserved for the CYW43 wireless chipset and MUST NOT be used for buttons or other GPIO functions:
+
+| GPIO Pin | Function | Description |
+|----------|----------|-------------|
+| **GPIO 23** | WL_GPIO0 | CYW43 WiFi/Bluetooth communication |
+| **GPIO 24** | WL_GPIO1 | CYW43 WiFi/Bluetooth communication |
+| **GPIO 25** | WL_GPIO2 | CYW43 WiFi/Bluetooth communication |
+| **GPIO 29** | VSYS_MONITOR | System voltage monitoring |
+
+These pins are internally connected to the CYW43 wireless module and using them for other purposes will interfere with Bluetooth and WiFi functionality.

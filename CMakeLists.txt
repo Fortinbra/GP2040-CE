@@ -296,6 +296,59 @@ pico_mbedtls
 nanopb
 )
 
+# ====================================================================================
+# Board-Specific Library Configuration
+# ====================================================================================
+# This section conditionally includes additional libraries based on the PICO_BOARD setting.
+# Currently supported: 
+#   - pico_w: Adds CYW43 and Bluetooth libraries for Pico W
+#   - pico: Standard Pico (default, no additional libraries)
+# 
+# Example usage:
+#   set PICO_BOARD=pico_w        (Windows)
+#   export PICO_BOARD=pico_w     (Linux/Mac)
+#   cmake --build build
+# ====================================================================================
+
+# Conditionally link board-specific libraries based on PICO_BOARD
+if(PICO_BOARD STREQUAL "pico_w")
+    message(STATUS "Pico W board detected - adding CYW43 and Bluetooth libraries")
+    target_link_libraries(${PROJECT_NAME}
+        pico_cyw43_arch_none
+        pico_btstack_ble
+        pico_btstack_cyw43
+    )
+    target_compile_definitions(${PROJECT_NAME} PUBLIC
+        PICO_W_ENABLED=1
+        CYW43_ENABLE_BLUETOOTH=1
+    )
+    
+    # Add BTStack configuration include directory
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${CMAKE_SOURCE_DIR}/configs/PicoW
+    )
+    
+    # Generate GATT header for PicoW configuration
+    if(GP2040_BOARDCONFIG STREQUAL "PicoW")
+        pico_btstack_make_gatt_header(${PROJECT_NAME} PRIVATE
+            ${CMAKE_SOURCE_DIR}/configs/PicoW/gp2040_picow.gatt
+        )
+        message(STATUS "Generated GATT header for PicoW Bluetooth")
+    endif()
+else()
+    message(STATUS "Standard Pico board (${PICO_BOARD}) detected - using base libraries")
+endif()
+
+# Print the board configuration for debugging
+message(STATUS "Building for PICO_BOARD: ${PICO_BOARD}")
+message(STATUS "Building for GP2040_BOARDCONFIG: ${GP2040_BOARDCONFIG}")
+
+# Include board-specific configurations
+if(GP2040_BOARDCONFIG STREQUAL "PicoW" AND PICO_BOARD STREQUAL "pico_w")
+    message(STATUS "Including PicoW configuration with GATT support")
+    add_subdirectory(configs/PicoW)
+endif()
+
 target_include_directories(${PROJECT_NAME} PUBLIC
 headers
 headers/addons

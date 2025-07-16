@@ -11,6 +11,28 @@
 
 #define BOARD_CONFIG_LABEL "Pico-W"
 
+// Pico W Bluetooth Configuration
+#define BLUETOOTH_ENABLED               1
+#define BLUETOOTH_HID_ENABLED           1
+#define BLUETOOTH_DEVICE_NAME          "GP2040-CE Pico W"
+#define BLUETOOTH_APPEARANCE           HID_APPEARANCE_GAMEPAD
+
+// Bluetooth PIN (if needed for pairing)
+#define BLUETOOTH_PIN                  "0000"
+
+// ============================================================================
+// RESERVED PINS - DO NOT USE FOR GPIO
+// ============================================================================
+// The following pins are reserved for the CYW43 wireless chipset:
+// - GPIO 23 (WL_GPIO0): CYW43 WiFi/Bluetooth communication
+// - GPIO 24 (WL_GPIO1): CYW43 WiFi/Bluetooth communication  
+// - GPIO 25 (WL_GPIO2): CYW43 WiFi/Bluetooth communication
+// - GPIO 29 (VSYS_MONITOR): System voltage monitoring
+// 
+// DO NOT define GPIO_PIN_23, GPIO_PIN_24, GPIO_PIN_25, or GPIO_PIN_29
+// Using these pins will interfere with Bluetooth and WiFi functionality
+// ============================================================================
+
 // Main pin mapping Configuration
 //                                                  // GP2040 | Xinput | Switch  | PS3/4/5  | Dinput | Arcade |
 #define GPIO_PIN_02 GpioAction::BUTTON_PRESS_UP     // UP     | UP     | UP      | UP       | UP     | UP     |
