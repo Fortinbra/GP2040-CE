@@ -203,6 +203,8 @@ src/drivers/xboxog/XboxOriginalDriver.cpp
 src/drivers/xinput/XInputAuth.cpp
 src/drivers/xinput/XInputAuthUSBListener.cpp
 src/drivers/xinput/XInputDriver.cpp
+src/drivers/xinput/XInputProtocolDriver.cpp
+src/interfaces/gpiotransport.cpp
 src/interfaces/i2c/i2cdevicebase.cpp
 src/interfaces/i2c/pcf8575/pcf8575.cpp
 src/interfaces/i2c/ssd1306/obd_ssd1306.cpp
@@ -226,6 +228,7 @@ src/display/ui/screens/DisplaySaverScreen.cpp
 src/display/GPGFX.cpp
 src/display/GPGFX_UI.cpp
 src/drivermanager.cpp
+src/drivermanager_v2.cpp
 src/eventmanager.cpp
 src/layoutmanager.cpp
 src/peripheralmanager.cpp
