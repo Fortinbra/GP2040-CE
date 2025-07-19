@@ -127,11 +127,7 @@ bool initializeDriverSystem(InputMode mode) {
     
     // Check if the mode supports new architecture
     if (useNewArch) {
-        DriverManagerV2& manager = DriverManagerV2::getInstance();
-        // Use supportsNewArchitecture to check if this mode is available
-        // For now, create a temporary instance to check
-        auto tempManager = DriverManagerV2::getInstance();
-        // We need to expose supportsNewArchitecture as public or add a public method
+        // Check if this mode supports the new architecture
         // For now, we'll assume XInput supports new architecture
         if (mode != INPUT_MODE_XINPUT) {
             useNewArch = false; // Fall back to legacy for unsupported modes

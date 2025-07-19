@@ -3,61 +3,96 @@
 
 # Add interface headers
 target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_CURRENT_LIST_DIR}/headers/interfaces
+    ${CMAKE_CURRENT_LIST_DIR}/../headers/interfaces
 )
 
-# Transport implementations
-set(TRANSPORT_SOURCES
-    ${CMAKE_CURRENT_LIST_DIR}/src/interfaces/usbtransport.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/src/interfaces/bluetoothtransport.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/src/interfaces/gpiotransport.cpp
+# Core transport implementations (always included)
+set(CORE_TRANSPORT_SOURCES
+    ${CMAKE_CURRENT_LIST_DIR}/../src/interfaces/gpiotransport.cpp
+)
+
+# USB transport (mutually exclusive with legacy USB driver)
+set(USB_TRANSPORT_SOURCES
+    ${CMAKE_CURRENT_LIST_DIR}/../src/interfaces/usbtransport.cpp
+)
+
+# Optional Bluetooth transport (only if enabled)
+set(BLUETOOTH_TRANSPORT_SOURCES
+    ${CMAKE_CURRENT_LIST_DIR}/../src/interfaces/bluetoothtransport.cpp
 )
 
 # Protocol driver implementations
 set(PROTOCOL_SOURCES
-    ${CMAKE_CURRENT_LIST_DIR}/src/drivers/xinput/XInputProtocolDriver.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/drivers/xinput/XInputProtocolDriver.cpp
     # Add other protocol drivers here as they are implemented
-    # ${CMAKE_CURRENT_LIST_DIR}/src/drivers/ps4/PS4ProtocolDriver.cpp
-    # ${CMAKE_CURRENT_LIST_DIR}/src/drivers/snes/SNESProtocolDriver.cpp
+    # ${CMAKE_CURRENT_LIST_DIR}/../src/drivers/ps4/PS4ProtocolDriver.cpp
+    # ${CMAKE_CURRENT_LIST_DIR}/../src/drivers/snes/SNESProtocolDriver.cpp
 )
 
 # Enhanced driver manager
 set(MANAGER_SOURCES
-    ${CMAKE_CURRENT_LIST_DIR}/src/drivermanager_v2.cpp
-    ${CMAKE_CURRENT_LIST_DIR}/src/driverintegration.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/drivermanager_v2.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../src/driverintegration.cpp
 )
 
-# Add all new architecture sources
-target_sources(${PROJECT_NAME} PRIVATE
-    ${TRANSPORT_SOURCES}
-    ${PROTOCOL_SOURCES}
-    ${MANAGER_SOURCES}
-)
+# NOTE: Options are defined in main CMakeLists.txt to be available during source selection
 
-# Conditional compilation flags for optional features
-option(ENABLE_NEW_DRIVER_ARCHITECTURE "Enable new protocol/transport driver architecture" ON)
-option(ENABLE_BLUETOOTH_TRANSPORT "Enable Bluetooth transport (requires BTStack)" OFF)
-option(ENABLE_GPIO_TRANSPORT "Enable GPIO transport for retro consoles" ON)
+# Start with core transport sources
+set(TRANSPORT_SOURCES ${CORE_TRANSPORT_SOURCES})
+
+# Add USB transport when new architecture is enabled (mutually exclusive with legacy)
+if(ENABLE_NEW_DRIVER_ARCHITECTURE)
+    list(APPEND TRANSPORT_SOURCES ${USB_TRANSPORT_SOURCES})
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+        ENABLE_USB_TRANSPORT=1
+    )
+    message(STATUS "USB transport enabled (new architecture)")
+endif()
+
+# Add Bluetooth transport conditionally
+if(ENABLE_BLUETOOTH_TRANSPORT)
+    list(APPEND TRANSPORT_SOURCES ${BLUETOOTH_TRANSPORT_SOURCES})
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+        ENABLE_BLUETOOTH_TRANSPORT=1
+    )
+    message(STATUS "Bluetooth transport enabled")
+    
+    # TODO: Add BTStack dependency when available
+    # find_package(BTStack REQUIRED)
+    # target_link_libraries(${PROJECT_NAME} PRIVATE BTStack::BTStack)
+else()
+    message(STATUS "Bluetooth transport disabled")
+endif()
+
+# Add all architecture sources to the build
+if(ENABLE_NEW_DRIVER_ARCHITECTURE)
+    target_sources(${PROJECT_NAME} PRIVATE
+        ${TRANSPORT_SOURCES}
+        ${PROTOCOL_SOURCES}
+        ${MANAGER_SOURCES}
+    )
+    message(STATUS "Added ${CMAKE_CURRENT_LIST_DIR}/../src/drivermanager_v2.cpp to build")
+    message(STATUS "Added ${CMAKE_CURRENT_LIST_DIR}/../src/driverintegration.cpp to build")
+else()
+    message(STATUS "New driver architecture disabled - not adding source files")
+endif()
 
 if(ENABLE_NEW_DRIVER_ARCHITECTURE)
     target_compile_definitions(${PROJECT_NAME} PRIVATE
         ENABLE_NEW_DRIVER_ARCHITECTURE=1
     )
-endif()
-
-if(ENABLE_BLUETOOTH_TRANSPORT)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE
-        ENABLE_BLUETOOTH_TRANSPORT=1
-    )
-    # Add BTStack dependency when available
-    # find_package(BTStack REQUIRED)
-    # target_link_libraries(${PROJECT_NAME} PRIVATE BTStack::BTStack)
+    message(STATUS "New driver architecture enabled")
+else()
+    message(STATUS "New driver architecture disabled - using legacy drivers only")
 endif()
 
 if(ENABLE_GPIO_TRANSPORT)
     target_compile_definitions(${PROJECT_NAME} PRIVATE
         ENABLE_GPIO_TRANSPORT=1
     )
+    message(STATUS "GPIO transport enabled")
+else()
+    message(STATUS "GPIO transport disabled")
 endif()
 
 # Add protocol-specific feature flags

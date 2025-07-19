@@ -3,6 +3,8 @@
  * SPDX-FileCopyrightText: Copyright (c) 2024 OpenStickCommunity (gp2040-ce.info)
  */
 
+#ifdef ENABLE_BLUETOOTH_TRANSPORT
+
 #include "interfaces/bluetoothtransport.h"
 #include <cstring>
 
@@ -177,3 +179,5 @@ void BluetoothTransport::handleDataReceived(const uint8_t* data, size_t length) 
         data_available = true;
     }
 }
+
+#endif // ENABLE_BLUETOOTH_TRANSPORT

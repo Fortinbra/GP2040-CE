@@ -27,8 +27,12 @@
 
 // Transport implementations
 #include "interfaces/usbtransport.h"
+#ifdef ENABLE_BLUETOOTH_TRANSPORT
 #include "interfaces/bluetoothtransport.h"
+#endif
+#ifdef ENABLE_GPIO_TRANSPORT
 #include "interfaces/gpiotransport.h"
+#endif
 
 #include <memory>
 
@@ -269,9 +273,17 @@ std::unique_ptr<TransportInterface> DriverManagerV2::createTransport(TransportTy
         case TransportType::USB:
             return std::make_unique<USBTransport>();
         case TransportType::BLUETOOTH:
+#ifdef ENABLE_BLUETOOTH_TRANSPORT
             return std::make_unique<BluetoothTransport>();
+#else
+            return nullptr; // Bluetooth not enabled at compile time
+#endif
         case TransportType::GPIO:
+#ifdef ENABLE_GPIO_TRANSPORT
             return std::make_unique<GPIOTransport>();
+#else
+            return nullptr; // GPIO not enabled at compile time
+#endif
     }
     return nullptr; // Should never reach here with the enum
 }

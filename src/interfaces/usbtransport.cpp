@@ -189,7 +189,7 @@ bool USBTransport::tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage,
     return false;
 }
 
-// TinyUSB callback implementations
+// TinyUSB callback implementations - safe since legacy USB driver is excluded
 extern "C" {
     void tud_mount_cb(void) {
         USBTransport::tud_mount_cb();

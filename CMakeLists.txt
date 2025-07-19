@@ -162,6 +162,21 @@ endif()
 # We want a larger stack of 4kb per core instead of the default 2kb
 add_compile_definitions(PICO_STACK_SIZE=0x1000)
 
+# Driver Architecture options (needed before source file selection)
+option(ENABLE_NEW_DRIVER_ARCHITECTURE "Enable new protocol/transport driver architecture" OFF)
+option(ENABLE_BLUETOOTH_TRANSPORT "Enable Bluetooth transport (requires BTStack)" OFF)
+option(ENABLE_GPIO_TRANSPORT "Enable GPIO transport for retro consoles" ON)
+
+# Handle USB driver mutual exclusion
+# If new driver architecture is enabled, exclude legacy USB driver
+if(ENABLE_NEW_DRIVER_ARCHITECTURE)
+    set(USB_DRIVER_SOURCES "")
+    message(STATUS "Using new USB transport - excluding legacy usbdriver.cpp")
+else()
+    set(USB_DRIVER_SOURCES "src/usbdriver.cpp")
+    message(STATUS "Using legacy USB driver - excluding new USB transport")
+endif()
+
 add_executable(${PROJECT_NAME}
 src/main.cpp
 src/gp2040.cpp
@@ -203,8 +218,6 @@ src/drivers/xboxog/XboxOriginalDriver.cpp
 src/drivers/xinput/XInputAuth.cpp
 src/drivers/xinput/XInputAuthUSBListener.cpp
 src/drivers/xinput/XInputDriver.cpp
-src/drivers/xinput/XInputProtocolDriver.cpp
-src/interfaces/gpiotransport.cpp
 src/interfaces/i2c/i2cdevicebase.cpp
 src/interfaces/i2c/pcf8575/pcf8575.cpp
 src/interfaces/i2c/ssd1306/obd_ssd1306.cpp
@@ -228,13 +241,12 @@ src/display/ui/screens/DisplaySaverScreen.cpp
 src/display/GPGFX.cpp
 src/display/GPGFX_UI.cpp
 src/drivermanager.cpp
-src/drivermanager_v2.cpp
 src/eventmanager.cpp
 src/layoutmanager.cpp
 src/peripheralmanager.cpp
 src/storagemanager.cpp
 src/system.cpp
-src/usbdriver.cpp
+${USB_DRIVER_SOURCES}
 src/usbhostmanager.cpp
 src/config_legacy.cpp
 src/config_utils.cpp
@@ -349,6 +361,9 @@ install(FILES
     ${CMAKE_CURRENT_LIST_DIR}/README.md
     DESTINATION .
 )
+
+# Include Driver Architecture V2 - Protocol/Transport Separation
+include(cmake/DriverArchitectureV2.cmake)
 
 if (NOT (DEFINED ENV(CI)) AND (EXISTS ${CMAKE_SOURCE_DIR}/modules/Custom.cmake))
   message(STATUS "Found custom script.")

@@ -60,6 +60,14 @@ public:
     bool sendEndpointData(uint8_t endpoint, const uint8_t* data, size_t length);
     bool receiveEndpointData(uint8_t endpoint, uint8_t* buffer, size_t length);
 
+    // Static TinyUSB callbacks (public so extern C functions can call them)
+    static void tud_mount_cb();
+    static void tud_umount_cb();
+    static void tud_suspend_cb(bool remote_wakeup_en);
+    static void tud_resume_cb();
+    static bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, 
+                                          tusb_control_request_t const* request);
+
 protected:
     struct USBState {
         bool initialized;
@@ -84,14 +92,6 @@ protected:
 
 private:
     static USBTransport* instance; // For static callbacks
-    
-    // Static TinyUSB callbacks
-    static void tud_mount_cb();
-    static void tud_umount_cb();
-    static void tud_suspend_cb(bool remote_wakeup_en);
-    static void tud_resume_cb();
-    static bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, 
-                                          tusb_control_request_t const* request);
 };
 
 #endif // _USBTRANSPORT_H_
