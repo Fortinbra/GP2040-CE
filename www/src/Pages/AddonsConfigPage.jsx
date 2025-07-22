@@ -27,6 +27,10 @@ import I2CAnalog1219, {
 	i2cAnalogScheme,
 	i2cAnalogState,
 } from '../Addons/I2CAnalog1219';
+import MAX17048, {
+	max17048Scheme,
+	max17048State,
+} from '../Addons/MAX17048';
 import OnBoardLed, {
 	onBoardLedScheme,
 	onBoardLedState,
@@ -65,6 +69,7 @@ const schema = yup.object().shape({
 	...turboScheme,
 	...reverseScheme,
 	...i2cAnalogScheme,
+	...max17048Scheme,
 	...dualDirectionScheme,
 	...tiltScheme,
 	...buzzerScheme,
@@ -87,6 +92,7 @@ const defaultValues = {
 	...turboState,
 	...reverseState,
 	...i2cAnalogState,
+	...max17048State,
 	...dualDirectionState,
 	...tiltState,
 	...buzzerState,
@@ -109,6 +115,7 @@ const ADDONS = [
 	Turbo,
 	Reverse,
 	I2CAnalog1219,
+	MAX17048,
 	Analog1256,
 	DualDirection,
 	Tilt,

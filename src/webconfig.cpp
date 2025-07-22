@@ -1560,6 +1560,14 @@ std::string setAddonOptions()
     AnalogADS1219Options& analogADS1219Options = Storage::getInstance().getAddonOptions().analogADS1219Options;
     docToValue(analogADS1219Options.enabled, doc, "I2CAnalog1219InputEnabled");
 
+    MAX17048MonitorOptions& max17048MonitorOptions = Storage::getInstance().getAddonOptions().max17048MonitorOptions;
+    docToValue(max17048MonitorOptions.enabled, doc, "MAX17048MonitorEnabled");
+    docToValue(max17048MonitorOptions.monitoringIntervalMs, doc, "MAX17048MonitoringIntervalMs");
+    docToValue(max17048MonitorOptions.alertVoltageMin, doc, "MAX17048AlertVoltageMin");
+    docToValue(max17048MonitorOptions.alertVoltageMax, doc, "MAX17048AlertVoltageMax");
+    docToValue(max17048MonitorOptions.enableHibernation, doc, "MAX17048EnableHibernation");
+    docToValue(max17048MonitorOptions.hibernationThreshold, doc, "MAX17048HibernationThreshold");
+
     ReverseOptions& reverseOptions = Storage::getInstance().getAddonOptions().reverseOptions;
     docToValue(reverseOptions.enabled, doc, "ReverseInputEnabled");
     docToPin(reverseOptions.ledPin, doc, "reversePinLED");
@@ -1982,6 +1990,14 @@ std::string getAddonOptions()
 
     const AnalogADS1219Options& analogADS1219Options = Storage::getInstance().getAddonOptions().analogADS1219Options;
     writeDoc(doc, "I2CAnalog1219InputEnabled", analogADS1219Options.enabled);
+
+    const MAX17048MonitorOptions& max17048MonitorOptions = Storage::getInstance().getAddonOptions().max17048MonitorOptions;
+    writeDoc(doc, "MAX17048MonitorEnabled", max17048MonitorOptions.enabled);
+    writeDoc(doc, "MAX17048MonitoringIntervalMs", max17048MonitorOptions.monitoringIntervalMs);
+    writeDoc(doc, "MAX17048AlertVoltageMin", max17048MonitorOptions.alertVoltageMin);
+    writeDoc(doc, "MAX17048AlertVoltageMax", max17048MonitorOptions.alertVoltageMax);
+    writeDoc(doc, "MAX17048EnableHibernation", max17048MonitorOptions.enableHibernation);
+    writeDoc(doc, "MAX17048HibernationThreshold", max17048MonitorOptions.hibernationThreshold);
 
     const ReverseOptions& reverseOptions = Storage::getInstance().getAddonOptions().reverseOptions;
     writeDoc(doc, "reversePinLED", cleanPin(reverseOptions.ledPin));
