@@ -843,6 +843,16 @@ message ReactiveLEDOptions
     repeated ReactiveLEDInfo leds = 2 [(nanopb).max_count = 10];
 }
 
+message MAX17048MonitorOptions
+{
+    optional bool enabled = 1;
+    optional uint32 monitoringIntervalMs = 2;
+    optional float alertVoltageMin = 3;
+    optional float alertVoltageMax = 4;
+    optional bool enableHibernation = 5;
+    optional float hibernationThreshold = 6;
+}
+
 message AddonOptions
 {
     optional BootselButtonOptions bootselButtonOptions = 1;
@@ -873,6 +883,7 @@ message AddonOptions
     optional DRV8833RumbleOptions drv8833RumbleOptions = 26;
     optional ReactiveLEDOptions reactiveLEDOptions = 27;
     optional GamepadUSBHostOptions gamepadUSBHostOptions = 28;
+    optional MAX17048MonitorOptions max17048MonitorOptions = 29;
 }
 
 message MigrationHistory
