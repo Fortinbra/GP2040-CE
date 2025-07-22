@@ -1,4 +1,4 @@
-#include "drivers/ps4/PS4Driver.h"
+﻿#include "drivers/ps4/PS4Driver.h"
 #include "drivers/shared/driverhelper.h"
 #include "storagemanager.h"
 #include "CRC32.h"
@@ -306,8 +306,8 @@ bool PS4Driver::process(Gamepad * gamepad) {
         // report to send.
         if ((now - last_report_timer) > PS4_KEEPALIVE_TIMER) {
             last_report_counter = (last_report_counter+1) & 0x3F;
-            ps4Report.report_counter = last_report_counter;		// report counter is 6 bits
-            ps4Report.axis_timing = now;		 		// axis counter is 16 bits
+            ps4Report.report_counter = last_report_counter;        // report counter is 6 bits
+            ps4Report.axis_timing = now;                 // axis counter is 16 bits
             // the *next* process() will be a forced report (or real user input)
         }
     }

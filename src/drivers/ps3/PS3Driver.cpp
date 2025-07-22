@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SPDX-License-Identifier: MIT
  * SPDX-FileCopyrightText: Copyright (c) 2024 OpenStickCommunity (gp2040-ce.info)
  */
@@ -298,8 +298,8 @@ bool PS3Driver::vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_contr
 }
 
 const uint16_t * PS3Driver::get_descriptor_string_cb(uint8_t index, uint16_t langid) {
-	const char *value = (const char *)ps3_string_descriptors[index];
-	return getStringDescriptor(value, index); // getStringDescriptor returns a static array
+    const char *value = (const char *)ps3_string_descriptors[index];
+    return getStringDescriptor(value, index); // getStringDescriptor returns a static array
 }
 
 const uint8_t * PS3Driver::get_descriptor_device_cb() {
@@ -315,9 +315,9 @@ const uint8_t * PS3Driver::get_descriptor_configuration_cb(uint8_t index) {
 }
 
 const uint8_t * PS3Driver::get_descriptor_device_qualifier_cb() {
-	return nullptr;
+    return nullptr;
 }
 
 uint16_t PS3Driver::GetJoystickMidValue() {
-	return PS3_JOYSTICK_MID << 8;
+    return PS3_JOYSTICK_MID << 8;
 }

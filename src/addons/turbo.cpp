@@ -1,4 +1,4 @@
-#include "addons/turbo.h"
+﻿#include "addons/turbo.h"
 
 #include "hardware/adc.h"
 
@@ -63,7 +63,7 @@ void TurboInput::setup(){
     }
 
     Gamepad * gamepad = Storage::getInstance().GetProcessedGamepad();
-	gamepad->auxState.turbo.enabled = true;
+    gamepad->auxState.turbo.enabled = true;
     gamepad->auxState.turbo.active = 1;
 
     // SHMUP Mode

@@ -1,4 +1,4 @@
-#include "host/usbh.h"
+﻿#include "host/usbh.h"
 #include "class/hid/hid.h"
 #include "class/hid/hid_host.h"
 #include "drivers/xbone/XBOneAuthUSBListener.h"
@@ -20,8 +20,8 @@ static uint8_t xb1_led_on[] = {0x00, 0x01, 0x14}; // 0x01 - LED on, 0x14 - Brigh
 // Report Queue for big report sizes from dongle
 #include <queue>
 typedef struct {
-	uint8_t report[XBONE_ENDPOINT_SIZE];
-	uint16_t len;
+    uint8_t report[XBONE_ENDPOINT_SIZE];
+    uint16_t len;
 } report_queue_t;
 
 static std::queue<report_queue_t> report_queue;
@@ -166,10 +166,10 @@ void XBOneAuthUSBListener::process_report_queue() {
     uint32_t now = to_ms_since_boot(get_absolute_time());
     if ( mounted == true && !report_queue.empty() && (now - lastReportQueue) > REPORT_QUEUE_INTERVAL  ) {
         if ( tuh_xinput_send_report(xbone_dev_addr, xbone_instance, report_queue.front().report, report_queue.front().len) ) {
-			report_queue.pop();
+            report_queue.pop();
             lastReportQueue = now; // last time we checked report queue
         } else {
             sleep_ms(REPORT_QUEUE_INTERVAL);
         }
-	}
+    }
 }

@@ -1,10 +1,10 @@
-#include "customtheme.h"
+﻿#include "customtheme.h"
 #include "storagemanager.h"
 
 CustomTheme::CustomTheme(PixelMatrix &matrix) : Animation(matrix) {
   AnimationOptions & animationOptions = Storage::getInstance().getAnimationOptions();
   if (animationOptions.hasCustomTheme)
-	{
+    {
       theme[GAMEPAD_MASK_DU] = RGB(animationOptions.customThemeUp);
       theme[GAMEPAD_MASK_DD] = RGB(animationOptions.customThemeDown);
       theme[GAMEPAD_MASK_DL] = RGB(animationOptions.customThemeLeft);
@@ -23,7 +23,7 @@ CustomTheme::CustomTheme(PixelMatrix &matrix) : Animation(matrix) {
       theme[GAMEPAD_MASK_A2] = RGB(animationOptions.customThemeA2);
       theme[GAMEPAD_MASK_L3] = RGB(animationOptions.customThemeL3);
       theme[GAMEPAD_MASK_R3] = RGB(animationOptions.customThemeR3);
-	}
+    }
 }
 
 bool CustomTheme::Animate(RGB (&frame)[100]) {

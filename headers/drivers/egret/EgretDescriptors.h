@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SPDX-License-Identifier: MIT
  * SPDX-FileCopyrightText: Copyright (c) 2024 OpenStickCommunity (gp2040-ce.info)
  */
@@ -39,16 +39,16 @@
 
 typedef struct __attribute((packed, aligned(1)))
 {
-	uint16_t buttons;
-	uint8_t lx;
-	uint8_t ly;
+    uint16_t buttons;
+    uint8_t lx;
+    uint8_t ly;
 } EgretReport;
 
 typedef struct
 {
-	uint16_t buttons;
-	uint8_t lx;
-	uint8_t ly;
+    uint16_t buttons;
+    uint8_t lx;
+    uint8_t ly;
 } EgretOutReport;
 
 static const uint8_t egret_string_language[]     = { 0x09, 0x04 };
@@ -58,10 +58,10 @@ static const uint8_t egret_string_version[]      = "1.0";
 
 static const uint8_t *egret_string_descriptors[] __attribute__((unused)) =
 {
-	egret_string_language,
-	egret_string_manufacturer,
-	egret_string_product,
-	egret_string_version
+    egret_string_language,
+    egret_string_manufacturer,
+    egret_string_product,
+    egret_string_version
 };
 
 static const uint8_t egret_device_descriptor[] =

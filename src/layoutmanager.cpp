@@ -1,4 +1,4 @@
-#include "layoutmanager.h"
+﻿#include "layoutmanager.h"
 #include "storagemanager.h"
 #include "buttonlayouts.h"
 #include "enums.pb.h"
@@ -353,7 +353,7 @@ LayoutManager::LayoutList LayoutManager::flipHorizontally(LayoutList layout, int
 
 LayoutManager::LayoutList LayoutManager::drawStickless()
 {
-	return BUTTON_GROUP_STICKLESS;
+    return BUTTON_GROUP_STICKLESS;
 }
 
 LayoutManager::LayoutList LayoutManager::drawWasdBox()

@@ -1,4 +1,4 @@
-#ifndef XID_STEELBATTALION_H_
+﻿#ifndef XID_STEELBATTALION_H_
 #define XID_STEELBATTALION_H_
 
 #ifdef __cplusplus
@@ -55,45 +55,45 @@ extern "C"
 
 typedef struct __attribute__((packed))
 {
-	uint8_t zero;
-	uint8_t bLength;
-	uint16_t dButtons[3];
-	uint16_t aimingX;       //0 to 2^16 left to right
-	uint16_t aimingY;       //0 to 2^16 top to bottom
-	int16_t rotationLever;
-	int16_t sightChangeX;
-	int16_t sightChangeY;
-	uint16_t leftPedal;      //Sidestep, 0x0000 to 0xFF00
-	uint16_t middlePedal;    //Brake, 0x0000 to 0xFF00
-	uint16_t rightPedal;     //Acceleration, 0x0000 to oxFF00
-	int8_t tunerDial;        //0-15 is from 9oclock, around clockwise
-	int8_t gearLever;        //7-13 is gears R,1,2,3,4,5
+    uint8_t zero;
+    uint8_t bLength;
+    uint16_t dButtons[3];
+    uint16_t aimingX;       //0 to 2^16 left to right
+    uint16_t aimingY;       //0 to 2^16 top to bottom
+    int16_t rotationLever;
+    int16_t sightChangeX;
+    int16_t sightChangeY;
+    uint16_t leftPedal;      //Sidestep, 0x0000 to 0xFF00
+    uint16_t middlePedal;    //Brake, 0x0000 to 0xFF00
+    uint16_t rightPedal;     //Acceleration, 0x0000 to oxFF00
+    int8_t tunerDial;        //0-15 is from 9oclock, around clockwise
+    int8_t gearLever;        //7-13 is gears R,1,2,3,4,5
 } USB_SteelBattalion_InReport_t;
 
 typedef struct
 {
-	uint8_t zero;
-	uint8_t bLength;
-	uint8_t CockpitHatch_EmergencyEject;
-	uint8_t Start_Ignition;
-	uint8_t MapZoomInOut_OpenClose;
-	uint8_t SubMonitorModeSelect_ModeSelect;
-	uint8_t MainMonitorZoomOut_MainMonitorZoomIn;
-	uint8_t Manipulator_ForecastShootingSystem;
-	uint8_t Washing_LineColorChange;
-	uint8_t Chaff_Extinguisher;
-	uint8_t Override_TankDetach;
-	uint8_t F1_NightScope;
-	uint8_t F3_F2;
-	uint8_t SubWeaponControl_MainWeaponControl;
-	uint8_t Comm1_MagazineChange;
-	uint8_t Comm3_Comm2;
-	uint8_t Comm5_Comm4;
-	uint8_t GearR_;
-	uint8_t Gear1_GearN;
-	uint8_t Gear3_Gear2;
-	uint8_t Gear5_Gear4;
-	uint8_t dummy;
+    uint8_t zero;
+    uint8_t bLength;
+    uint8_t CockpitHatch_EmergencyEject;
+    uint8_t Start_Ignition;
+    uint8_t MapZoomInOut_OpenClose;
+    uint8_t SubMonitorModeSelect_ModeSelect;
+    uint8_t MainMonitorZoomOut_MainMonitorZoomIn;
+    uint8_t Manipulator_ForecastShootingSystem;
+    uint8_t Washing_LineColorChange;
+    uint8_t Chaff_Extinguisher;
+    uint8_t Override_TankDetach;
+    uint8_t F1_NightScope;
+    uint8_t F3_F2;
+    uint8_t SubWeaponControl_MainWeaponControl;
+    uint8_t Comm1_MagazineChange;
+    uint8_t Comm3_Comm2;
+    uint8_t Comm5_Comm4;
+    uint8_t GearR_;
+    uint8_t Gear1_GearN;
+    uint8_t Gear3_Gear2;
+    uint8_t Gear5_Gear4;
+    uint8_t dummy;
 } USB_SteelBattalion_OutReport_t;
 
 #define TUD_XID_SB_DESC_LEN  (9+7+7)

@@ -1,4 +1,4 @@
-#include "drivers/xbone/XBOneDriver.h"
+﻿#include "drivers/xbone/XBOneDriver.h"
 #include "drivers/shared/driverhelper.h"
 
 #include "drivers/xbone/XBOneAuth.h"
@@ -222,23 +222,23 @@ static void queue_xbone_report(void *report, uint16_t report_size) {
 // DevCompatIDsOne sends back XGIP10 data when requested by Windows
 bool xbone_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage,
                                 tusb_control_request_t const *request) {
-	uint8_t buf[255];
+    uint8_t buf[255];
 
-  	// nothing to with DATA & ACK stage
-  	if (stage != CONTROL_STAGE_SETUP)
-		return true;
+      // nothing to with DATA & ACK stage
+      if (stage != CONTROL_STAGE_SETUP)
+        return true;
 
-	if (request->bmRequestType_bit.direction == TUSB_DIR_IN) { // This is where we should be
-		uint16_t len = request->wLength;
-		if ( request->bmRequestType == (USB_SETUP_DEVICE_TO_HOST | USB_SETUP_RECIPIENT_DEVICE | USB_SETUP_TYPE_VENDOR) && request->bRequest == REQ_GET_OS_FEATURE_DESCRIPTOR &&
-			request->wIndex == DESC_EXTENDED_COMPATIBLE_ID_DESCRIPTOR) {
-			memcpy(buf, &DevCompatIDsOne, len);
-		}
-		tud_control_xfer(rhport, request, (void*)buf, len);
-	} else {
-		tud_control_xfer(rhport, request, (void*)buf, request->wLength);
-	}
-	return true;
+    if (request->bmRequestType_bit.direction == TUSB_DIR_IN) { // This is where we should be
+        uint16_t len = request->wLength;
+        if ( request->bmRequestType == (USB_SETUP_DEVICE_TO_HOST | USB_SETUP_RECIPIENT_DEVICE | USB_SETUP_TYPE_VENDOR) && request->bRequest == REQ_GET_OS_FEATURE_DESCRIPTOR &&
+            request->wIndex == DESC_EXTENDED_COMPATIBLE_ID_DESCRIPTOR) {
+            memcpy(buf, &DevCompatIDsOne, len);
+        }
+        tud_control_xfer(rhport, request, (void*)buf, len);
+    } else {
+        tud_control_xfer(rhport, request, (void*)buf, request->wLength);
+    }
+    return true;
 }
 
 bool xbone_xfer_cb(uint8_t rhport, uint8_t ep_addr, xfer_result_t result,
@@ -341,7 +341,7 @@ void XBOneDriver::initialize() {
         .rightStickY = GAMEPAD_JOYSTICK_MID,
         .reserved = {}
     };
-    class_driver = 	{
+    class_driver =     {
 #if CFG_TUSB_DEBUG >= 2
         .name = "XBONE",
 #endif
@@ -549,12 +549,12 @@ bool XBOneDriver::send_xbone_usb(uint8_t const *report, uint16_t report_size) {
         if (p_xbone->ep_in)
             break;
     }
-    if ( tud_ready() &&											// Is the device ready?
+    if ( tud_ready() &&                                            // Is the device ready?
         (p_xbone->ep_in != 0) && (!usbd_edpt_busy(TUD_OPT_RHPORT, p_xbone->ep_in))) // Is the IN endpoint available?
     {
-        usbd_edpt_claim(0, p_xbone->ep_in);										// Take control of IN endpoint
-        usbd_edpt_xfer(0, p_xbone->ep_in, (uint8_t *)report, report_size); 	// Send report buffer
-        usbd_edpt_release(0, p_xbone->ep_in);										// Release control of IN endpoint
+        usbd_edpt_claim(0, p_xbone->ep_in);                                        // Take control of IN endpoint
+        usbd_edpt_xfer(0, p_xbone->ep_in, (uint8_t *)report, report_size);     // Send report buffer
+        usbd_edpt_release(0, p_xbone->ep_in);                                        // Release control of IN endpoint
 
         // we successfully sent the report
         return true;

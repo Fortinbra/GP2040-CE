@@ -1,4 +1,4 @@
-#ifndef _BootselButton_H
+﻿#ifndef _BootselButton_H
 #define _BootselButton_H
 
 #include "gpaddon.h"
@@ -24,7 +24,7 @@ public:
     virtual void postprocess(bool sent) {}
     virtual void reinit() {}
     virtual std::string name() { return BootselButtonName; }
-private:	
+private:    
     bool isBootselPressed();
     uint32_t bootselButtonMap;
 };

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * The MIT License (MIT)
  *
  * Copyright (c) 2019 Ha Thach (tinyusb.org)
@@ -112,7 +112,7 @@
 #define CFG_TUSB_MEM_ALIGN          __attribute__ ((aligned(4)))
 #endif
 
-	// defined by compiler flags for flexibility
+    // defined by compiler flags for flexibility
 #ifndef CFG_TUSB_MCU
 #error CFG_TUSB_MCU must be defined
 #endif

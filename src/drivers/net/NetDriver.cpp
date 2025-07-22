@@ -1,4 +1,4 @@
-#include "drivers/net/NetDriver.h"
+﻿#include "drivers/net/NetDriver.h"
 #include "drivers/shared/driverhelper.h"
 #include "class/net/net_device.h"
 #include "rndis.h"
@@ -43,7 +43,7 @@ enum
 };
 
 void NetDriver::initialize() {
-	class_driver = {
+    class_driver = {
     #if CFG_TUSB_DEBUG >= 2
         .name = "NET",
     #endif
@@ -64,7 +64,7 @@ bool NetDriver::process(Gamepad * gamepad) {
 
 // tud_hid_get_report_cb
 uint16_t NetDriver::get_report(uint8_t report_id, hid_report_type_t report_type, uint8_t *buffer, uint16_t reqlen) {
-	return 0;
+    return 0;
 }
 
 // Only PS4 does anything with set report
@@ -241,9 +241,9 @@ const uint8_t * NetDriver::get_descriptor_configuration_cb(uint8_t index) {
 }
 
 const uint8_t * NetDriver::get_descriptor_device_qualifier_cb() {
-	return nullptr;
+    return nullptr;
 }
 
 uint16_t NetDriver::GetJoystickMidValue() {
-	return GAMEPAD_JOYSTICK_MID;
+    return GAMEPAD_JOYSTICK_MID;
 }

@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SPDX-License-Identifier: MIT
  * SPDX-FileCopyrightText: Copyright (c) 2024 OpenStickCommunity (gp2040-ce.info)
  */
@@ -29,7 +29,7 @@ public:
     void handleEncoder(GPEvent* e); // for Volume - rotary encoder
 private:
     void releaseAllKeys(void);
-	void pressKey(uint8_t code);
+    void pressKey(uint8_t code);
     uint8_t getModifier(uint8_t code);
     uint8_t getMultimedia(uint8_t code);
     uint8_t last_report[CFG_TUD_ENDPOINT0_SIZE] = { };

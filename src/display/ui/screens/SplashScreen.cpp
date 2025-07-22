@@ -1,4 +1,4 @@
-#include "SplashScreen.h"
+﻿#include "SplashScreen.h"
 
 #include "pico/stdlib.h"
 #include "drivermanager.h"
@@ -14,12 +14,12 @@ void SplashScreen::shutdown() {
 }
 
 void SplashScreen::drawScreen() {
-	if (getDisplayOptions().splashMode == static_cast<SplashMode>(SPLASH_MODE_NONE)) {
-		getRenderer()->drawText(0, 4, " Splash NOT enabled.");
+    if (getDisplayOptions().splashMode == static_cast<SplashMode>(SPLASH_MODE_NONE)) {
+        getRenderer()->drawText(0, 4, " Splash NOT enabled.");
     } else {
             // Default, display static or custom image
             getRenderer()->drawSprite((uint8_t*) getDisplayOptions().splashImage.bytes, 128, 64, 16, 0, 0, 1);
-	}
+    }
 }
 
 int8_t SplashScreen::update() {

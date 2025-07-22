@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <stdint.h>
 #include "drivers/xboxog/xid/xid_driver.h"
@@ -13,10 +13,10 @@ static const uint8_t xboxoriginal_string_version[]      = "1.0";
 
 static const uint8_t *xboxoriginal_string_descriptors[] __attribute__((unused)) =
 {
-	xboxoriginal_string_language,
-	xboxoriginal_string_manufacturer,
-	xboxoriginal_string_product,
-	xboxoriginal_string_version
+    xboxoriginal_string_language,
+    xboxoriginal_string_manufacturer,
+    xboxoriginal_string_product,
+    xboxoriginal_string_version
 };
 
 static const uint8_t *xboxoriginal_device_descriptor = (const uint8_t*)&XID_DESC_DEVICE;

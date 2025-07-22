@@ -1,4 +1,4 @@
-#include "customthemepressed.h"
+﻿#include "customthemepressed.h"
 #include "GamepadState.h"
 #include "storagemanager.h"
 
@@ -7,7 +7,7 @@ CustomThemePressed::CustomThemePressed(PixelMatrix &matrix) : Animation(matrix) 
 
   AnimationOptions & animationOptions = Storage::getInstance().getAnimationOptions();
   if (animationOptions.hasCustomTheme)
-	{
+    {
       theme[GAMEPAD_MASK_DU] = RGB(animationOptions.customThemeUpPressed);
       theme[GAMEPAD_MASK_DD] = RGB(animationOptions.customThemeDownPressed);
       theme[GAMEPAD_MASK_DL] = RGB(animationOptions.customThemeLeftPressed);
@@ -26,7 +26,7 @@ CustomThemePressed::CustomThemePressed(PixelMatrix &matrix) : Animation(matrix) 
       theme[GAMEPAD_MASK_A2] = RGB(animationOptions.customThemeA2Pressed);
       theme[GAMEPAD_MASK_L3] = RGB(animationOptions.customThemeL3Pressed);
       theme[GAMEPAD_MASK_R3] = RGB(animationOptions.customThemeR3Pressed);
-	}
+    }
 }
 
 CustomThemePressed::CustomThemePressed(PixelMatrix &matrix, std::vector<Pixel> &pixels) : Animation(matrix), pixels(&pixels) {
@@ -34,7 +34,7 @@ CustomThemePressed::CustomThemePressed(PixelMatrix &matrix, std::vector<Pixel> &
 
   AnimationOptions & animationOptions = Storage::getInstance().getAnimationOptions();
   if (animationOptions.hasCustomTheme)
-	{
+    {
       theme[GAMEPAD_MASK_DU] = RGB(animationOptions.customThemeUpPressed);
       theme[GAMEPAD_MASK_DD] = RGB(animationOptions.customThemeDownPressed);
       theme[GAMEPAD_MASK_DL] = RGB(animationOptions.customThemeLeftPressed);
@@ -53,7 +53,7 @@ CustomThemePressed::CustomThemePressed(PixelMatrix &matrix, std::vector<Pixel> &
       theme[GAMEPAD_MASK_A2] = RGB(animationOptions.customThemeA2Pressed);
       theme[GAMEPAD_MASK_L3] = RGB(animationOptions.customThemeL3Pressed);
       theme[GAMEPAD_MASK_R3] = RGB(animationOptions.customThemeR3Pressed);
-	}
+    }
 }
 
 bool CustomThemePressed::Animate(RGB (&frame)[100]) {

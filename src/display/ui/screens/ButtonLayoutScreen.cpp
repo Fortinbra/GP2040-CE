@@ -1,4 +1,4 @@
-#include "ButtonLayoutScreen.h"
+﻿#include "ButtonLayoutScreen.h"
 #include "buttonlayouts.h"
 #include "drivermanager.h"
 #include "drivers/ps4/PS4Driver.h"
@@ -24,7 +24,7 @@ void ButtonLayoutScreen::init() {
 
     setViewport((isInputHistoryEnabled ? 8 : 0), 0, (isInputHistoryEnabled ? 56 : getRenderer()->getDriver()->getMetrics()->height), getRenderer()->getDriver()->getMetrics()->width);
 
-	// load layout (drawElement pushes element to the display list)
+    // load layout (drawElement pushes element to the display list)
     uint16_t elementCtr = 0;
     LayoutManager::LayoutList currLayoutLeft = LayoutManager::getInstance().getLayoutA();
     LayoutManager::LayoutList currLayoutRight = LayoutManager::getInstance().getLayoutB();
@@ -35,8 +35,8 @@ void ButtonLayoutScreen::init() {
         pushElement(currLayoutRight[elementCtr]);
     }
 
-	// start with profile mode displayed
-	bannerDisplay = true;
+    // start with profile mode displayed
+    bannerDisplay = true;
     prevProfileNumber = -1;
 
     prevLayoutLeft = Storage::getInstance().getDisplayOptions().buttonLayout;
@@ -115,9 +115,9 @@ int8_t ButtonLayoutScreen::update() {
     }
 
     // main logic loop
-	generateHeader();
+    generateHeader();
     if (isInputHistoryEnabled)
-		processInputHistory();
+        processInputHistory();
 
     // check for exit/screen change
     if (DriverManager::getInstance().isConfigMode()) {
@@ -131,34 +131,34 @@ int8_t ButtonLayoutScreen::update() {
         prevButtonState = buttonState;
     }
 
-	return -1;
+    return -1;
 }
 
 void ButtonLayoutScreen::generateHeader() {
-	// Limit to 21 chars with 6x8 font for now
-	statusBar.clear();
-	Storage& storage = Storage::getInstance();
+    // Limit to 21 chars with 6x8 font for now
+    statusBar.clear();
+    Storage& storage = Storage::getInstance();
 
-	// Display Profile # banner
-	if ( bannerDisplay ) {
-		if (((getMillis() - bannerDelayStart) / 1000) < bannerDelay) {
-			if (bannerMessage.empty()) {
-				statusBar.assign(storage.currentProfileLabel(), strlen(storage.currentProfileLabel()));
-				if (statusBar.empty()) {
-					statusBar = "     Profile #";
-					statusBar +=  std::to_string(getGamepad()->getOptions().profileNumber);
-				} else {
-					statusBar.insert(statusBar.begin(), (21-statusBar.length())/2, ' ');
-				}
-			} else {
-				statusBar = bannerMessage;
-			}
-			return;
-		} else {
-			bannerDisplay = false;
+    // Display Profile # banner
+    if ( bannerDisplay ) {
+        if (((getMillis() - bannerDelayStart) / 1000) < bannerDelay) {
+            if (bannerMessage.empty()) {
+                statusBar.assign(storage.currentProfileLabel(), strlen(storage.currentProfileLabel()));
+                if (statusBar.empty()) {
+                    statusBar = "     Profile #";
+                    statusBar +=  std::to_string(getGamepad()->getOptions().profileNumber);
+                } else {
+                    statusBar.insert(statusBar.begin(), (21-statusBar.length())/2, ' ');
+                }
+            } else {
+                statusBar = bannerMessage;
+            }
+            return;
+        } else {
+            bannerDisplay = false;
             bannerMessage.clear();
-		}
-	}
+        }
+    }
 
     if (showInputMode) {
         // Display standard header
@@ -219,7 +219,7 @@ void ButtonLayoutScreen::generateHeader() {
         }
     }
 
-	const GamepadOptions & options = gamepad->getOptions();
+    const GamepadOptions & options = gamepad->getOptions();
 
     if (showDpadMode) {
         switch (gamepad->getActiveDpadMode())
@@ -261,10 +261,10 @@ void ButtonLayoutScreen::generateHeader() {
 void ButtonLayoutScreen::drawScreen() {
     if (bannerDisplay) {
         getRenderer()->drawRectangle(0, 0, 128, 7, true, true);
-    	getRenderer()->drawText(0, 0, statusBar, true);
+        getRenderer()->drawText(0, 0, statusBar, true);
     } else {
-		getRenderer()->drawText(0, 0, statusBar);
-	}
+        getRenderer()->drawText(0, 0, statusBar);
+    }
     getRenderer()->drawText(0, 7, footer);
 }
 
@@ -343,86 +343,86 @@ GPWidget* ButtonLayoutScreen::pushElement(GPButtonLayout element) {
 }
 
 void ButtonLayoutScreen::processInputHistory() {
-	std::deque<std::string> pressed;
+    std::deque<std::string> pressed;
 
-	// Get key states
-	std::array<bool, INPUT_HISTORY_MAX_INPUTS> currentInput = {
+    // Get key states
+    std::array<bool, INPUT_HISTORY_MAX_INPUTS> currentInput = {
 
-		pressedUp(),
-		pressedDown(),
-		pressedLeft(),
-		pressedRight(),
+        pressedUp(),
+        pressedDown(),
+        pressedLeft(),
+        pressedRight(),
 
-		pressedUpLeft(),
-		pressedUpRight(),
-		pressedDownLeft(),
-		pressedDownRight(),
+        pressedUpLeft(),
+        pressedUpRight(),
+        pressedDownLeft(),
+        pressedDownRight(),
 
-		getProcessedGamepad()->pressedB1(),
-		getProcessedGamepad()->pressedB2(),
-		getProcessedGamepad()->pressedB3(),
-		getProcessedGamepad()->pressedB4(),
-		getProcessedGamepad()->pressedL1(),
-		getProcessedGamepad()->pressedR1(),
-		getProcessedGamepad()->pressedL2(),
-		getProcessedGamepad()->pressedR2(),
-		getProcessedGamepad()->pressedS1(),
-		getProcessedGamepad()->pressedS2(),
-		getProcessedGamepad()->pressedL3(),
-		getProcessedGamepad()->pressedR3(),
-		getProcessedGamepad()->pressedA1(),
-		getProcessedGamepad()->pressedA2(),
-	};
+        getProcessedGamepad()->pressedB1(),
+        getProcessedGamepad()->pressedB2(),
+        getProcessedGamepad()->pressedB3(),
+        getProcessedGamepad()->pressedB4(),
+        getProcessedGamepad()->pressedL1(),
+        getProcessedGamepad()->pressedR1(),
+        getProcessedGamepad()->pressedL2(),
+        getProcessedGamepad()->pressedR2(),
+        getProcessedGamepad()->pressedS1(),
+        getProcessedGamepad()->pressedS2(),
+        getProcessedGamepad()->pressedL3(),
+        getProcessedGamepad()->pressedR3(),
+        getProcessedGamepad()->pressedA1(),
+        getProcessedGamepad()->pressedA2(),
+    };
 
-	uint8_t mode = ((displayModeLookup.count(getGamepad()->getOptions().inputMode) > 0) ? displayModeLookup.at(getGamepad()->getOptions().inputMode) : 0);
+    uint8_t mode = ((displayModeLookup.count(getGamepad()->getOptions().inputMode) > 0) ? displayModeLookup.at(getGamepad()->getOptions().inputMode) : 0);
 
-	// Check if any new keys have been pressed
-	if (lastInput != currentInput) {
-		// Iterate through array
-		for (uint8_t x=0; x<INPUT_HISTORY_MAX_INPUTS; x++) {
-			// Add any pressed keys to deque
-			std::string inputChar(displayNames[mode][x]);
-			if (currentInput[x] && (inputChar != "")) pressed.push_back(inputChar);
-		}
-		// Update the last keypress array
-		lastInput = currentInput;
-	}
+    // Check if any new keys have been pressed
+    if (lastInput != currentInput) {
+        // Iterate through array
+        for (uint8_t x=0; x<INPUT_HISTORY_MAX_INPUTS; x++) {
+            // Add any pressed keys to deque
+            std::string inputChar(displayNames[mode][x]);
+            if (currentInput[x] && (inputChar != "")) pressed.push_back(inputChar);
+        }
+        // Update the last keypress array
+        lastInput = currentInput;
+    }
 
-	if (pressed.size() > 0) {
-		std::string newInput;
-		for(const auto &s : pressed) {
-				if(!newInput.empty())
-						newInput += "+";
-				newInput += s;
-		}
+    if (pressed.size() > 0) {
+        std::string newInput;
+        for(const auto &s : pressed) {
+                if(!newInput.empty())
+                        newInput += "+";
+                newInput += s;
+        }
 
-		inputHistory.push_back(newInput);
-	}
+        inputHistory.push_back(newInput);
+    }
 
-	if (inputHistory.size() > (inputHistoryLength / 2) + 1) {
-		inputHistory.pop_front();
-	}
+    if (inputHistory.size() > (inputHistoryLength / 2) + 1) {
+        inputHistory.pop_front();
+    }
 
-	std::string ret;
+    std::string ret;
 
-	for (auto it = inputHistory.crbegin(); it != inputHistory.crend(); ++it) {
-		std::string newRet = ret;
-		if (!newRet.empty())
-			newRet = " " + newRet;
+    for (auto it = inputHistory.crbegin(); it != inputHistory.crend(); ++it) {
+        std::string newRet = ret;
+        if (!newRet.empty())
+            newRet = " " + newRet;
 
-		newRet = *it + newRet;
-		ret = newRet;
+        newRet = *it + newRet;
+        ret = newRet;
 
-		if (ret.size() >= inputHistoryLength) {
-			break;
-		}
-	}
+        if (ret.size() >= inputHistoryLength) {
+            break;
+        }
+    }
 
-	if(ret.size() >= inputHistoryLength) {
-		historyString = ret.substr(ret.size() - inputHistoryLength);
-	} else {
-		historyString = ret;
-	}
+    if(ret.size() >= inputHistoryLength) {
+        historyString = ret.substr(ret.size() - inputHistoryLength);
+    } else {
+        historyString = ret;
+    }
 
     footer = historyString;
 }

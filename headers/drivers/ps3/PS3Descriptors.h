@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SPDX-License-Identifier: MIT
  * SPDX-FileCopyrightText: Copyright (c) 2021 Jason Skuby (mytechtoybox.com)
  */
@@ -26,12 +26,12 @@
  *
  **************************************************************************/
 
-#define ENDPOINT0_SIZE	64
+#define ENDPOINT0_SIZE    64
 #define PS3_FEATURES_SIZE 48
 
-#define GAMEPAD_INTERFACE	0
-#define GAMEPAD_ENDPOINT	1
-#define GAMEPAD_SIZE		64
+#define GAMEPAD_INTERFACE    0
+#define GAMEPAD_ENDPOINT    1
+#define GAMEPAD_SIZE        64
 
 #define LSB(n) (n & 255)
 #define MSB(n) ((n >> 8) & 255)
@@ -104,7 +104,7 @@ typedef enum {
 
 typedef struct __attribute((packed, aligned(1)))
 {
-	// digital buttons, 0 = off, 1 = on
+    // digital buttons, 0 = off, 1 = on
     // 0
     uint8_t reportID;
     // 1
@@ -258,10 +258,10 @@ static const uint8_t ps3_string_version[]      = "1.0";
 
 static const uint8_t *ps3_string_descriptors[] __attribute__((unused)) =
 {
-	ps3_string_language,
-	ps3_string_manufacturer,
-	ps3_string_product,
-	ps3_string_version
+    ps3_string_language,
+    ps3_string_manufacturer,
+    ps3_string_product,
+    ps3_string_version
 };
 
 static const uint8_t ps3_device_descriptor[] =
@@ -273,7 +273,7 @@ static const uint8_t ps3_device_descriptor[] =
     0x00,        // bDeviceSubClass 
     0x00,        // bDeviceProtocol 
     0x40,        // bMaxPacketSize0 64
-    LSB(PS3_VENDOR_ID), MSB(PS3_VENDOR_ID),	  // idVendor
+    LSB(PS3_VENDOR_ID), MSB(PS3_VENDOR_ID),      // idVendor
     LSB(PS3_PRODUCT_ID), MSB(PS3_PRODUCT_ID), // idProduct
     0x00, 0x01,  // bcdDevice 1.00
     0x01,        // iManufacturer (String Index)

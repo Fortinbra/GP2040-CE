@@ -1,4 +1,4 @@
-#include "drivers/xinput/XInputAuth.h"
+﻿#include "drivers/xinput/XInputAuth.h"
 #include "drivers/xinput/XInputAuthUSBListener.h"
 #include "peripheralmanager.h"
 
@@ -19,8 +19,8 @@ void XInputAuth::initialize() {
     } else {
         // Generate a serial number from the pico's unique ID
         uint8_t serial[0x0C];
-		pico_unique_board_id_t id;
-		pico_get_unique_board_id(&id);
+        pico_unique_board_id_t id;
+        pico_get_unique_board_id(&id);
         for(int i = 0; i < 0x0C; i++) {
             serial[i] = 'A' + (id.id[i]%25); // some alphanumeric from 'A' to 'Z'
         }

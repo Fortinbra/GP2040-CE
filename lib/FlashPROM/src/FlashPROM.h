@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SPDX-License-Identifier: MIT
  * SPDX-FileCopyrightText: Copyright (c) 2021 Jason Skuby (mytechtoybox.com)
  */
@@ -21,12 +21,12 @@
 
 class FlashPROM
 {
-	public:
-		void start();
-		void commit();
-		void reset();
+    public:
+        void start();
+        void commit();
+        void reset();
 
-		static uint8_t writeCache[EEPROM_SIZE_BYTES];
+        static uint8_t writeCache[EEPROM_SIZE_BYTES];
 };
 
 inline FlashPROM EEPROM;

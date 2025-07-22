@@ -1,4 +1,4 @@
-#ifndef _USBHOSTMANAGER_H_
+﻿#ifndef _USBHOSTMANAGER_H_
 #define _USBHOSTMANAGER_H_
 
 #include "usblistener.h"
@@ -14,12 +14,12 @@ usbh_class_driver_t const* usbh_app_driver_get_cb(uint8_t *driver_count);
 
 class USBHostManager {
 public:
-	USBHostManager(USBHostManager const&) = delete;
-	void operator=(USBHostManager const&)  = delete;
+    USBHostManager(USBHostManager const&) = delete;
+    void operator=(USBHostManager const&)  = delete;
     static USBHostManager& getInstance() {// Thread-safe storage ensures cross-thread talk
-		static USBHostManager instance; // Guaranteed to be destroyed. // Instantiated on first use.
-		return instance;
-	}
+        static USBHostManager instance; // Guaranteed to be destroyed. // Instantiated on first use.
+        return instance;
+    }
     void start();               // Start USB Host
     void shutdown();            // Called on system reboot
     void pushListener(USBListener *); // If anything needs to update in the gpconfig driver
