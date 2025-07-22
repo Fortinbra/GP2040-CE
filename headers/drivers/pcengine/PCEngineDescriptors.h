@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SPDX-License-Identifier: MIT
  * SPDX-FileCopyrightText: Copyright (c) 2024 OpenStickCommunity (gp2040-ce.info)
  */
@@ -31,24 +31,24 @@
 
 typedef struct __attribute((packed, aligned(1)))
 {
-	uint16_t buttons;
-	uint8_t hat;
-	uint8_t const0;
-	uint8_t const1;
-	uint8_t const2;
-	uint8_t const3;
-	uint8_t const4;
+    uint16_t buttons;
+    uint8_t hat;
+    uint8_t const0;
+    uint8_t const1;
+    uint8_t const2;
+    uint8_t const3;
+    uint8_t const4;
 } PCEngineReport;
 
 typedef struct
 {
-	uint16_t buttons;
-	uint8_t hat;
-	uint8_t const0;
-	uint8_t const1;
-	uint8_t const2;
-	uint8_t const3;
-	uint8_t const4;
+    uint16_t buttons;
+    uint8_t hat;
+    uint8_t const0;
+    uint8_t const1;
+    uint8_t const2;
+    uint8_t const3;
+    uint8_t const4;
 } PCEngineOutReport;
 
 static const uint8_t pcengine_string_language[]     = { 0x09, 0x04 };
@@ -58,10 +58,10 @@ static const uint8_t pcengine_string_version[]      = "1.0";
 
 static const uint8_t *pcengine_string_descriptors[] __attribute__((unused)) =
 {
-	pcengine_string_language,
-	pcengine_string_manufacturer,
-	pcengine_string_product,
-	pcengine_string_version
+    pcengine_string_language,
+    pcengine_string_manufacturer,
+    pcengine_string_product,
+    pcengine_string_version
 };
 
 static const uint8_t pcengine_device_descriptor[] =
@@ -84,13 +84,13 @@ static const uint8_t pcengine_device_descriptor[] =
 
 static const uint8_t pcengine_hid_descriptor[] =
 {
-	0x09,        // bLength
-	0x21,        // bDescriptorType (HID)
-	0x11, 0x01,  // bcdHID 1.11
-	0x00,        // bCountryCode
-	0x01,        // bNumDescriptors
-	0x22,        // bDescriptorType[0] (HID)
-	0x56, 0x00   // wDescriptorLength[0] 86
+    0x09,        // bLength
+    0x21,        // bDescriptorType (HID)
+    0x11, 0x01,  // bcdHID 1.11
+    0x00,        // bCountryCode
+    0x01,        // bNumDescriptors
+    0x22,        // bDescriptorType[0] (HID)
+    0x56, 0x00   // wDescriptorLength[0] 86
 };
 
 static const uint8_t pcengine_configuration_descriptor[] =

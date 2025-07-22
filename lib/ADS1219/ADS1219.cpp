@@ -1,4 +1,4 @@
-#include "ADS1219.h"
+﻿#include "ADS1219.h"
 
 #include <cstring>
 
@@ -75,7 +75,7 @@ uint32_t ADS1219::readConversionResult(){
   i2c->read(address, uc, 3);
   uint32_t data32 = (uc[0] << 16) | (uc[1] << 8) | (uc[2]);
   if (data32 >= 0x800000)
-			data32 = data32-0x1000000;
+            data32 = data32-0x1000000;
   return data32; // 24-bit ADC result signage hack
 }
 
@@ -89,12 +89,12 @@ void ADS1219::reset(){
 }
 
 void ADS1219::resetConfig(){
-	writeRegister(0x00);
+    writeRegister(0x00);
 }
 
 long ADS1219::readSingleEnded(int channel){
-	config &= MUX_MASK;
-	switch (channel){
+    config &= MUX_MASK;
+    switch (channel){
     case (0):
       config |= MUX_SINGLE_0;
       break;
@@ -107,8 +107,8 @@ long ADS1219::readSingleEnded(int channel){
     case (3):
       config |= MUX_SINGLE_3;
       break;
-	default:
-	  break;
+    default:
+      break;
   }
   writeRegister(config);
   return readConversionResult();
@@ -149,8 +149,8 @@ void ADS1219::setGain(adsGain_t gain){
 }
 
 void ADS1219::setDataRate(int rate){
-	config &= DATA_RATE_MASK;
-	switch (rate){
+    config &= DATA_RATE_MASK;
+    switch (rate){
     case (20):
       config |= DATA_RATE_20;
       break;
@@ -163,8 +163,8 @@ void ADS1219::setDataRate(int rate){
     case (1000):
       config |= DATA_RATE_1000;
       break;
-	default:
-	  break;
+    default:
+      break;
   }
   writeRegister(config);
 }
@@ -174,9 +174,9 @@ void ADS1219::setConversionMode(adsMode_t mode){
   config |= mode;
   writeRegister(config);
   if (mode == CONTINUOUS){
-	  singleShot = false;
+      singleShot = false;
   } else {
-	  singleShot = true;
+      singleShot = true;
   }
 }
 
@@ -188,7 +188,7 @@ void ADS1219::setVoltageReference(adsRef_t vref){
 
 void ADS1219::setChannel(int channel){
   config &= MUX_MASK;
-	switch (channel){
+    switch (channel){
     case (0):
       config |= MUX_SINGLE_0;
       break;
@@ -201,8 +201,8 @@ void ADS1219::setChannel(int channel){
     case (3):
       config |= MUX_SINGLE_3;
       break;
-	  default:
-	    break;
+      default:
+        break;
   }
   writeRegister(config);
 }

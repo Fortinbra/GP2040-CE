@@ -1,4 +1,4 @@
-#include "host/usbh.h"
+﻿#include "host/usbh.h"
 #include "class/hid/hid.h"
 #include "class/hid/hid_host.h"
 #include "drivers/ps4/PS4Auth.h"
@@ -66,7 +66,7 @@ void PS4Auth::process() {
     if (authType == InputModeAuthType::INPUT_MODE_AUTH_TYPE_KEYS ) {
         keyModeProcess();
     } else if (authType == InputModeAuthType::INPUT_MODE_AUTH_TYPE_USB ) {
-        ((PS4AuthUSBListener*)listener)->process(); 	// process HOST with client data
+        ((PS4AuthUSBListener*)listener)->process();     // process HOST with client data
     }
 }
 

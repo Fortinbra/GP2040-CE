@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SPDX-License-Identifier: MIT
  * SPDX-FileCopyrightText: Copyright (c) 2024 OpenStickCommunity (gp2040-ce.info)
  */
@@ -45,10 +45,10 @@ static const uint8_t psclassic_string_version[]      = { };
 
 static const uint8_t *psclassic_string_descriptors[] __attribute__((unused)) =
 {
-	psclassic_string_language,
-	psclassic_string_manufacturer,
-	psclassic_string_product,
-	psclassic_string_version
+    psclassic_string_language,
+    psclassic_string_manufacturer,
+    psclassic_string_product,
+    psclassic_string_version
 };
 
 static const uint8_t psclassic_device_descriptor[] =

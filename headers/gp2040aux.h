@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SPDX-License-Identifier: MIT
  * SPDX-FileCopyrightText: Copyright (c) 2024 OpenStickCommunity (gp2040-ce.info)
  */
@@ -11,7 +11,7 @@
 
 class GP2040Aux {
 public:
-	GP2040Aux();
+    GP2040Aux();
     ~GP2040Aux();
     void setup();           // setup core1
     void run();             // loop core1

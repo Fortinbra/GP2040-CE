@@ -1,4 +1,4 @@
-#include "addons/reverse.h"
+﻿#include "addons/reverse.h"
 #include "storagemanager.h"
 #include "GamepadEnums.h"
 #include "helper.h"
@@ -6,7 +6,7 @@
 
 bool ReverseInput::available() {
     const ReverseOptions& options = Storage::getInstance().getAddonOptions().reverseOptions;
-	return options.enabled;
+    return options.enabled;
 }
 
 void ReverseInput::setup()
@@ -39,10 +39,10 @@ void ReverseInput::setup()
     actionRight = options.actionRight;
 
     Gamepad * gamepad = Storage::getInstance().GetGamepad();
-	mapDpadUp    = gamepad->mapDpadUp;
-	mapDpadDown  = gamepad->mapDpadDown;
-	mapDpadLeft  = gamepad->mapDpadLeft;
-	mapDpadRight = gamepad->mapDpadRight;
+    mapDpadUp    = gamepad->mapDpadUp;
+    mapDpadDown  = gamepad->mapDpadDown;
+    mapDpadLeft  = gamepad->mapDpadLeft;
+    mapDpadRight = gamepad->mapDpadRight;
 
     invertXAxis = gamepad->getOptions().invertXAxis;
     invertYAxis = gamepad->getOptions().invertYAxis;

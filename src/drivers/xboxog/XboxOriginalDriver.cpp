@@ -1,4 +1,4 @@
-#include "drivers/xboxog/XboxOriginalDriver.h"
+﻿#include "drivers/xboxog/XboxOriginalDriver.h"
 #include "drivers/xboxog/xid/xid.h"
 #include "drivers/shared/driverhelper.h"
 
@@ -24,17 +24,17 @@ void XboxOriginalDriver::initialize() {
 }
 
 bool XboxOriginalDriver::process(Gamepad * gamepad) {
-	// digital buttons
-	xboxOriginalReport.dButtons = 0
-		| (gamepad->pressedUp()    ? XID_DUP    : 0)
-		| (gamepad->pressedDown()  ? XID_DDOWN  : 0)
-		| (gamepad->pressedLeft()  ? XID_DLEFT  : 0)
-		| (gamepad->pressedRight() ? XID_DRIGHT : 0)
-		| (gamepad->pressedS2()    ? XID_START  : 0)
-		| (gamepad->pressedS1()    ? XID_BACK   : 0)
-		| (gamepad->pressedL3()    ? XID_LS     : 0)
-		| (gamepad->pressedR3()    ? XID_RS     : 0)
-	;
+    // digital buttons
+    xboxOriginalReport.dButtons = 0
+        | (gamepad->pressedUp()    ? XID_DUP    : 0)
+        | (gamepad->pressedDown()  ? XID_DDOWN  : 0)
+        | (gamepad->pressedLeft()  ? XID_DLEFT  : 0)
+        | (gamepad->pressedRight() ? XID_DRIGHT : 0)
+        | (gamepad->pressedS2()    ? XID_START  : 0)
+        | (gamepad->pressedS1()    ? XID_BACK   : 0)
+        | (gamepad->pressedL3()    ? XID_LS     : 0)
+        | (gamepad->pressedR3()    ? XID_RS     : 0)
+    ;
 
     // analog buttons - convert to digital
     xboxOriginalReport.A     = (gamepad->pressedB1() ? 0xFF : 0);
@@ -45,26 +45,26 @@ bool XboxOriginalDriver::process(Gamepad * gamepad) {
     xboxOriginalReport.WHITE = (gamepad->pressedL1() ? 0xFF : 0);
 
     // analog triggers
-	if (gamepad->hasAnalogTriggers) {
-		xboxOriginalReport.L = gamepad->pressedL2() ? 0xFF : gamepad->state.lt;
-		xboxOriginalReport.R = gamepad->pressedR2() ? 0xFF : gamepad->state.rt;
-	} else {
-		xboxOriginalReport.L = gamepad->pressedL2() ? 0xFF : 0;
-		xboxOriginalReport.R = gamepad->pressedR2() ? 0xFF : 0;
-	}
+    if (gamepad->hasAnalogTriggers) {
+        xboxOriginalReport.L = gamepad->pressedL2() ? 0xFF : gamepad->state.lt;
+        xboxOriginalReport.R = gamepad->pressedR2() ? 0xFF : gamepad->state.rt;
+    } else {
+        xboxOriginalReport.L = gamepad->pressedL2() ? 0xFF : 0;
+        xboxOriginalReport.R = gamepad->pressedR2() ? 0xFF : 0;
+    }
 
     // analog sticks
-	xboxOriginalReport.leftStickX = static_cast<int16_t>(gamepad->state.lx) + INT16_MIN;
-	xboxOriginalReport.leftStickY = static_cast<int16_t>(~gamepad->state.ly) + INT16_MIN;
-	xboxOriginalReport.rightStickX = static_cast<int16_t>(gamepad->state.rx) + INT16_MIN;
-	xboxOriginalReport.rightStickY = static_cast<int16_t>(~gamepad->state.ry) + INT16_MIN;
+    xboxOriginalReport.leftStickX = static_cast<int16_t>(gamepad->state.lx) + INT16_MIN;
+    xboxOriginalReport.leftStickY = static_cast<int16_t>(~gamepad->state.ly) + INT16_MIN;
+    xboxOriginalReport.rightStickX = static_cast<int16_t>(gamepad->state.rx) + INT16_MIN;
+    xboxOriginalReport.rightStickY = static_cast<int16_t>(~gamepad->state.ry) + INT16_MIN;
 
-	if (tud_suspended())
-		tud_remote_wakeup();
+    if (tud_suspended())
+        tud_remote_wakeup();
 
     bool reportSent = false;
     uint8_t xIndex = xid_get_index_by_type(0, XID_TYPE_GAMECONTROLLER);
-	if (memcmp(last_report, &xboxOriginalReport, sizeof(XboxOriginalReport)) != 0) {
+    if (memcmp(last_report, &xboxOriginalReport, sizeof(XboxOriginalReport)) != 0) {
         if ( xid_send_report(xIndex, &xboxOriginalReport, sizeof(XboxOriginalReport)) == true ) {
             memcpy(last_report, &xboxOriginalReport, sizeof(XboxOriginalReport));
             reportSent = true;
@@ -93,7 +93,7 @@ bool XboxOriginalDriver::process(Gamepad * gamepad) {
 // tud_hid_get_report_cb
 uint16_t XboxOriginalDriver::get_report(uint8_t report_id, hid_report_type_t report_type, uint8_t *buffer, uint16_t reqlen) {
     memcpy(buffer, &xboxOriginalReport, sizeof(XboxOriginalReport));
-	return sizeof(XboxOriginalReport);
+    return sizeof(XboxOriginalReport);
 }
 
 // Only PS4 does anything with set report
@@ -105,8 +105,8 @@ bool XboxOriginalDriver::vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, t
 }
 
 const uint16_t * XboxOriginalDriver::get_descriptor_string_cb(uint8_t index, uint16_t langid) {
-	const char *value = (const char *)xboxoriginal_string_descriptors[index];
-	return getStringDescriptor(value, index); // getStringDescriptor returns a static array
+    const char *value = (const char *)xboxoriginal_string_descriptors[index];
+    return getStringDescriptor(value, index); // getStringDescriptor returns a static array
 }
 
 const uint8_t * XboxOriginalDriver::get_descriptor_device_cb() {
@@ -122,9 +122,9 @@ const uint8_t * XboxOriginalDriver::get_descriptor_configuration_cb(uint8_t inde
 }
 
 const uint8_t * XboxOriginalDriver::get_descriptor_device_qualifier_cb() {
-	return nullptr;
+    return nullptr;
 }
 
 uint16_t XboxOriginalDriver::GetJoystickMidValue() {
-	return GAMEPAD_JOYSTICK_MID;
+    return GAMEPAD_JOYSTICK_MID;
 }

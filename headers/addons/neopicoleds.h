@@ -1,4 +1,4 @@
-/*
+﻿/*
 * SPDX-License-Identifier: MIT
 * SPDX-FileCopyrightText: Copyright (c) 2021 Jason Skuby (mytechtoybox.com)
 */
@@ -229,7 +229,7 @@ public:
     virtual void postprocess(bool sent) {}
     virtual void reinit() {}
     virtual std::string name() { return NeoPicoLEDName; }    
-	void ambientLightLinkage(); 
+    void ambientLightLinkage(); 
     
 private:
     std::vector<uint8_t> * getLEDPositions(std::string button, std::vector<std::vector<uint8_t>> *positions);
@@ -257,14 +257,14 @@ private:
     uint32_t frame[100];
 
     // Ambient neopico leds
-	float alBrightnessBreathX;
-	uint8_t breathLedEffectCycle;
-	bool alReverse;
-	int alCurrentFrame;
-	int alFrameToRGB;
-	int alFrameSpeed;
+    float alBrightnessBreathX;
+    uint8_t breathLedEffectCycle;
+    bool alReverse;
+    int alCurrentFrame;
+    int alFrameToRGB;
+    int alFrameSpeed;
     RGB ambientLight;
-	absolute_time_t nextRunTimeAmbientLight;
+    absolute_time_t nextRunTimeAmbientLight;
     uint8_t chaseLightIndex;
     uint8_t chaseLightMaxIndexPos;
 

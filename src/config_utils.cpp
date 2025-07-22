@@ -1,4 +1,4 @@
-#include "config_utils.h"
+﻿#include "config_utils.h"
 
 #include "config.pb.h"
 #include "enums.pb.h"
@@ -447,7 +447,7 @@ void ConfigUtils::initUnsetPropertiesWithDefaults(Config& config)
     INIT_UNSET_PROPERTY(config.displayOptions, splashMode, SPLASH_MODE);
     INIT_UNSET_PROPERTY(config.displayOptions, splashChoice, SPLASH_CHOICE);
     INIT_UNSET_PROPERTY(config.displayOptions, splashDuration, SPLASH_DURATION);
-	const unsigned char defaultSplash[] = { DEFAULT_SPLASH };
+    const unsigned char defaultSplash[] = { DEFAULT_SPLASH };
     INIT_UNSET_PROPERTY_BYTES(config.displayOptions, splashImage, defaultSplash);
     INIT_UNSET_PROPERTY(config.displayOptions, size, DISPLAY_SIZE);
     INIT_UNSET_PROPERTY(config.displayOptions, flip, DISPLAY_FLIP);
@@ -685,7 +685,7 @@ void ConfigUtils::initUnsetPropertiesWithDefaults(Config& config)
     INIT_UNSET_PROPERTY(config.addonOptions.dualDirectionalOptions, combineMode, DualDirectionalCombinationMode::MIXED_MODE);
     INIT_UNSET_PROPERTY(config.addonOptions.dualDirectionalOptions, fourWayMode, false);
 
-	// addonOptions.tiltOptions
+    // addonOptions.tiltOptions
     INIT_UNSET_PROPERTY(config.addonOptions.tiltOptions, enabled, !!TILT_ENABLED);
     INIT_UNSET_PROPERTY(config.addonOptions.tiltOptions, tilt1Pin, (Pin_t)-1);
     INIT_UNSET_PROPERTY(config.addonOptions.tiltOptions, factorTilt1LeftX, TILT1_FACTOR_LEFT_X);
@@ -1109,7 +1109,7 @@ void gpioMappingsMigrationCore(Config& config)
 
     // Assign all potential board config pins
     GpioAction boardConfig[NUM_BANK0_GPIOS] = {GPIO_PIN_00, GPIO_PIN_01, GPIO_PIN_02,
-											   GPIO_PIN_03, GPIO_PIN_04, GPIO_PIN_05,
+                                               GPIO_PIN_03, GPIO_PIN_04, GPIO_PIN_05,
                                                GPIO_PIN_06, GPIO_PIN_07, GPIO_PIN_08,
                                                GPIO_PIN_09, GPIO_PIN_10, GPIO_PIN_11,
                                                GPIO_PIN_12, GPIO_PIN_13, GPIO_PIN_14,
@@ -1504,38 +1504,38 @@ void hotkeysMigration(Config& config)
 
     // F1 == S1 | S2, no Fn
     if (hotkeys.hotkey01.has_dpadMask && (!hotkeys.hotkey01.has_auxMask || !hotkeys.hotkey01.has_buttonsMask)) {
-	INIT_UNSET_PROPERTY(hotkeys.hotkey01, auxMask, 0);
-	INIT_UNSET_PROPERTY(hotkeys.hotkey01, buttonsMask, GAMEPAD_MASK_S1 | GAMEPAD_MASK_S2);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey01, auxMask, 0);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey01, buttonsMask, GAMEPAD_MASK_S1 | GAMEPAD_MASK_S2);
     }
     if (hotkeys.hotkey02.has_dpadMask && (!hotkeys.hotkey02.has_auxMask || !hotkeys.hotkey02.has_buttonsMask)) {
-	INIT_UNSET_PROPERTY(hotkeys.hotkey02, auxMask, 0);
-	INIT_UNSET_PROPERTY(hotkeys.hotkey02, buttonsMask, GAMEPAD_MASK_S1 | GAMEPAD_MASK_S2);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey02, auxMask, 0);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey02, buttonsMask, GAMEPAD_MASK_S1 | GAMEPAD_MASK_S2);
     }
     if (hotkeys.hotkey03.has_dpadMask && (!hotkeys.hotkey03.has_auxMask || !hotkeys.hotkey03.has_buttonsMask)) {
-	INIT_UNSET_PROPERTY(hotkeys.hotkey03, auxMask, 0);
-	INIT_UNSET_PROPERTY(hotkeys.hotkey03, buttonsMask, GAMEPAD_MASK_S1 | GAMEPAD_MASK_S2);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey03, auxMask, 0);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey03, buttonsMask, GAMEPAD_MASK_S1 | GAMEPAD_MASK_S2);
     }
     if (hotkeys.hotkey04.has_dpadMask && (!hotkeys.hotkey04.has_auxMask || !hotkeys.hotkey04.has_buttonsMask)) {
-	INIT_UNSET_PROPERTY(hotkeys.hotkey04, auxMask, 0);
-	INIT_UNSET_PROPERTY(hotkeys.hotkey04, buttonsMask, GAMEPAD_MASK_S1 | GAMEPAD_MASK_S2);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey04, auxMask, 0);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey04, buttonsMask, GAMEPAD_MASK_S1 | GAMEPAD_MASK_S2);
     }
 
     // F2 == S2 | A1, no Fn
     if (hotkeys.hotkey05.has_dpadMask && (!hotkeys.hotkey05.has_auxMask || !hotkeys.hotkey05.has_buttonsMask)) {
-	INIT_UNSET_PROPERTY(hotkeys.hotkey05, auxMask, 0);
-	INIT_UNSET_PROPERTY(hotkeys.hotkey05, buttonsMask, GAMEPAD_MASK_S2 | GAMEPAD_MASK_A1);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey05, auxMask, 0);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey05, buttonsMask, GAMEPAD_MASK_S2 | GAMEPAD_MASK_A1);
     }
     if (hotkeys.hotkey06.has_dpadMask && (!hotkeys.hotkey06.has_auxMask || !hotkeys.hotkey06.has_buttonsMask)) {
-	INIT_UNSET_PROPERTY(hotkeys.hotkey06, auxMask, 0);
-	INIT_UNSET_PROPERTY(hotkeys.hotkey06, buttonsMask, GAMEPAD_MASK_S2 | GAMEPAD_MASK_A1);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey06, auxMask, 0);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey06, buttonsMask, GAMEPAD_MASK_S2 | GAMEPAD_MASK_A1);
     }
     if (hotkeys.hotkey07.has_dpadMask && (!hotkeys.hotkey07.has_auxMask || !hotkeys.hotkey07.has_buttonsMask)) {
-	INIT_UNSET_PROPERTY(hotkeys.hotkey07, auxMask, 0);
-	INIT_UNSET_PROPERTY(hotkeys.hotkey07, buttonsMask, GAMEPAD_MASK_S2 | GAMEPAD_MASK_A1);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey07, auxMask, 0);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey07, buttonsMask, GAMEPAD_MASK_S2 | GAMEPAD_MASK_A1);
     }
     if (hotkeys.hotkey08.has_dpadMask && (!hotkeys.hotkey08.has_auxMask || !hotkeys.hotkey08.has_buttonsMask)) {
-	INIT_UNSET_PROPERTY(hotkeys.hotkey08, auxMask, 0);
-	INIT_UNSET_PROPERTY(hotkeys.hotkey08, buttonsMask, GAMEPAD_MASK_S2 | GAMEPAD_MASK_A1);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey08, auxMask, 0);
+    INIT_UNSET_PROPERTY(hotkeys.hotkey08, buttonsMask, GAMEPAD_MASK_S2 | GAMEPAD_MASK_A1);
     }
 
     config.migrations.hotkeysMigrated = true;

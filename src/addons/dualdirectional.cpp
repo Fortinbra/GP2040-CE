@@ -1,4 +1,4 @@
-#include "addons/dualdirectional.h"
+﻿#include "addons/dualdirectional.h"
 #include "storagemanager.h"
 #include "helper.h"
 #include "config.pb.h"
@@ -52,32 +52,32 @@ void DualDirectionalInput::reinit()
 
 uint8_t DualDirectionalInput::updateDpadDDI(uint8_t dpad, DpadDirection direction)
 {
-	static bool inList[] = {false, false, false, false, false}; // correspond to DpadDirection: none, up, down, left, right
-	static list<DpadDirection> dpadList;
+    static bool inList[] = {false, false, false, false, false}; // correspond to DpadDirection: none, up, down, left, right
+    static list<DpadDirection> dpadList;
 
-	if(dpad & getMaskFromDirection(direction))
-	{
-		if(!inList[direction])
-		{
-			dpadList.push_back(direction);
-			inList[direction] = true;
-		}
-	}
-	else
-	{
-		if(inList[direction])
-		{
-			dpadList.remove(direction);
-			inList[direction] = false;
-		}
-	}
+    if(dpad & getMaskFromDirection(direction))
+    {
+        if(!inList[direction])
+        {
+            dpadList.push_back(direction);
+            inList[direction] = true;
+        }
+    }
+    else
+    {
+        if(inList[direction])
+        {
+            dpadList.remove(direction);
+            inList[direction] = false;
+        }
+    }
 
-	if(dpadList.empty()) {
-		return 0;
-	}
-	else {
-		return getMaskFromDirection(dpadList.back());
-	}
+    if(dpadList.empty()) {
+        return 0;
+    }
+    else {
+        return getMaskFromDirection(dpadList.back());
+    }
 }
 
 /**
@@ -90,10 +90,10 @@ uint8_t DualDirectionalInput::updateDpadDDI(uint8_t dpad, DpadDirection directio
  */
 uint8_t DualDirectionalInput::filterToFourWayModeDDI(uint8_t dpad)
 {
-	updateDpadDDI(dpad, DIRECTION_UP);
-	updateDpadDDI(dpad, DIRECTION_DOWN);
-	updateDpadDDI(dpad, DIRECTION_LEFT);
-	return updateDpadDDI(dpad, DIRECTION_RIGHT);
+    updateDpadDDI(dpad, DIRECTION_UP);
+    updateDpadDDI(dpad, DIRECTION_DOWN);
+    updateDpadDDI(dpad, DIRECTION_LEFT);
+    return updateDpadDDI(dpad, DIRECTION_RIGHT);
 }
 
 

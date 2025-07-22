@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Copyright (c) 2020 Raspberry Pi (Trading) Ltd.
  *
  * Modified by Jonathan Barket - 2021
@@ -89,9 +89,9 @@ void AnimationStation::HandleEvent(GamepadHotkey action) {
     reqSave = true;
   }
 
-	if (reqSave) {
-		EventManager::getInstance().triggerEvent(new GPStorageSaveEvent(false));
-	}
+    if (reqSave) {
+        EventManager::getInstance().triggerEvent(new GPStorageSaveEvent(false));
+    }
 }
 
 void AnimationStation::ChangeAnimation(int changeSize) {

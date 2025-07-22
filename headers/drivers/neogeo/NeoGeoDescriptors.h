@@ -1,4 +1,4 @@
-/*
+﻿/*
  * SPDX-License-Identifier: MIT
  * SPDX-FileCopyrightText: Copyright (c) 2024 OpenStickCommunity (gp2040-ce.info)
  */
@@ -36,50 +36,50 @@
 
 typedef struct __attribute((packed, aligned(1)))
 {
-	uint16_t buttons;
-	uint8_t hat;
-	uint8_t const0;
-	uint8_t const1;
-	uint8_t const2;
-	uint8_t const3;
-	uint8_t const4;
-	uint8_t const5;
-	uint8_t const6;
-	uint8_t const7;
-	uint8_t const8;
-	uint8_t const9;
-	uint8_t const10;
-	uint8_t const11;
-	uint8_t const12;
-	uint8_t const13;
-	uint8_t const14;
-	uint8_t const15;
-	uint8_t const16;
-	uint8_t const17;
+    uint16_t buttons;
+    uint8_t hat;
+    uint8_t const0;
+    uint8_t const1;
+    uint8_t const2;
+    uint8_t const3;
+    uint8_t const4;
+    uint8_t const5;
+    uint8_t const6;
+    uint8_t const7;
+    uint8_t const8;
+    uint8_t const9;
+    uint8_t const10;
+    uint8_t const11;
+    uint8_t const12;
+    uint8_t const13;
+    uint8_t const14;
+    uint8_t const15;
+    uint8_t const16;
+    uint8_t const17;
 } NeogeoReport;
 
 typedef struct
 {
-	uint16_t buttons;
-	uint8_t hat;
-	uint8_t const0;
-	uint8_t const1;
-	uint8_t const2;
-	uint8_t const3;
-	uint8_t const4;
-	uint8_t const5;
-	uint8_t const6;
-	uint8_t const7;
-	uint8_t const8;
-	uint8_t const9;
-	uint8_t const10;
-	uint8_t const11;
-	uint8_t const12;
-	uint8_t const13;
-	uint8_t const14;
-	uint8_t const15;
-	uint8_t const16;
-	uint8_t const17;
+    uint16_t buttons;
+    uint8_t hat;
+    uint8_t const0;
+    uint8_t const1;
+    uint8_t const2;
+    uint8_t const3;
+    uint8_t const4;
+    uint8_t const5;
+    uint8_t const6;
+    uint8_t const7;
+    uint8_t const8;
+    uint8_t const9;
+    uint8_t const10;
+    uint8_t const11;
+    uint8_t const12;
+    uint8_t const13;
+    uint8_t const14;
+    uint8_t const15;
+    uint8_t const16;
+    uint8_t const17;
 } NeogeoOutReport;
 
 static const uint8_t neogeo_string_language[]     = { 0x09, 0x04 };
@@ -89,10 +89,10 @@ static const uint8_t neogeo_string_version[]      = { 0x20, 0x31, 0x2e, 0x31, 0x
 
 static const uint8_t *neogeo_string_descriptors[] __attribute__((unused)) =
 {
-	neogeo_string_language,
-	neogeo_string_manufacturer,
-	neogeo_string_product,
-	neogeo_string_version
+    neogeo_string_language,
+    neogeo_string_manufacturer,
+    neogeo_string_product,
+    neogeo_string_version
 };
 
 static const uint8_t neogeo_device_descriptor[] =
@@ -115,13 +115,13 @@ static const uint8_t neogeo_device_descriptor[] =
 
 static const uint8_t neogeo_hid_descriptor[] =
 {
-	0x09,        // bLength
-	0x21,        // bDescriptorType (HID)
-	0x11, 0x01,  // bcdHID 1.11
-	0x00,        // bCountryCode
-	0x01,        // bNumDescriptors
-	0x22,        // bDescriptorType[0] (HID)
-	0x56, 0x00   // wDescriptorLength[0] 86
+    0x09,        // bLength
+    0x21,        // bDescriptorType (HID)
+    0x11, 0x01,  // bcdHID 1.11
+    0x00,        // bCountryCode
+    0x01,        // bNumDescriptors
+    0x22,        // bDescriptorType[0] (HID)
+    0x56, 0x00   // wDescriptorLength[0] 86
 };
 
 static const uint8_t neogeo_configuration_descriptor[] =

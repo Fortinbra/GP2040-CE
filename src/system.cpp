@@ -1,4 +1,4 @@
-#include "system.h"
+﻿#include "system.h"
 
 #include "usbhostmanager.h"
 
@@ -64,15 +64,15 @@ void System::reboot(BootMode bootMode) {
 
     // Make sure that the other core is halted
     // We do not want it to be talking to devices (e.g. OLED display) while we reboot
-	multicore_lockout_start_timeout_us(0xfffffffffffffff);
+    multicore_lockout_start_timeout_us(0xfffffffffffffff);
 
-	watchdog_hw->scratch[5] = static_cast<uint32_t>(bootMode);
+    watchdog_hw->scratch[5] = static_cast<uint32_t>(bootMode);
 
     // This is based on MicroPythons machine.reset()
-	watchdog_reboot(0, 0, 0);
-	for (;;) {
-		__wfi();
-	}
+    watchdog_reboot(0, 0, 0);
+    for (;;) {
+        __wfi();
+    }
 }
 
 System::BootMode System::takeBootMode() {

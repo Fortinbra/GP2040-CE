@@ -1,4 +1,4 @@
-#include "config.pb.h"
+﻿#include "config.pb.h"
 #include "base64.h"
 
 #include "drivermanager.h"
@@ -1010,42 +1010,42 @@ std::string setCustomTheme()
     };
 
     readDoc(options.hasCustomTheme, doc, "enabled");
-    options.customThemeUp 			= readDocDefaultToZero("Up", "u");
-    options.customThemeDown 		= readDocDefaultToZero("Down", "u");
-    options.customThemeLeft			= readDocDefaultToZero("Left", "u");
-    options.customThemeRight		= readDocDefaultToZero("Right", "u");
-    options.customThemeB1			= readDocDefaultToZero("B1", "u");
-    options.customThemeB2			= readDocDefaultToZero("B2", "u");
-    options.customThemeB3			= readDocDefaultToZero("B3", "u");
-    options.customThemeB4			= readDocDefaultToZero("B4", "u");
-    options.customThemeL1			= readDocDefaultToZero("L1", "u");
-    options.customThemeR1			= readDocDefaultToZero("R1", "u");
-    options.customThemeL2			= readDocDefaultToZero("L2", "u");
-    options.customThemeR2			= readDocDefaultToZero("R2", "u");
-    options.customThemeS1			= readDocDefaultToZero("S1", "u");
-    options.customThemeS2			= readDocDefaultToZero("S2", "u");
-    options.customThemeL3			= readDocDefaultToZero("L3", "u");
-    options.customThemeR3			= readDocDefaultToZero("R3", "u");
-    options.customThemeA1			= readDocDefaultToZero("A1", "u");
-    options.customThemeA2			= readDocDefaultToZero("A2", "u");
-    options.customThemeUpPressed	= readDocDefaultToZero("Up", "d");
-    options.customThemeDownPressed	= readDocDefaultToZero("Down", "d");
-    options.customThemeLeftPressed	= readDocDefaultToZero("Left", "d");
-    options.customThemeRightPressed	= readDocDefaultToZero("Right", "d");
-    options.customThemeB1Pressed	= readDocDefaultToZero("B1", "d");
-    options.customThemeB2Pressed	= readDocDefaultToZero("B2", "d");
-    options.customThemeB3Pressed	= readDocDefaultToZero("B3", "d");
-    options.customThemeB4Pressed	= readDocDefaultToZero("B4", "d");
-    options.customThemeL1Pressed	= readDocDefaultToZero("L1", "d");
-    options.customThemeR1Pressed	= readDocDefaultToZero("R1", "d");
-    options.customThemeL2Pressed	= readDocDefaultToZero("L2", "d");
-    options.customThemeR2Pressed	= readDocDefaultToZero("R2", "d");
-    options.customThemeS1Pressed	= readDocDefaultToZero("S1", "d");
-    options.customThemeS2Pressed	= readDocDefaultToZero("S2", "d");
-    options.customThemeL3Pressed	= readDocDefaultToZero("L3", "d");
-    options.customThemeR3Pressed	= readDocDefaultToZero("R3", "d");
-    options.customThemeA1Pressed	= readDocDefaultToZero("A1", "d");
-    options.customThemeA2Pressed	= readDocDefaultToZero("A2", "d");
+    options.customThemeUp             = readDocDefaultToZero("Up", "u");
+    options.customThemeDown         = readDocDefaultToZero("Down", "u");
+    options.customThemeLeft            = readDocDefaultToZero("Left", "u");
+    options.customThemeRight        = readDocDefaultToZero("Right", "u");
+    options.customThemeB1            = readDocDefaultToZero("B1", "u");
+    options.customThemeB2            = readDocDefaultToZero("B2", "u");
+    options.customThemeB3            = readDocDefaultToZero("B3", "u");
+    options.customThemeB4            = readDocDefaultToZero("B4", "u");
+    options.customThemeL1            = readDocDefaultToZero("L1", "u");
+    options.customThemeR1            = readDocDefaultToZero("R1", "u");
+    options.customThemeL2            = readDocDefaultToZero("L2", "u");
+    options.customThemeR2            = readDocDefaultToZero("R2", "u");
+    options.customThemeS1            = readDocDefaultToZero("S1", "u");
+    options.customThemeS2            = readDocDefaultToZero("S2", "u");
+    options.customThemeL3            = readDocDefaultToZero("L3", "u");
+    options.customThemeR3            = readDocDefaultToZero("R3", "u");
+    options.customThemeA1            = readDocDefaultToZero("A1", "u");
+    options.customThemeA2            = readDocDefaultToZero("A2", "u");
+    options.customThemeUpPressed    = readDocDefaultToZero("Up", "d");
+    options.customThemeDownPressed    = readDocDefaultToZero("Down", "d");
+    options.customThemeLeftPressed    = readDocDefaultToZero("Left", "d");
+    options.customThemeRightPressed    = readDocDefaultToZero("Right", "d");
+    options.customThemeB1Pressed    = readDocDefaultToZero("B1", "d");
+    options.customThemeB2Pressed    = readDocDefaultToZero("B2", "d");
+    options.customThemeB3Pressed    = readDocDefaultToZero("B3", "d");
+    options.customThemeB4Pressed    = readDocDefaultToZero("B4", "d");
+    options.customThemeL1Pressed    = readDocDefaultToZero("L1", "d");
+    options.customThemeR1Pressed    = readDocDefaultToZero("R1", "d");
+    options.customThemeL2Pressed    = readDocDefaultToZero("L2", "d");
+    options.customThemeR2Pressed    = readDocDefaultToZero("R2", "d");
+    options.customThemeS1Pressed    = readDocDefaultToZero("S1", "d");
+    options.customThemeS2Pressed    = readDocDefaultToZero("S2", "d");
+    options.customThemeL3Pressed    = readDocDefaultToZero("L3", "d");
+    options.customThemeR3Pressed    = readDocDefaultToZero("R3", "d");
+    options.customThemeA1Pressed    = readDocDefaultToZero("A1", "d");
+    options.customThemeA2Pressed    = readDocDefaultToZero("A2", "d");
 
     uint32_t pressCooldown = 0;
     readDoc(pressCooldown, doc, "buttonPressColorCooldownTimeInMs");
@@ -2341,9 +2341,9 @@ std::string echo()
 
 // MUST MATCH NAVIGATION.JSX
 enum BOOT_MODES {
-	GAMEPAD = 0,
-	WEBCONFIG = 1,
-	BOOTSEL = 2,
+    GAMEPAD = 0,
+    WEBCONFIG = 1,
+    BOOTSEL = 2,
 };
 
 std::string reboot() {

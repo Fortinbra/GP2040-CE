@@ -1,9 +1,9 @@
-// ADS1256 cpp file
+﻿// ADS1256 cpp file
 /*
-Name:		ADS1256.cpp
-Created:	2022/07/14
-Author:	Curious Scientist
-Editor:	Notepad++
+Name:        ADS1256.cpp
+Created:    2022/07/14
+Author:    Curious Scientist
+Editor:    Notepad++
 Comment: Visit https://curiousscientist.tech/blog/ADS1256-custom-library
 Special thanks to Abraão Queiroz for spending time on the code and suggesting corrections for ESP32 microcontrollers!
 
