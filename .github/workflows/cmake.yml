@@ -13,37 +13,41 @@ on:
         description: "Board configuration to build (leave empty to build all)"
         required: false
         type: choice
+        # NOTE: These options must be manually maintained to match configs/ directories
+        # Run: find configs/ -maxdepth 1 -type d -not -name "configs" -not -name ".*" | sed 's|configs/||' | sort
+        # to get the current list of available board configurations
         options:
           - ""
+          - adafruit_kb2040
           - ARCController
-          - Blank
-          - pico
-          - pico_w
-          - pico2
-          - pico2_w
           - BentoBox
+          - Blank
           - DuelPadZen
           - FlatboxRev4
           - FlatboxRev5
           - FlatboxRev5RGB
-          - FlatboxRev5USBPassthrough
           - FlatboxRev5Southpaw
+          - FlatboxRev5USBPassthrough
           - FlatboxRev8
           - Granola
-          - adafruit_kb2040
-          - KeyboardConverter
           - Haute42COSMOX
           - Haute42COSMOXMLite
           - Haute42COSMOXMUltra
           - Haute42COSMOXXAnalog
+          - KeyboardConverter
           - Liatris
           - MavercadeRev1
           - MavercadeRev2
+          - Minimal
           - MiSTercadeV2
           - OpenCore0
           - OpenCore0MIXUP
           - OpenCore0WASD
           - OSUMGP-RP2040
+          - pico
+          - pico_w
+          - pico2
+          - pico2_w
           - PicoAnn
           - PicoFightingBoard
           - PXPGamepad
@@ -59,11 +63,11 @@ on:
           - RP2040MiniBreakoutBoard
           - RP2040MiniBreakoutBoardUSBPassthrough
           - seeed_xiao_rp2040
+          - SGFDevices
           - sparkfun_promicro
           - sparkfun_promicro_rp2350
-          - waveshare_rp2040_zero
           - Stress
-          - SGFDevices
+          - waveshare_rp2040_zero
           - ZeroRhythm
 
 env:
@@ -78,6 +82,12 @@ jobs:
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
+      - name: Checkout GP2040-CE
+        uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
       - name: Determine build matrix
         id: set-matrix
         run: |
@@ -86,10 +96,28 @@ jobs:
             echo "matrix=[\"${{ github.event.inputs.board_config }}\"]" >> $GITHUB_OUTPUT
             echo "Building single board: ${{ github.event.inputs.board_config }}"
           else
-            # Build all boards
-            ALL_BOARDS='["ARCController", "Blank", "pico", "pico_w", "pico2", "pico2_w", "BentoBox", "DuelPadZen", "FlatboxRev4", "FlatboxRev5", "FlatboxRev5RGB", "FlatboxRev5USBPassthrough", "FlatboxRev5Southpaw", "FlatboxRev8", "Granola", "adafruit_kb2040", "KeyboardConverter", "Haute42COSMOX", "Haute42COSMOXMLite", "Haute42COSMOXMUltra", "Haute42COSMOXXAnalog", "Liatris", "MavercadeRev1", "MavercadeRev2", "MiSTercadeV2", "OpenCore0", "OpenCore0MIXUP", "OpenCore0WASD", "OSUMGP-RP2040", "PicoAnn", "PicoFightingBoard", "PXPGamepad", "ReflexCtrlGenesis6", "ReflexCtrlNES", "ReflexCtrlSaturn", "ReflexCtrlSNES", "ReflexCtrlVB", "ReflexEncodeV1.2", "ReflexEncodeV2.0", "RP2040AdvancedBreakoutBoard", "RP2040AdvancedBreakoutBoardUSBPassthrough", "RP2040MiniBreakoutBoard", "RP2040MiniBreakoutBoardUSBPassthrough", "seeed_xiao_rp2040", "sparkfun_promicro", "sparkfun_promicro_rp2350", "waveshare_rp2040_zero", "Stress", "SGFDevices", "ZeroRhythm"]'
-            echo "matrix=$ALL_BOARDS" >> $GITHUB_OUTPUT
-            echo "Building all boards"
+            # Build all boards - derive list from configs/ directory
+            # Get all directories in configs/ (excluding the configs directory itself)
+            cd configs
+            BOARD_DIRS=$(ls -d */ 2>/dev/null | sed 's|/||' | sort)
+            cd ..
+            
+            # Convert to JSON array
+            BOARD_JSON="["
+            FIRST=true
+            for board in $BOARD_DIRS; do
+              if [ "$FIRST" = true ]; then
+                BOARD_JSON="$BOARD_JSON\"$board\""
+                FIRST=false
+              else
+                BOARD_JSON="$BOARD_JSON, \"$board\""
+              fi
+            done
+            BOARD_JSON="$BOARD_JSON]"
+            
+            echo "matrix=$BOARD_JSON" >> $GITHUB_OUTPUT
+            echo "Building all boards from configs/ directory:"
+            echo "$BOARD_JSON"
           fi
 
   build:
