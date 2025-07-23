@@ -13,28 +13,28 @@ on:
         description: "Board configuration to build (leave empty to build all)"
         required: false
         type: choice
+        # NOTE: These options must be manually maintained to match configs/ directories
+        # Run: find configs/ -maxdepth 1 -type d -not -name "configs" -not -name ".*" | sed 's|configs/||' | sort
+        # to get the current list of available board configurations
         options:
           - ""
+          - adafruit_kb2040
           - ARCController
-          - Blank
-          - Pico
-          - PicoW
-          - Pico2
           - BentoBox
+          - Blank
           - DuelPadZen
           - FlatboxRev4
           - FlatboxRev5
           - FlatboxRev5RGB
-          - FlatboxRev5USBPassthrough
           - FlatboxRev5Southpaw
+          - FlatboxRev5USBPassthrough
           - FlatboxRev8
           - Granola
-          - KB2040
-          - KeyboardConverter
           - Haute42COSMOX
           - Haute42COSMOXMLite
           - Haute42COSMOXMUltra
           - Haute42COSMOXXAnalog
+          - KeyboardConverter
           - Liatris
           - MavercadeRev1
           - MavercadeRev2
@@ -43,6 +43,10 @@ on:
           - OpenCore0MIXUP
           - OpenCore0WASD
           - OSUMGP-RP2040
+          - pico
+          - pico_w
+          - pico2
+          - pico2_w
           - PicoAnn
           - PicoFightingBoard
           - PXPGamepad
@@ -57,12 +61,12 @@ on:
           - RP2040AdvancedBreakoutBoardUSBPassthrough
           - RP2040MiniBreakoutBoard
           - RP2040MiniBreakoutBoardUSBPassthrough
-          - SeeedXIAORP2040
-          - SparkFunProMicro
-          - SparkFunProMicroRP2350
-          - WaveshareZero
-          - Stress
+          - seeed_xiao_rp2040
           - SGFDevices
+          - sparkfun_promicro
+          - sparkfun_promicro_rp2350
+          - Stress
+          - waveshare_rp2040_zero
           - ZeroRhythm
 
 env:
@@ -71,15 +75,58 @@ env:
 jobs:
   call-node-workflow:
     uses: ./.github/workflows/node.js.yml
+  
+  determine-matrix:
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout GP2040-CE
+        uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Determine build matrix
+        id: set-matrix
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.board_config }}" != "" ]]; then
+            # Single board selected
+            echo "matrix=[\"${{ github.event.inputs.board_config }}\"]" >> $GITHUB_OUTPUT
+            echo "Building single board: ${{ github.event.inputs.board_config }}"
+          else
+            # Build all boards - derive list from configs/ directory
+            # Get all directories in configs/ (excluding the configs directory itself)
+            cd configs
+            BOARD_DIRS=$(ls -d */ 2>/dev/null | sed 's|/||' | sort)
+            cd ..
+            
+            # Convert to JSON array
+            BOARD_JSON="["
+            FIRST=true
+            for board in $BOARD_DIRS; do
+              if [ "$FIRST" = true ]; then
+                BOARD_JSON="$BOARD_JSON\"$board\""
+                FIRST=false
+              else
+                BOARD_JSON="$BOARD_JSON, \"$board\""
+              fi
+            done
+            BOARD_JSON="$BOARD_JSON]"
+            
+            echo "matrix=$BOARD_JSON" >> $GITHUB_OUTPUT
+            echo "Building all boards from configs/ directory:"
+            echo "$BOARD_JSON"
+          fi
+
   build:
-    needs: call-node-workflow
-    # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
-    # You can convert this to a matrix build if you need cross-platform coverage.
-    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
+    needs: [call-node-workflow, determine-matrix]
+    # Dynamic matrix strategy: build single board if selected via workflow_dispatch,
+    # otherwise build all boards for push/PR events
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        GP2040_BOARDCONFIG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.board_config != '' && fromJSON(format('["{0}"]', github.event.inputs.board_config)) || fromJSON('["ARCController", "Blank", "Pico", "PicoW", "Pico2", "BentoBox", "DuelPadZen", "FlatboxRev4", "FlatboxRev5", "FlatboxRev5RGB", "FlatboxRev5USBPassthrough", "FlatboxRev5Southpaw", "FlatboxRev8", "Granola", "KB2040", "KeyboardConverter", "Haute42COSMOX", "Haute42COSMOXMLite", "Haute42COSMOXMUltra", "Haute42COSMOXXAnalog", "Liatris", "MavercadeRev1", "MavercadeRev2", "MiSTercadeV2", "OpenCore0", "OpenCore0MIXUP", "OpenCore0WASD", "OSUMGP-RP2040", "PicoAnn", "PicoFightingBoard", "PXPGamepad", "ReflexCtrlGenesis6", "ReflexCtrlNES", "ReflexCtrlSaturn", "ReflexCtrlSNES", "ReflexCtrlVB", "ReflexEncodeV1.2", "ReflexEncodeV2.0", "RP2040AdvancedBreakoutBoard", "RP2040AdvancedBreakoutBoardUSBPassthrough", "RP2040MiniBreakoutBoard", "RP2040MiniBreakoutBoardUSBPassthrough", "SeeedXIAORP2040", "SparkFunProMicro", "SparkFunProMicroRP2350", "WaveshareZero", "Stress", "SGFDevices", "ZeroRhythm"]') }}
+        GP2040_BOARDCONFIG: ${{ fromJSON(needs.determine-matrix.outputs.matrix) }}
     steps:
       - name: Setup cmake
         uses: jwlawson/actions-setup-cmake@v2
@@ -109,26 +156,17 @@ jobs:
         run: cat /proc/cpuinfo  | grep processor | wc -l
         #End Global Setup
 
-      - name: Pico Build Configure CMake
+      - name: Configure CMake
         shell: bash
-        if: ${{ matrix.GP2040_BOARDCONFIG != 'PicoW' && matrix.GP2040_BOARDCONFIG != 'Pico2' && matrix.GP2040_BOARDCONFIG != 'SparkFunProMicroRP2350' && matrix.GP2040_BOARDCONFIG != 'FlatboxRev8' }}
+        # With the unified board configuration system, we only need to set GP2040_BOARDCONFIG
+        # The build system automatically determines the correct PICO_BOARD value
         run: PICO_SDK_PATH=${{github.workspace}}/pico-sdk GP2040_BOARDCONFIG=${{ matrix.GP2040_BOARDCONFIG }} SKIP_WEBBUILD=TRUE cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
-      - name: PicoW Build Configure CMake
-        shell: bash
-        if: ${{ matrix.GP2040_BOARDCONFIG == 'PicoW'}}
-        run: PICO_SDK_PATH=${{github.workspace}}/pico-sdk GP2040_BOARDCONFIG=${{ matrix.GP2040_BOARDCONFIG }} SKIP_WEBBUILD=TRUE cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DPICO_BOARD=pico_w
-
-      - name: Pico2 Build Configure CMake
-        shell: bash
-        if: ${{ matrix.GP2040_BOARDCONFIG == 'Pico2' || matrix.GP2040_BOARDCONFIG == 'SparkFunProMicroRP2350' || matrix.GP2040_BOARDCONFIG == 'FlatboxRev8' }}
-        run: PICO_SDK_PATH=${{github.workspace}}/pico-sdk GP2040_BOARDCONFIG=${{ matrix.GP2040_BOARDCONFIG }} SKIP_WEBBUILD=TRUE cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DPICO_BOARD=pico2 -DPICO_PLATFORM=rp2350-arm-s
-
-      - name: Pico Build
+      - name: Build
         shell: bash
         run: GP2040_BOARDCONFIG=${{ matrix.GP2040_BOARDCONFIG }} cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel ${{steps.core_count.outputs.output}}
 
-      - name: Upload Pico Artifact
+      - name: Upload UF2 Artifact
         uses: actions/upload-artifact@v4.3.1
         with:
           name: GP2040-CE - ${{ matrix.GP2040_BOARDCONFIG }}
@@ -136,7 +174,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload .elf Artifact
-        if: ${{ matrix.GP2040_BOARDCONFIG == 'Pico'}}
+        if: ${{ matrix.GP2040_BOARDCONFIG == 'pico'}}
         uses: actions/upload-artifact@v4.3.1
         with:
           name: elf
