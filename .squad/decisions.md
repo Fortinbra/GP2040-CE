@@ -136,6 +136,32 @@ Documented gaps:
 **Reference:** https://shop.pimoroni.com/products/rm2-breakout?variant=53492995719547
 **Why:** Expands wireless capability to the broader ecosystem of custom GP2040-CE boards.
 
+### 2026-03-28T234414: Deferred Dependency Upgrade Planning Documentation
+
+**By:** Maes Hughes (authored), Riza (approved)  
+**What:** Four feature planning documents created to guide future contributors through deferred dependency upgrades that require significant manual effort:
+
+1. **tinyusb-upstream-port.md** — Plan to port TinyUSB fork (0.17.0 + 18 commits) to upstream 0.20.0
+2. **pico-pio-usb-upstream-port.md** — Plan to port pico-pio-usb fork (0.5.3 + 10 commits) to upstream 0.7.2
+3. **nanopb-stable-migration.md** — Plan to migrate vendored nanopb from 0.4.8-dev to 0.4.8 stable
+4. **npm-major-upgrades.md** — Five-phase roadmap for npm major version upgrades in web configurator
+
+**Technical Facts Verified:**
+- SDK 2.2.0 referenced throughout (matches squad decision 2026-03-28T024429)
+- TinyUSB: 0.17.0 base + 18 custom commits verified; upstream 0.20.0 correct
+- pico-pio-usb: 0.5.3 base + 10 custom commits verified; upstream 0.7.2 correct
+- nanopb: 0.4.8-dev confirmed as vendored snapshot (not submodule)
+- npm packages: All version pairs match confirmed facts (React 18→19, Vite 4→8, react-router-dom 6→7, ESLint 8→9, TypeScript 5→6, Zustand 4→5, protobufjs-cli 1→2)
+
+**Standards Compliance:**
+- No internal Squad agent names in any document (uses "GP2040-CE core team" only)
+- Documentation complete with problem statements, inventories, goals, phased approaches, risk analysis, and testing requirements
+- Ready for merge to main
+
+**Why:** Automated dependency audit identified deferred items that could not be automatically updated due to manual effort requirements. Without clear documentation, these items risk being forgotten, tackled haphazardly, or duplicated. These docs provide clear roadmaps, timelines, and success criteria.
+
+**Commit:** `49bd6797` (feature/dependency-updates branch)
+
 ## Governance
 
 - All meaningful changes require team consensus
