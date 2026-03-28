@@ -274,5 +274,5 @@ When contributing as GitHub Copilot:
 
 ---
 
-**Last updated:** 2025-03-28  
+**Last updated:** 2026-03-28  
 **Maintained by:** Roy Mustang, Project Lead

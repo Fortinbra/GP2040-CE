@@ -26,7 +26,6 @@ if (PICO_SDK_VERSION_STRING VERSION_LESS "2.2.0")
 endif()
 ```
 
-> **Note:** `copilot-instructions.md` currently references SDK 2.1.1 as a default — this is a stale value. The authoritative minimum is 2.2.0 as enforced by the build system and CI.
 
 ### Verifying your SDK version
 
@@ -121,7 +120,7 @@ The web build process is integrated into CMake. By default in development builds
 ### Pico SDK
 
 #### Where to update
-**File:** `pico_sdk_import.cmake`
+**File:** `CMakeLists.txt`
 
 #### What changes
 ```cmake
