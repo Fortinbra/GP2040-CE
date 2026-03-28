@@ -17,6 +17,19 @@
 **What:** Created docs/development/dependency-updates.md covering all GP2040-CE dependencies (firmware + web configurator) with update procedures and compatibility notes.
 **Why:** Feature doc requested by Fortinbra before PR
 
+### 2026-03-28T024429: SDK version 2.2.0 confirmed as project-wide ground truth
+
+**By:** Edward  
+**What:** CMakeLists.txt line 7 sets `sdkVersion 2.2.0` and lines 62-63 enforce a FATAL_ERROR if SDK < 2.2.0. CI (`cmake.yml`) checks out pico-sdk at tag `2.2.0` explicitly. This is the project-wide minimum for ALL builds — RP2040 and RP2350 alike. All documentation must reference 2.2.0, not 2.1.1.  
+**Impact:** `copilot-instructions.md`, `rp2350-support.md`, and `dependency-updates.md` all updated to 2.2.0. Picotool version confirmed as `2.2.0-a4` (exact CMakeLists.txt value).  
+**Why:** Riza review rejection — SDK version conflict between docs and copilot-instructions.md required resolution. Ground truth is the build system and CI, not developer guidance docs.
+
+### 2026-03-28T024429: All internal AI agent names removed from public-facing docs
+
+**By:** Fortinbra  
+**What:** Internal Squad agent names (e.g., "Roy Mustang", team member names) must not appear in any public-facing documentation. Maintainer fields should attribute "GP2040-CE core team" or similar project-level attribution.  
+**Why:** Riza review round 4 & 5 — AI tooling references are inappropriate in public docs. Governance decision by Fortinbra.
+
 ### 2026-03-28T021300: RP2350 support doc created
 
 **By:** Maes Hughes (from Edward's analysis)
