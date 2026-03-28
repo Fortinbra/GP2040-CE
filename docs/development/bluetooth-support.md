@@ -285,31 +285,61 @@ When the user selects a new output mode:
 
 ## Battery Level Reporting
 
-Battery voltage measurement and reporting to the Bluetooth host is essential for wireless gaming on battery-powered boards (e.g., Pimoroni Pico Lipo 2 XL W).
+Battery voltage measurement and reporting to the Bluetooth host is essential for wireless gaming on battery-powered boards (e.g., Pimoroni Pico Lipo 2 XL W). For BT Classic HID (Phase 1), battery level is reported via the **HID descriptor**, not a GATT service.
 
-### Bluetooth Battery Service
+### HID Descriptor Battery Strength Feature Report
 
-Bluetooth HID hosts expect battery level via the **Battery Service (UUID 0x180F)** — a standard BLE GATT service with a Battery Level characteristic (UUID 0x2A19). The service reports a percentage value (0–100) that the host OS displays in its controller menu.
+BT Classic HID reports battery level as a **Feature report** in the HID report descriptor itself, per the HID Usage Tables specification:
 
-**BTStack API:**
-```cpp
-// Initialize Battery Service (call once during setup)
-void battery_service_server_init(uint8_t battery_value);
+- **Usage Page:** `0x06` (Generic Device Controls)
+- **Usage:** `0x20` (Battery Strength)
+- **Report type:** Feature (responds to `GET_REPORT` requests)
+- **Logical range:** 0–100 (percentage)
+- **Report size:** 8 bits
 
-// Update battery percentage (call at regular intervals or when changed)
-void battery_service_server_set_battery_value(uint8_t percentage);
+**HID descriptor snippet (add to the gamepad descriptor):**
+```c
+// Battery Strength — Feature report (BT Classic HID)
+0x85, 0x02,        // Report ID (2)
+0x05, 0x06,        // Usage Page (Generic Device Controls)
+0x09, 0x20,        // Usage (Battery Strength)
+0x15, 0x00,        // Logical Minimum (0)
+0x26, 0x64, 0x00,  // Logical Maximum (100)
+0x75, 0x08,        // Report Size (8 bits)
+0x95, 0x01,        // Report Count (1)
+0xB1, 0x02,        // Feature (Data, Variable, Absolute)
 ```
 
-The percentage value must be in range **0–100**:
-- **0%:** LiPo fully discharged (approximately 3.0 V)
-- **100%:** LiPo fully charged (approximately 4.2 V)
-- **Values in-between:** Linear interpolation from ADC voltage reading
+The host sends a `GET_REPORT(Feature, report_id=0x02)` request over the HID control channel (L2CAP PSM 0x0011). The device responds with the current battery percentage (0–100). The host may poll this periodically or on connection.
+
+**BTStack API for handling battery queries:**
+```c
+// Register callback to handle GET_REPORT(Feature) requests
+hid_device_register_report_request_callback(report_request_cb);
+
+// In the callback, respond with battery percentage:
+static int report_request_cb(uint16_t hid_cid,
+                             hid_report_type_t report_type,
+                             uint16_t report_id,
+                             int * out_size,
+                             uint8_t * out_report) {
+    if (report_type == HID_REPORT_TYPE_FEATURE && report_id == 0x02) {
+        bool usb = gpio_get(24);
+        *out_report = usb ? 100 : readBatteryPercent();
+        *out_size = 1;
+        return 0;  // success
+    }
+    return -1;    // not handled
+}
+```
+
+The full HID descriptor (including the battery Feature report) is passed to both `hid_device_init()` and the `hid_sdp_record_t` struct in `hid_create_sdp_record()`, so the host discovers the battery capability via SDP.
 
 ### ADC Voltage Measurement
 
 On the Pimoroni Pico Lipo 2 XL W, battery voltage is measured via **GPIO29 (ADC3)** through a voltage divider:
 
-```cpp
+```c
 constexpr float ADC_VREF        = 3.3f;           // Reference voltage
 constexpr float ADC_MAX         = 4095.0f;        // 12-bit ADC resolution
 constexpr float BATT_DIVIDER    = 3.0f;           // 200kΩ / 100kΩ divider
@@ -335,45 +365,46 @@ The divider ratio **3.0** is standard for Pimoroni Pico LiPo boards. Verify this
 
 When USB power is connected, **GPIO24** reads HIGH (via VBUS sense). In this state, report battery level as **100%** to the host, even if the actual battery is partially discharged:
 
-```cpp
+```c
 bool usb_connected = gpio_get(24);    // HIGH = USB present
 
 if (usb_connected) {
     // USB charging: always report 100%
-    battery_service_server_set_battery_value(100);
     gamepad->auxState.power.pluggedIn = true;
     gamepad->auxState.power.charging = true;
     gamepad->auxState.power.level = 100;
 } else {
     // Battery-only: read ADC and report real percentage
     uint8_t batt_pct = readBatteryPercent();
-    battery_service_server_set_battery_value(batt_pct);
     gamepad->auxState.power.pluggedIn = false;
     gamepad->auxState.power.charging = false;
     gamepad->auxState.power.level = batt_pct;
 }
 ```
 
-The `GamepadAuxPower` struct is already defined in `headers/gamepad/GamepadAuxState.h`. The battery service implementation replaces the current hardcoded `level = 100` in `src/gp2040.cpp`.
+The `GamepadAuxPower` struct is already defined in `headers/gamepad/GamepadAuxState.h`. Update this struct when the host queries the Feature report, and periodically during the main loop.
 
 ### Polling Interval
 
-**Battery level should be read at most every 30 seconds.** Battery percentage changes slowly, and excessive ADC reads would flood Bluetooth GATT notifications. Recommendation:
+**Battery level should be read at most every 30–60 seconds** to avoid excessive ADC sampling. The host initiates `GET_REPORT(Feature)` requests at its own cadence (typically every 30–120 seconds for a connected controller); the device responds with the current ADC reading. No notification flooding concern applies because the device does not push unsolicited battery updates.
 
-```cpp
+```c
 constexpr uint32_t BATTERY_POLL_MS = 30000;  // 30 seconds
 
 if (time_us_64() - last_battery_update > BATTERY_POLL_MS * 1000) {
     uint8_t new_level = readBatteryPercent();
     if (new_level != last_reported_level) {
-        battery_service_server_set_battery_value(new_level);
+        // Update auxState for the next GET_REPORT callback response
+        gamepad->auxState.power.level = new_level;
         last_reported_level = new_level;
     }
     last_battery_update = time_us_64();
 }
 ```
 
-Only call the setter function if the percentage changed by ≥1% to avoid unnecessary GATT notifications.
+### Future: BLE HID Battery Service
+
+If BLE HID mode is added in a future phase (in addition to or instead of BT Classic), the GATT Battery Service (UUID 0x180F) with characteristic UUID 0x2A19 and the BTStack API `battery_service_server_init()` / `battery_service_server_set_battery_value()` would then be the correct mechanism for battery reporting over BLE. This is a BLE GATT construct and has no effect over a BT Classic HID connection. The ADC reading logic and VBUS detection would remain unchanged; only the delivery mechanism (HID descriptor vs. GATT) would differ.
 
 ---
 
