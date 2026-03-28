@@ -188,6 +188,39 @@
 
 **Ready for Review:** Document now contains sufficient technical depth for Phase 1 implementation to begin. All major architectural decisions (power states, battery reporting, namespace isolation) are documented and grounded in codebase analysis.
 
+### RM2 Module Support Documentation (Session 8)
+
+**Feature Planning Document Created:** `docs/development/rm2-module-support.md`
+
+**Subject:** Future feature — Pimoroni RM2 (CYW43439 standalone module) support for custom RP2040/RP2350 GP2040-CE boards.
+
+**Key technical content derived from Edward's rm2-analysis.md:**
+- Exact GPIO pin table (23/24/25/29) grounded in SDK 2.2.0 `pico_w.h` and `pico2_w.h` headers
+- GPIO 24 tri-functional (DATA_OUT/DATA_IN/HOST_WAKE — half-duplex PIO SPI, not an error)
+- GPIO 29 shared with VSYS ADC (`CYW43_USES_VSYS_PIN=1` — wrap ADC reads in cyw43_thread_enter/exit)
+- Three board config paths (Path A: `PICO_BOARD=pico_w`, Path B: `PICO_BOARD=pico2_w`, Path C: custom header)
+- GPIO availability table: 26 user GPIOs (RP2040/RP2350A), 44 user GPIOs (RP2350B)
+- `configs/CustomRM2Board/` directory structure and `BoardConfig.h` constraints (omit GPIO 23/24/25/29)
+- CMake link library block (`pico_cyw43_arch_lwip_threadsafe_background`, `pico_btstack_*`)
+- RP2350B alternate wiring flagged as TBD/unsupported (PIO program compatibility unverified)
+- 7 open questions / TBD items in Known Constraints section
+
+**Style conventions enforced:**
+- SDK version: 2.2.0 (never 2.1.1)
+- Picotool: 2.2.0-a4
+- CMake minimum: 3.10
+- 4-space indentation in all code blocks
+- No AI agent names in document
+- Maintained by: GP2040-CE core team
+- Status: Planned — not yet implemented (future feature, clearly stated)
+- Cross-references: bluetooth-support.md, rp2350-support.md, dependency-updates.md
+
+**Riza rejection patterns avoided:**
+- No agent names anywhere in the committed document
+- Version strings verified against CMakeLists.txt ground truth
+- Picotool version is exact (`2.2.0-a4`, not `2.2.0`)
+- Out-of-scope items not over-promised (RP2350B alternate wiring flagged TBD, not documented)
+
 ### Battery Level Reporting Correction (Session 7)
 
 **Critical Technical Error Identified and Fixed:**

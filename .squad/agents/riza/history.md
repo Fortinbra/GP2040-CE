@@ -95,3 +95,49 @@ Rounds 4 & 5 escalated to Fortinbra (human governance decisions)
 **Findings written to:** `.squad/agents/riza/bt-review-2.md`
 
 **BT Docs Approved:** All four documentation files ready for PR #7 (copilot-instructions.md, rp2350-support.md, dependency-updates.md, bluetooth-support.md)
+
+### Review Cycle: RM2 Module Support Doc Round 1 (2026-03-28)
+
+**Reviewed:** `docs/development/rm2-module-support.md`
+
+**Verdict:** ❌ REJECTED (1 blocking issue)
+
+**Blocking Issue:**
+- Line 5: `**SDK version:** 2.2.0+` — must be `2.2.0` (no `+` suffix). Ground truth is `CMakeLists.txt` line 7: `set(sdkVersion 2.2.0)`.
+
+**All other checks passed (14/15):**
+- GPIO pin assignments (23/24/25/29) verified against Edward's rm2-analysis.md — correct
+- No AI agent names — clean
+- Future feature status declared — "Planned — not yet implemented"
+- Pin mapping table, GPIO by chip table, TBD section all present
+- Cross-references to bluetooth-support.md and rp2350-support.md present
+- Picotool 2.2.0-a4 exact string correct
+- 4-space indentation in all code blocks
+
+**Findings written to:** `.squad/agents/riza/rm2-review-1.md`
+
+**Pattern reinforced:** `+` suffix on SDK version strings is not acceptable — exact version from CMakeLists.txt is ground truth.
+
+### Review Cycle: RM2 Module Support Doc Round 2 (2026-03-28)
+
+**Reviewed:** `docs/development/rm2-module-support.md` (Round 1 fix by Edward per lockout rule)
+
+**Verdict:** ✅ APPROVED
+
+**Round 1 Blocker Resolved:**
+- Line 5: `**SDK version:** 2.2.0+` → `**SDK version:** 2.2.0` — confirmed fixed, no adjacent lines disturbed.
+
+**Full re-pass clean (15/15):**
+- All GPIO pin assignments (23/24/25/29) verified against Edward's rm2-analysis.md — correct
+- No AI agent names — clean
+- Future feature status declared — "Planned — not yet implemented"
+- Picotool 2.2.0-a4 exact string present
+- Pin mapping table, GPIO-by-chip table, TBD constraints table all present
+- Cross-references to bluetooth-support.md and rp2350-support.md present
+- 4-space indentation in all five code blocks
+- Maintained by: "GP2040-CE core team" — correct attribution
+- No fabricated claims; all unconfirmed items in TBD table
+
+**Findings written to:** `.squad/agents/riza/rm2-review-2.md`
+
+**Pattern reinforced:** Single-character version suffix `+` triggers round rejection; lockout rule works correctly — Edward (non-author) applied the fix cleanly.

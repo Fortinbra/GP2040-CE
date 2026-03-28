@@ -130,6 +130,12 @@ Documented gaps:
 **What:** GP2040-CE must implement power management for wireless (battery-powered) builds. USB builds always have VBUS so power management was never needed. BT+battery builds require: sleep/dormant modes when idle, CYW43 radio power saving, VBUS detection to switch power profiles between USB and battery operation.  
 **Why:** First time the firmware must manage its own power budget — foundational for any battery-powered use.
 
+### 2026-03-28T17:05: User directive — RM2 module support for custom boards (future feature)
+**By:** Fortinbra (via Copilot)
+**What:** Future feature — custom RP2040/RP2350 boards should be able to use the Pimoroni RM2 module (CYW43439 standalone wireless module) for BT/WiFi, provided they wire the RM2 to the same GPIO pins that Pico W / Pico 2 W use for their onboard CYW43. This enables BT on custom boards without requiring a Pico W form factor.
+**Reference:** https://shop.pimoroni.com/products/rm2-breakout?variant=53492995719547
+**Why:** Expands wireless capability to the broader ecosystem of custom GP2040-CE boards.
+
 ## Governance
 
 - All meaningful changes require team consensus

@@ -17,6 +17,20 @@
 
 ## Learnings
 
+### 2026-03-28: RM2 Module CYW43 GPIO Analysis
+
+**Tasked by:** Fortinbra (via Coordinator). Full findings in `.squad/agents/edward/rm2-analysis.md`.
+
+**Exact GPIO pins confirmed from SDK 2.2.0 `pico_w.h` and `pico2_w.h`:** Both boards use IDENTICAL CYW43 pin assignments — GPIO 23 (`WL_REG_ON`/power enable), GPIO 24 (`DATA_OUT`/`DATA_IN`/`HOST_WAKE` — all three share GPIO 24 due to half-duplex gSPI), GPIO 25 (`CS`), GPIO 29 (`CLOCK`; shared with `PICO_VSYS_PIN` for ADC). Total: 4 RP2040 bank0 GPIOs consumed. LED and VBUS sense go through CYW43 internal WL_GPIO0/WL_GPIO2 — NOT on any RP2040 GPIO.
+
+**`PICO_CYW43_SUPPORTED=1` is the master switch.** Set via `pico_board_cmake_set(PICO_CYW43_SUPPORTED, 1)` in the board `.h` header. This unlocks all `pico_cyw43_driver`, `pico_cyw43_arch`, and `pico_btstack_*` CMake targets. Pin defaults set via `#ifndef CYW43_DEFAULT_PIN_WL_*` guards in board header — overridable via custom board header.
+
+**"Same pins as Pico W" = easiest path.** A custom board wiring RM2 to GPIO 23/24/25/29 can use `PICO_BOARD=pico_w` (RP2040) or `PICO_BOARD=pico2_w` (RP2350A) directly. No firmware changes, no custom board header, no driver modifications. The existing `configs/PicoW/BoardConfig.h` works as-is (it already omits GPIO 23–25, 29).
+
+**Alternate GPIO wiring (RP2350B only) requires PIO driver verification.** The `cyw43_bus_pio_spi.pio` PIO program governs GPIO constraints for the CYW43 interface. Non-standard pin placement may require SDK-level PIO program modification. This is unsupported for non-Pico-W boards and is an open question.
+
+**Open TBD items for Hughes:** RM2 VBUS sense mechanism (CYW43 WL_GPIO or separate pin?), RM2 LED pin (WL_GPIO0 vs RP2040 GPIO?), PIO program GPIO constraint for RP2350B alternate wiring, Pimoroni RM2 schematic confirmation.
+
 ### 2026-03-28: BT Battery Protocol Analysis — Classic HID vs BLE HID
 
 **Tasked by:** Fortinbra (via Coordinator). Full findings in `.squad/agents/edward/bt-battery-protocol-analysis.md`.
