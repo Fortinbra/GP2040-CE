@@ -77,7 +77,7 @@ target_include_directories(gp2040_firmware PRIVATE
 
 ### Build Tools
 - **Ninja**: v1.12.1
-- **Picotool**: 2.2.0 (for flashing and device operations)
+- **Picotool**: 2.2.0-a4 (for flashing and device operations)
 - **OpenOCD**: 0.12.0+dev (for debugging)
 - **CMake**: 3.10+
 

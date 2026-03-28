@@ -297,7 +297,7 @@ Watch for:
    - Comprehensive test results (compile log, hardware tests)
    - Changelog entry documenting compatibility implications
 
-3. **Code review** by the team (especially Edward for firmware, Winry for web UI, Riza for stability)
+3. **Code review** by the core team (firmware reviewers for C++ changes, frontend reviewers for web UI changes)
 
 4. **Merge to develop branch first** — avoid direct main commits
 
