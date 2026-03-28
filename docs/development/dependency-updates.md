@@ -292,7 +292,7 @@ Watch for:
    - Your testing plan
 
 2. **Create a pull request** (branch: `deps/update-<lib-name>`) with:
-   - Version pin updates in `CMakeLists.txt`, `pico_sdk_import.cmake`, or `www/package.json`
+   - Version pin updates in `CMakeLists.txt` (SDK and ArduinoJson) or `www/package.json` (npm packages)
    - Updated `www/package-lock.json` (if npm changes)
    - Comprehensive test results (compile log, hardware tests)
    - Changelog entry documenting compatibility implications

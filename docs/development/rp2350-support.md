@@ -46,7 +46,7 @@ All boards are CI-tested and release-ready.
 ## Minimum Requirements
 
 - **Pico SDK 2.2.0 or later** — required by the GP2040-CE build system for all targets (enforced in `CMakeLists.txt`; the build will fail with a fatal error if an older SDK is detected)
-- **CMake 3.13+** — standard requirement
+- **CMake 3.10+** — standard requirement
 - **ARM Embedded Toolchain** — e.g., `arm-none-eabi-gcc`
 
 > **Note on SDK version:** SDK 2.2.0 is the minimum for the entire GP2040-CE project, not just RP2350 boards. RP2040 boards also require SDK 2.2.0. The project-wide version is pinned in `CMakeLists.txt` (`set(sdkVersion 2.2.0)`) and in CI.
