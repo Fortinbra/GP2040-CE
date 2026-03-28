@@ -24,6 +24,8 @@ GP2040-CE currently supports 17 USB HID output modes (XInput, PS4, Switch, keybo
 - **Future:** Raspberry Pi Pico 2 W (RP2350 + CYW43) — pending CYW43 stack porting to RP2350
 - All other boards retain USB-only output
 
+**Out of scope for this document:** GPIO output to retro consoles (SNES, N64, Dreamcast, Genesis, etc.). GP2040-CE reads FROM retro controllers via GPIO input add-ons (SNESpadInput, TG16padInput) but does not emit GPIO signals to emulate controllers for retro consoles. Retro console output is a separate architectural concern not addressed here and will be covered in a future document.
+
 ---
 
 ## Supported Hardware
@@ -42,7 +44,7 @@ GP2040-CE currently supports 17 USB HID output modes (XInput, PS4, Switch, keybo
 - Pico SDK version: **2.2.0 or later** (enforced in CMakeLists.txt)
 - Pico W board with CYW43439 chip
 - Available GPIO and flash storage for bonding keys
-- CMake target linkage: `pico_btstack_cyw43`, `pico_btstack_hid_device`
+- CMake target linkage: `pico_cyw43_arch_lwip_threadsafe_background`, `pico_btstack_cyw43`, `pico_btstack_hid_device`
 
 **Note on Pico 2 W:** The hardware supports Bluetooth, but as of Pico SDK 2.2.0, CYW43 integration with RP2350 has not been validated by the Raspberry Pi Foundation. A new `configs/Pico2W/` configuration will be added once CYW43 wireless stack support for RP2350 is confirmed.
 
@@ -83,8 +85,8 @@ class GPDriver {
     virtual bool process(Gamepad * gamepad) = 0;
     virtual void processAux() = 0;
     // ... USB-specific callbacks:
-    virtual uint8_t * get_descriptor_device_cb() = 0;
-    virtual uint8_t * get_hid_descriptor_report_cb(...) = 0;
+    virtual const uint8_t * get_descriptor_device_cb() = 0;
+    virtual const uint8_t * get_hid_descriptor_report_cb(...) = 0;
     virtual uint16_t get_report(...) = 0;    // TinyUSB GET_REPORT
     virtual void set_report(...) = 0;         // TinyUSB SET_REPORT
     virtual bool vendor_control_xfer_cb(...) = 0;
@@ -263,7 +265,7 @@ This roadmap is the ordered list of work items to implement Bluetooth HID suppor
 
 | Task | Estimate | Description |
 |------|----------|-------------|
-| **1.1** Add CMake BTstack linkage | 1 day | Add `pico_btstack_cyw43`, `pico_btstack_hid_device` targets to `CMakeLists.txt` (only for Pico W) |
+| **1.1** Add CMake BTstack linkage | 1 day | Add `pico_cyw43_arch_lwip_threadsafe_background`, `pico_btstack_cyw43`, `pico_btstack_hid_device` targets to `CMakeLists.txt` (only for Pico W) |
 | **1.2** Implement `BTHIDDriver` class | 2–3 days | New class mimicking `GPDriver` interface but calling `hid_device_send_interrupt_message()` instead of TinyUSB. Include gamepad HID descriptor and report handling. |
 | **1.3** CYW43 initialization in firmware | 1 day | Call `cyw43_arch_init()` in `gp2040.cpp::setup()` before `tud_init()`. Ensure WiFi coexistence. |
 | **1.4** Output mode persistence | 1 day | Extend `GamepadOptions` protobuf with `output_mode` and `BluetoothConfig` fields. Update config save/load. |
@@ -434,6 +436,8 @@ Ensure Phase 1 does not break existing USB HID modes:
 ---
 
 ## Related Documentation
+
+> **Note:** `rp2350-support.md` references "Bluetooth HID" in the context of the Pico 2 W blocker. As of this writing, Bluetooth HID is **not yet implemented** on any GP2040-CE board, including Pico W. `rp2350-support.md` was written anticipating this feature; this document is the authoritative planning reference for Bluetooth HID.
 
 - **[RP2350 Support](./rp2350-support.md)** — Chip and board configuration details
 - **[Dependency Updates](./dependency-updates.md)** — Pico SDK and library version notes

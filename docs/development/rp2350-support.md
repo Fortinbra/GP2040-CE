@@ -243,7 +243,7 @@ RP2350 runs at 150 MHz by default (vs 133 MHz for RP2040). This can affect PIO t
 
 The **Raspberry Pi Pico 2 W** (RP2350A + CYW43439 WiFi) is not yet supported in the main branch.
 
-**Why it's missing:** GP2040-CE's wireless feature stack (Bluetooth HID, WiFi-based web configurator access) was developed for the RP2040-based Pico W and the CYW43439 driver integration specific to that platform. The Pico 2 W uses the same CYW43439 chip but on an RP2350A, and the wireless integration layer needs dedicated porting and validation work before a `Pico2W` board config can be released. The base firmware compiles and runs on RP2350A without issues — the gap is specifically the CYW43 wireless feature integration. A configuration will be added in a future release once this work is complete.
+**Why it's missing:** GP2040-CE's wireless feature stack (Bluetooth HID, WiFi-based web configurator access) is being developed for the RP2040-based Pico W and the CYW43439 driver integration specific to that platform. The Pico 2 W uses the same CYW43439 chip but on an RP2350A, and the wireless integration layer needs dedicated porting and validation work before a `Pico2W` board config can be released. The base firmware compiles and runs on RP2350A without issues — the gap is specifically the CYW43 wireless feature integration. A configuration will be added in a future release once this work is complete.
 
 ### RISC-V Mode
 
