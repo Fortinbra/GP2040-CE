@@ -3,6 +3,7 @@
 **Last updated:** 2026-03-28  
 **Maintained by:** GP2040-CE core team  
 **Status:** Planning / Not yet implemented
+**SDK version:** 2.2.0+
 
 ---
 
@@ -20,8 +21,8 @@ This document describes the planned **Bluetooth HID (Human Interface Device) sup
 GP2040-CE currently supports 17 USB HID output modes (XInput, PS4, Switch, keyboard, etc.) but has zero wireless capability. Bluetooth HID fills a significant gap for portable gaming and console play, unlocking wireless arcade stick use cases.
 
 **Which boards benefit:**
-- **Today:** Raspberry Pi Pico W (RP2040 + CYW43 wireless chip)
-- **Future:** Raspberry Pi Pico 2 W (RP2350 + CYW43) — pending CYW43 stack porting to RP2350
+- **Today:** Raspberry Pi Pico W (RP2040 + CYW43 wireless chip) and Raspberry Pi Pico 2 W (RP2350 + CYW43)
+- **Future:** Additional wireless boards as they become available
 - All other boards retain USB-only output
 
 **Out of scope for this document:** GPIO output to retro consoles (SNES, N64, Dreamcast, Genesis, etc.). GP2040-CE reads FROM retro controllers via GPIO input add-ons (SNESpadInput, TG16padInput) but does not emit GPIO signals to emulate controllers for retro consoles. Retro console output is a separate architectural concern not addressed here and will be covered in a future document.
@@ -35,7 +36,8 @@ GP2040-CE currently supports 17 USB HID output modes (XInput, PS4, Switch, keybo
 | Board | Chip | Wireless Hardware | Status |
 |-------|------|-------------------|--------|
 | Pico W | RP2040 + CYW43439 | WiFi + Bluetooth HID | ✅ Target |
-| Pico 2 W | RP2350 + CYW43439 | WiFi + Bluetooth HID | 🟡 Blocked (CYW43 porting) |
+| Pico 2 W | RP2350 + CYW43439 | WiFi + Bluetooth HID | ✅ Confirmed |
+| Pimoroni Pico Lipo 2 XL W | RP2350B + CYW43439 | WiFi + Bluetooth HID + LiPo | ✅ Reference board |
 | All other boards | RP2040 / RP2350 | None | USB only |
 
 ### Minimum Requirements
@@ -46,7 +48,38 @@ GP2040-CE currently supports 17 USB HID output modes (XInput, PS4, Switch, keybo
 - Available GPIO and flash storage for bonding keys
 - CMake target linkage: `pico_cyw43_arch_lwip_threadsafe_background`, `pico_btstack_cyw43`, `pico_btstack_hid_device`
 
-**Note on Pico 2 W:** The hardware supports Bluetooth, but as of Pico SDK 2.2.0, CYW43 integration with RP2350 has not been validated by the Raspberry Pi Foundation. A new `configs/Pico2W/` configuration will be added once CYW43 wireless stack support for RP2350 is confirmed.
+**Note on Pico 2 W and RP2350:** RP2350 + CYW43 support is fully confirmed in Pico SDK 2.2.0. Both Pico 2 W (RP2350A) and boards like Pimoroni Pico Lipo 2 XL W (RP2350B) support Bluetooth HID without additional porting work. The Pimoroni board is designated as the reference platform for battery-backed wireless development in GP2040-CE.
+
+---
+
+## Reference Hardware
+
+### Pimoroni Pico Lipo 2 XL W
+
+The **Pimoroni Pico Lipo 2 XL W** is the designated reference board for Bluetooth and battery-backed development in GP2040-CE.
+
+**Specifications:**
+- **Microcontroller:** RP2350B (48 GPIO, 150 MHz, 520 KB SRAM)
+- **Wireless:** CYW43439 (WiFi + Bluetooth HID)
+- **Battery:** Built-in LiPo charger (MCP73831), battery voltage sensing via GPIO29/ADC3
+- **Power input:** USB-C with integrated charging
+- **GPIO headroom:** 30+ GPIO available after CYW43 routing (RP2350B advantage over Pico 2 W)
+
+**Why it's the reference:**
+- **Confirmed working:** Fortinbra has validated Bluetooth HID on this board
+- **Battery hardware included:** Simplifies battery voltage measurement and charging state detection
+- **GPIO capacity:** The 48-pin RP2350B variant provides excellent headroom for multi-output configurations (BT + GPIO retro output)
+
+**Build target:**
+```cmake
+set(PICO_BOARD pico2_w)
+set(PICO_PLATFORM rp2350-arm-s)
+```
+
+A new board configuration (`configs/PimoroniPicoLipo2XLW/`) will be created during Phase 1 implementation. This configuration will include:
+- GPIO pin mapping and CYW43 SPI/SDIO routing
+- ADC configuration for battery voltage measurement (GPIO29, voltage divider 3:1)
+- VBUS detection configuration (GPIO24 for USB input detection)
 
 ---
 
@@ -250,6 +283,226 @@ When the user selects a new output mode:
 
 ---
 
+## Battery Level Reporting
+
+Battery voltage measurement and reporting to the Bluetooth host is essential for wireless gaming on battery-powered boards (e.g., Pimoroni Pico Lipo 2 XL W).
+
+### Bluetooth Battery Service
+
+Bluetooth HID hosts expect battery level via the **Battery Service (UUID 0x180F)** — a standard BLE GATT service with a Battery Level characteristic (UUID 0x2A19). The service reports a percentage value (0–100) that the host OS displays in its controller menu.
+
+**BTStack API:**
+```cpp
+// Initialize Battery Service (call once during setup)
+void battery_service_server_init(uint8_t battery_value);
+
+// Update battery percentage (call at regular intervals or when changed)
+void battery_service_server_set_battery_value(uint8_t percentage);
+```
+
+The percentage value must be in range **0–100**:
+- **0%:** LiPo fully discharged (approximately 3.0 V)
+- **100%:** LiPo fully charged (approximately 4.2 V)
+- **Values in-between:** Linear interpolation from ADC voltage reading
+
+### ADC Voltage Measurement
+
+On the Pimoroni Pico Lipo 2 XL W, battery voltage is measured via **GPIO29 (ADC3)** through a voltage divider:
+
+```cpp
+constexpr float ADC_VREF        = 3.3f;           // Reference voltage
+constexpr float ADC_MAX         = 4095.0f;        // 12-bit ADC resolution
+constexpr float BATT_DIVIDER    = 3.0f;           // 200kΩ / 100kΩ divider
+constexpr float BATT_MIN_V      = 3.0f;           // 0% (discharged)
+constexpr float BATT_MAX_V      = 4.2f;           // 100% (charged)
+
+// Read battery percentage from ADC
+uint8_t readBatteryPercent() {
+    adc_select_input(3);                          // ADC3 = GPIO29
+    uint16_t raw = adc_read();
+    float v_adc = (raw / ADC_MAX) * ADC_VREF;
+    float v_bat = v_adc * BATT_DIVIDER;
+    float pct = (v_bat - BATT_MIN_V) / (BATT_MAX_V - BATT_MIN_V) * 100.0f;
+    return (uint8_t)std::clamp(pct, 0.0f, 100.0f);
+}
+```
+
+The divider ratio **3.0** is standard for Pimoroni Pico LiPo boards. Verify this value from your board's schematic before implementation.
+
+**Note:** LiPo discharge is non-linear in reality. This linear approximation is acceptable for user feedback. A lookup table can be added later for greater accuracy at low battery levels.
+
+### VBUS Detection and USB Charging
+
+When USB power is connected, **GPIO24** reads HIGH (via VBUS sense). In this state, report battery level as **100%** to the host, even if the actual battery is partially discharged:
+
+```cpp
+bool usb_connected = gpio_get(24);    // HIGH = USB present
+
+if (usb_connected) {
+    // USB charging: always report 100%
+    battery_service_server_set_battery_value(100);
+    gamepad->auxState.power.pluggedIn = true;
+    gamepad->auxState.power.charging = true;
+    gamepad->auxState.power.level = 100;
+} else {
+    // Battery-only: read ADC and report real percentage
+    uint8_t batt_pct = readBatteryPercent();
+    battery_service_server_set_battery_value(batt_pct);
+    gamepad->auxState.power.pluggedIn = false;
+    gamepad->auxState.power.charging = false;
+    gamepad->auxState.power.level = batt_pct;
+}
+```
+
+The `GamepadAuxPower` struct is already defined in `headers/gamepad/GamepadAuxState.h`. The battery service implementation replaces the current hardcoded `level = 100` in `src/gp2040.cpp`.
+
+### Polling Interval
+
+**Battery level should be read at most every 30 seconds.** Battery percentage changes slowly, and excessive ADC reads would flood Bluetooth GATT notifications. Recommendation:
+
+```cpp
+constexpr uint32_t BATTERY_POLL_MS = 30000;  // 30 seconds
+
+if (time_us_64() - last_battery_update > BATTERY_POLL_MS * 1000) {
+    uint8_t new_level = readBatteryPercent();
+    if (new_level != last_reported_level) {
+        battery_service_server_set_battery_value(new_level);
+        last_reported_level = new_level;
+    }
+    last_battery_update = time_us_64();
+}
+```
+
+Only call the setter function if the percentage changed by ≥1% to avoid unnecessary GATT notifications.
+
+---
+
+## Power Management
+
+This is the first time GP2040-CE must actively manage power. Previous builds were USB-powered (VBUS always present) and treated power as unlimited. Battery-backed wireless builds require a new paradigm.
+
+### Power States
+
+The firmware implements a four-state power state machine:
+
+**USB_CONNECTED** (always full power)
+- Full clock speed (150 MHz)
+- CYW43 radio: `CYW43_PERFORMANCE_PM` (no power saving)
+- Battery reporting: always 100%
+- Entry: VBUS (GPIO24) goes HIGH
+- Exit: USB removed (VBUS goes LOW)
+
+**ACTIVE** (playing, full power)
+- Full clock speed (150 MHz)
+- CYW43 radio: `CYW43_PERFORMANCE_PM` (no power saving)
+- Battery reporting: ADC read every 30 seconds
+- Entry: Boot or any button press from IDLE/DEEP_SLEEP
+- Exit: No input for N seconds (default N = 30–60 s, configurable)
+
+**IDLE** (light activity, reduced power)
+- Reduced clock speed (48 MHz via `sleep_run_from_xosc()`)
+- CYW43 radio: `CYW43_DEFAULT_PM` or `CYW43_AGGRESSIVE_PM`
+- Bluetooth sniff mode: HCI sniff every 40 ms (maintains connection, reduces wake-up latency)
+- LEDs: dimmed or off
+- Battery reporting: continue at reduced polling rate
+- Entry: ACTIVE timeout elapsed
+- Exit: Button press → ACTIVE, or idle for M seconds (default M = 300 s) → DEEP_SLEEP
+
+**DEEP_SLEEP** (maximum power saving)
+- RP2350 dormant mode: `sleep_goto_dormant_until_pin()` with all buttons as wake sources
+- CYW43 radio: disabled (Bluetooth disconnected before dormant entry)
+- Clock: stopped except XOSC
+- LEDs: off
+- Battery reporting: none (radio off)
+- Entry: IDLE timeout elapsed
+- Exit: Any button press (GPIO edge triggers wake)
+- Post-wake: Re-initialize clocks, CYW43, and re-advertise for Bluetooth reconnection
+
+### Implementation Location
+
+A new `src/power/PowerManager.cpp` + `headers/power/PowerManager.h` provides a singleton interface:
+
+```cpp
+class PowerManager {
+    enum PowerState { USB_CONNECTED, ACTIVE, IDLE, DEEP_SLEEP };
+    
+    void update(bool any_input, bool usb_present);  // Called once per main loop
+    void setState(PowerState new_state);
+    uint32_t getIdleTimeoutMs() const;
+    void setIdleTimeoutMs(uint32_t ms);
+    // ... etc
+};
+```
+
+Called from `src/gp2040.cpp::loop()` after input processing:
+
+```cpp
+bool any_input = gamepad->hasAnyButtonPress();
+bool usb_present = gpio_get(24);
+powerManager.update(any_input, usb_present);
+```
+
+This approach is gated with `#if defined(PICO_CYW43_SUPPORTED)` — USB-only boards (no CYW43) skip power management entirely.
+
+### CYW43 Radio Power Modes
+
+The CYW43 chip supports three WiFi power-saving modes (which also affect Bluetooth radio latency):
+
+| Mode | Constant | Latency Impact | Use Case |
+|------|----------|-----------------|----------|
+| Performance | `CYW43_PERFORMANCE_PM` (0x00A00000) | None — radio always on | USB power, gameplay, web config |
+| Default | `CYW43_DEFAULT_PM` (0x00A50000) | ~20 ms wake-up | Balanced; Bluetooth idle |
+| Aggressive | `CYW43_AGGRESSIVE_PM` (0x00A51000) | ~100 ms wake-up | Maximum power saving; acceptable for idle |
+
+Set via:
+```cpp
+cyw43_wifi_pm(&cyw43_state, CYW43_DEFAULT_PM);
+```
+
+For **Bluetooth HID in IDLE state**, recommend `CYW43_DEFAULT_PM` with HCI sniff mode at 40 ms intervals. This maintains connection responsiveness (~40 ms worst-case input latency) while reducing power ~30% vs. PERFORMANCE_PM.
+
+### DORMANT Entry/Exit Sequence
+
+Transitioning to DORMANT requires graceful shutdown of CYW43:
+
+```cpp
+// Before DORMANT:
+gap_disconnect(connection_handle);                   // Disconnect BT
+cyw43_wifi_leave(&cyw43_state, CYW43_ITF_STA);     // Leave WiFi
+cyw43_arch_deinit();                                // Power down CYW43
+
+// Enter DORMANT (wake on button GPIO falling edge):
+sleep_goto_dormant_until_pin(button_gpio, true, false);
+
+// After wake (in interrupt or main loop):
+cyw43_arch_init();                                  // Re-init CYW43
+btstack_init();                                     // Re-register services
+gap_advertisements_enable(true);                    // Re-advertise BT
+```
+
+**CYW43 init/deinit cycle latency:** Estimated 500 ms–2 s on RP2350. This is the "dead time" after pressing a button to wake from DORMANT. Accept this in user expectations for the deepest sleep mode.
+
+### Configuration & User Control
+
+Idle and sleep timeout durations are user-configurable via the web configurator:
+
+```protobuf
+// In GamepadOptions or new PowerOptions message:
+optional uint32 idle_timeout_ms = 200;       // ACTIVE → IDLE (default 30000)
+optional uint32 sleep_timeout_ms = 201;      // IDLE → DEEP_SLEEP (default 300000)
+optional bool power_management_enabled = 202; // Default: true if PICO_CYW43_SUPPORTED
+```
+
+This allows users to tune power profiles for their use case (competitive gaming may disable DEEP_SLEEP; portable play may reduce IDLE timeout).
+
+### Known Caveats (TBD)
+
+- **CYW43 latency on wake:** Exact wake-from-dormant time including CYW43 re-init and Bluetooth re-advertisement not yet measured on RP2350. May affect UX.
+- **Sniff mode gaming impact:** 40 ms sniff interval in IDLE state is acceptable for casual gaming but may introduce input lag in competitive play. Option to disable sniff mode may be needed.
+- **Voltage divider ratio:** Assumes Pimoroni standard (3:1); verify from board schematic before deployment.
+
+---
+
 ## Implementation Roadmap
 
 This roadmap is the ordered list of work items to implement Bluetooth HID support.
@@ -300,15 +553,11 @@ This roadmap is the ordered list of work items to implement Bluetooth HID suppor
 
 ## Known Limitations
 
-### Pico 2 W Support Blocked
+### RP2350 + CYW43 Support Confirmed
 
-**Status:** Not available; blocked pending CYW43 wireless stack porting to RP2350
+**Status:** Fully supported in Pico SDK 2.2.0
 
-The Pico 2 W hardware (RP2350 + CYW43) exists and is supported by Pico SDK 2.2.0 at the board definition level. However, the CYW43 wireless initialization stack (`cyw43_arch_init`, CYW43 clock configuration) has not been validated for RP2350's clock speeds and PIO timing.
-
-Once Raspberry Pi Foundation or the open-source community validates CYW43 for RP2350, a new `configs/Pico2W/` configuration can be added in ~1 day.
-
-**Workaround:** Use Pico W (RP2040 variant) for Bluetooth support until Pico 2 W becomes available.
+RP2350 + CYW43 (both Pico 2 W and Pimoroni Pico Lipo 2 XL W) support Bluetooth HID without additional SDK porting work. The CYW43 initialization stack is stable on RP2350's clock speeds and PIO timing. Board configurations will be created during Phase 1 implementation as needed.
 
 ### Single Primary Output
 
@@ -348,6 +597,40 @@ The CYW43 chip supports WiFi and Bluetooth simultaneously, but:
 - **Low-priority data:** WiFi (web config) is lower priority than BT HID. Under heavy WiFi load, BT latency may increase.
 
 **Recommendation:** For competitive play, disable WiFi on the web config to dedicate the radio to Bluetooth HID.
+
+### TinyUSB + BTStack Header Namespace Conflict
+
+**Status:** Identified and mitigated via translation-unit isolation
+
+When GP2040-CE implements Bluetooth HID, both TinyUSB and BTStack libraries will be linked into the same firmware binary. Both define a `hid_report_type_t` typedef in the global C namespace with incompatible first enum values:
+
+```c
+// TinyUSB (lib/tinyusb/src/class/hid/hid.h:84)
+typedef enum {
+    HID_REPORT_TYPE_INVALID = 0,    // First value differs
+    HID_REPORT_TYPE_INPUT,
+    HID_REPORT_TYPE_OUTPUT,
+    HID_REPORT_TYPE_FEATURE
+} hid_report_type_t;
+
+// BTStack (pico-sdk/lib/btstack/src/btstack_hid.h:109)
+typedef enum {
+    HID_REPORT_TYPE_RESERVED = 0,   // First value differs
+    HID_REPORT_TYPE_INPUT,
+    HID_REPORT_TYPE_OUTPUT,
+    HID_REPORT_TYPE_FEATURE
+} hid_report_type_t;
+```
+
+**Compilation error if both included in the same `.cpp` file:** `error: redefinition of 'hid_report_type_t'`
+
+**Mitigation:** Source-file isolation
+- All Bluetooth HID driver code lives in dedicated translation units (`src/drivers/bt/BTHIDDriver.cpp` and related files) that **include ONLY BTStack headers**
+- Existing USB driver files (`src/drivers/hid/HIDDriver.cpp`, `src/drivers/*.cpp`) continue to include TinyUSB headers as before
+- **Firewall rule:** No `.cpp` file may `#include` both `tusb.h` (or TinyUSB class headers) and `btstack_hid.h` (or `classic/hid_device.h`)
+- CMake successfully links both libraries in the same binary — the conflict is header-only, not link-time
+
+This isolation is straightforward to enforce in code review and requires no changes to existing USB driver code.
 
 ---
 
@@ -437,7 +720,7 @@ Ensure Phase 1 does not break existing USB HID modes:
 
 ## Related Documentation
 
-> **Note:** `rp2350-support.md` references "Bluetooth HID" in the context of the Pico 2 W blocker. As of this writing, Bluetooth HID is **not yet implemented** on any GP2040-CE board, including Pico W. `rp2350-support.md` was written anticipating this feature; this document is the authoritative planning reference for Bluetooth HID.
+> **Note:** This document has been updated to reflect confirmed RP2350 + CYW43 support and includes detailed specifications for battery reporting and power management, based on technical analysis for the Pimoroni Pico Lipo 2 XL W reference board. Bluetooth HID itself is **not yet implemented** on any GP2040-CE board. This document serves as the authoritative technical specification for Phase 1 implementation.
 
 - **[RP2350 Support](./rp2350-support.md)** — Chip and board configuration details
 - **[Dependency Updates](./dependency-updates.md)** — Pico SDK and library version notes
