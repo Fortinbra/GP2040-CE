@@ -275,4 +275,4 @@ When contributing as GitHub Copilot:
 ---
 
 **Last updated:** 2026-03-28  
-**Maintained by:** Roy Mustang, Project Lead
+**Maintained by:** GP2040-CE core team
