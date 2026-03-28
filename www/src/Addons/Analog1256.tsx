@@ -11,6 +11,12 @@ import FormSelect from '../Components/FormSelect';
 import boards from '../Data/Boards.json';
 import { SPI_BLOCKS } from '../Data/Peripherals';
 import WebApi from '../Services/WebApi';
+import { AddonPropTypes } from '../Pages/AddonsConfigPage';
+
+const ANALOG_MAX_VALUES = [
+	{ label: '3.3v', value: 33 },
+	{ label: '5.0v', value: 50 },
+];
 
 export const analog1256Scheme = {
 	Analog1256Enabled: yup.number().label('Analog1256 Input Enabled'),
@@ -23,6 +29,14 @@ export const analog1256Scheme = {
 		.number()
 		.label('Analog1256 DRDY Pin')
 		.validatePinWhenValue('Analog1256Enabled'),
+	analog1256AnalogMax: yup
+		.number()
+		.label('Analog1256 Analog Max')
+		.validateSelectionWhenValue('Analog1256Enabled', ANALOG_MAX_VALUES),
+	analog1256EnableTriggers: yup
+		.number()
+		.label('Analog1256 Enable Triggers')
+		.validateRangeWhenValue('Analog1256Enabled', 0, 1),
 };
 
 export const analog1256State = {
@@ -30,18 +44,18 @@ export const analog1256State = {
 	analog1256Block: 0,
 	analog1256CsPin: -1,
 	analog1256DrdyPin: -1,
-	analog1256AnalogMax: 3.3,
-	analog1256EnableTriggers: false,
+	analog1256AnalogMax: 33,
+	analog1256EnableTriggers: 0,
 };
 
-const Analog1256 = ({ values, errors, handleChange, handleCheckbox }) => {
+const Analog1256 = ({ values, errors, handleChange, handleCheckbox }: AddonPropTypes) => {
 	const {
 		getAvailablePeripherals,
 		getSelectedPeripheral,
 		setLoading,
 		usedPins,
 	} = useContext(AppContext);
-	const [csPins, setCsPins] = useState([]);
+	const [csPins, setCsPins] = useState<Array<{ pin: number; hwcs: boolean }>>([]);
 
 	const { t } = useTranslation();
 
@@ -108,7 +122,7 @@ const Analog1256 = ({ values, errors, handleChange, handleCheckbox }) => {
 							groupClassName="col-sm-3 mb-3"
 							value={values.analog1256Block}
 							error={errors.analog1256Block}
-							isInvalid={errors.analog1256Block}
+							isInvalid={Boolean(errors.analog1256Block)}
 							onChange={handlePeripheralChange}
 						>
 							{getAvailablePeripherals('spi').map((o, i) => (
@@ -127,7 +141,7 @@ const Analog1256 = ({ values, errors, handleChange, handleCheckbox }) => {
 						groupClassName="col-sm-3 mb-3"
 						value={values.analog1256CsPin}
 						error={errors.analog1256CsPin}
-						isInvalid={errors.analog1256CsPin}
+						isInvalid={Boolean(errors.analog1256CsPin)}
 						onChange={handleChange}
 					>
 						{csPins.map((p, i) => (
@@ -144,7 +158,7 @@ const Analog1256 = ({ values, errors, handleChange, handleCheckbox }) => {
 						groupClassName="col-sm-3 mb-3"
 						value={values.analog1256DrdyPin}
 						error={errors.analog1256DrdyPin}
-						isInvalid={errors.analog1256DrdyPin}
+						isInvalid={Boolean(errors.analog1256DrdyPin)}
 						onChange={handleChange}
 						maxLength={2}
 					/>
@@ -155,23 +169,26 @@ const Analog1256 = ({ values, errors, handleChange, handleCheckbox }) => {
 						groupClassName="col-sm-3 mb-3"
 						value={values.analog1256AnalogMax}
 						error={errors.analog1256AnalogMax}
-						isInvalid={errors.analog1256AnalogMax}
+						isInvalid={Boolean(errors.analog1256AnalogMax)}
 						onChange={handleChange}
 					>
-						<option value="3.3">{'3.3v'}</option>
-						<option value="5.0">{'5v'}</option>
+						{ANALOG_MAX_VALUES.map((o, i) => (
+							<option key={`analog1256AnalogMax-${i}`} value={o.value}>
+								{o.label}
+							</option>
+						))}
 					</FormSelect>
 				</Row>
 				<Row>
 					<FormCheck
 						label={t('AddonsConfig:analog1256-enable-triggers')}
 						type="switch"
-						id="analog1256EnableTriggers"
+						id="Analog1256EnableTriggers"
 						className="col-sm-3 ms-3"
 						isInvalid={false}
 						checked={Boolean(values.analog1256EnableTriggers)}
 						onChange={(e) => {
-							handleCheckbox('analog1256EnableTriggers', values);
+							handleCheckbox('analog1256EnableTriggers');
 							handleChange(e);
 						}}
 					/>
@@ -188,7 +205,7 @@ const Analog1256 = ({ values, errors, handleChange, handleCheckbox }) => {
 						Boolean(values.Analog1256Enabled) && getAvailablePeripherals('spi')
 					}
 					onChange={(e) => {
-						handleCheckbox('Analog1256Enabled', values);
+						handleCheckbox('Analog1256Enabled');
 						handleChange(e);
 					}}
 				/>

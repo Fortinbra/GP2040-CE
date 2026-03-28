@@ -645,6 +645,32 @@ async function setExpansionPins(mappings) {
 	return Http.post(`${baseUrl}/api/setExpansionPins`, mappings);
 }
 
+// POST function to get the ADC reading for one Hall Effect channel
+async function getHETriggerVoltage(settings) {
+	return Http.post(`${baseUrl}/api/getHETriggerVoltage`, settings);
+}
+
+// POST function to set our channels, select, and ADC pin
+async function setHETriggerOptions(settings) {
+	return Http.post(`${baseUrl}/api/setHETriggerOptions`, settings);
+}
+
+async function getHETriggerCalibrations() {
+	try {
+		const response = await Http.get(`${baseUrl}/api/getHETriggerCalibrations`);
+		return response.data;
+	} catch (error) {
+		console.error(error);
+	}
+}
+
+// POST to set all Hall Effect Trigger Calibrations
+async function setHETriggerCalibrations(triggers) {
+	console.dir(triggers);
+
+	return Http.post(`${baseUrl}/api/setHETriggerCalibrations`, triggers);
+}
+
 async function getHeldPins(abortSignal) {
 	try {
 		const response = await Http.get(`${baseUrl}/api/getHeldPins`, {
@@ -704,6 +730,10 @@ export default {
 	setPeripheralOptions,
 	getExpansionPins,
 	setExpansionPins,
+	getHETriggerVoltage,
+	setHETriggerCalibrations,
+	getHETriggerCalibrations,
+	setHETriggerOptions,
 	getReactiveLEDs,
 	setReactiveLEDs,
 	getButtonLayouts,

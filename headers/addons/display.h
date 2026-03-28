@@ -90,6 +90,30 @@
 #define DISPLAY_TURN_OFF_WHEN_SUSPENDED 0
 #endif
 
+#ifndef DISPLAY_INPUT_MODE
+#define DISPLAY_INPUT_MODE 1
+#endif
+
+#ifndef DISPLAY_TURBO_MODE
+#define DISPLAY_TURBO_MODE 1
+#endif
+
+#ifndef DISPLAY_DPAD_MODE
+#define DISPLAY_DPAD_MODE 1
+#endif
+
+#ifndef DISPLAY_SOCD_MODE
+#define DISPLAY_SOCD_MODE 1
+#endif
+
+#ifndef DISPLAY_MACRO_MODE
+#define DISPLAY_MACRO_MODE 1
+#endif
+
+#ifndef DISPLAY_PROFILE_MODE
+#define DISPLAY_PROFILE_MODE 0
+#endif
+
 #ifndef INPUT_HISTORY_ENABLED
 #define INPUT_HISTORY_ENABLED 0
 #endif
@@ -112,6 +136,10 @@
 
 #ifndef DISPLAY_LAYOUT_ORIENTATION
 #define DISPLAY_LAYOUT_ORIENTATION BUTTON_ORIENTATION_DEFAULT
+#endif
+
+#ifndef DISPLAY_CONTRAST
+#define DISPLAY_CONTRAST 0xFF
 #endif
 
 #ifndef DEFAULT_SPLASH
@@ -197,16 +225,13 @@ public:
     virtual void reinit() {}
     virtual std::string name() { return DisplayName; }
 
+    void handleProfileChange(GPEvent* e);
     void handleSystemRestart(GPEvent* e);
     void handleMenuNavigation(GPEvent* e);
+    void handleSystemError(GPEvent* e);
 private:
     bool updateDisplayScreen();
-    void drawStatusBar(Gamepad*);
-    void initMenu(char**);
-    bool pressedUp();
-    bool pressedDown();
-    bool pressedLeft();
-    bool pressedRight();
+    void setMenuMappings();
     const DisplayOptions& getDisplayOptions();
     bool isDisplayPowerOff();
     void setDisplayPower(uint8_t status);
@@ -228,6 +253,7 @@ private:
     GPGFX_DisplayTypeOptions gpOptions;
     GamepadButtonMapping *mapMenuToggle;
     GamepadButtonMapping *mapMenuSelect;
+    std::string errorMessage;
 };
 
 #endif

@@ -65,6 +65,14 @@ bool NeoGeoDriver::process(Gamepad * gamepad) {
 		| (gamepad->pressedR1() ? NEOGEO_MASK_R1      : 0)
 		| (gamepad->pressedR2() ? NEOGEO_MASK_R2      : 0)
 	;
+	if (gamepad->hasAnalogTriggers || gamepad->hasLeftAnalogStick) {
+		if (gamepad->state.lt > 0)
+			neogeoReport.buttons |= NEOGEO_MASK_L2;
+	}
+	if (gamepad->hasAnalogTriggers || gamepad->hasRightAnalogStick) {
+		if (gamepad->state.rt > 0)
+			neogeoReport.buttons |= NEOGEO_MASK_R2;
+	}
 
 	// Wake up TinyUSB device
 	if (tud_suspended())
@@ -120,5 +128,5 @@ const uint8_t * NeoGeoDriver::get_descriptor_device_qualifier_cb() {
 }
 
 uint16_t NeoGeoDriver::GetJoystickMidValue() {
-	return NEOGEO_JOYSTICK_MID << 8;
+	return NEOGEO_JOYSTICK_MID;
 }

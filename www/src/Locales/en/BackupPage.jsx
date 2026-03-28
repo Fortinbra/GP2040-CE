@@ -8,11 +8,13 @@ export default {
 	'load-export-option-label': 'Import {{api}} Options',
 	'api-display-text': 'Display',
 	'api-gamepad-text': 'Gamepad',
+	'api-keyboard-text': 'Keyboard Mappings',
 	'api-led-text': 'LED',
 	'api-ledTheme-text': 'Custom LED Theme',
 	'api-macros-text': 'Macro Mappings',
 	'api-pins-text': 'Pin Mappings',
 	'api-profiles-text': 'Profile Mappings',
 	'api-addons-text': 'Add-Ons',
+	'api-heTrigger-text': 'Hall Effect Trigger',
 	'api-splash-text': 'Splash Image',
 };

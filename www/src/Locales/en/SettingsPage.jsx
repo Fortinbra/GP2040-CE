@@ -10,11 +10,13 @@ export default {
 		none: 'No Mode Selected',
 		xinput: 'XInput',
 		'nintendo-switch': 'Nintendo Switch',
+		'nintendo-switch-pro': 'Nintendo Switch Pro',
 		ps3: 'PS3',
 		generic: 'Generic HID',
 		keyboard: 'Keyboard',
 		ps4: 'PS4',
 		ps5: 'PS5',
+		p5general: 'P5General',
 		neogeo: 'NEOGEO mini',
 		mdmini: 'Sega Genesis/MegaDrive Mini',
 		pcemini: 'PC Engine/Turbografx 16 Mini',
@@ -79,6 +81,8 @@ export default {
 		'<span>INFO:</span> Please ensure USB Peripheral is enabled and a PS5 compatible USB device is plugged in.',
 	'xbone-mode-text':
 		'<span>INFO:</span> Xbox One requires a USB host connection and USB dongle to properly authenticate in Xbox One mode.',
+	'p5general-mode-text':
+		'<span>INFO:</span> Requires a USB host connection and <span>P5General</span> to properly authenticate in PS5 general mode.',
 	'xinput-mode-text':
 		'<span>INFO:</span> XInput mode will work on a retail Xbox 360 console without a dongle. Only select USB if you would like to use an external dongle for authentication.',
 	'hotkey-settings-label': 'Hotkey Settings',
@@ -101,6 +105,8 @@ export default {
 		'invert-x': 'Invert X Axis',
 		'invert-y': 'Invert Y Axis',
 		'toggle-4way-joystick-mode': 'Toggle 4-Way Joystick Mode',
+		'enable-4way-joystick-mode': 'Enable 4-Way Joystick Mode',
+		'disable-4way-joystick-mode': 'Disable 4-Way Joystick Mode',
 		'toggle-ddi-4way-joystick-mode': 'Toggle DDI 4-Way Joystick Mode',
 		'b1-button': 'B1 Button',
 		'b2-button': 'B2 Button',
@@ -140,6 +146,17 @@ export default {
 		'menu-nav-select': 'Menu Select',
 		'menu-nav-back': 'Menu Back',
 		'menu-nav-toggle': 'Menu Toggle',
+		'focus-mode-toggle': 'Focus Mode Toggle',
+		'turbo-count-up': 'Turbo Count Up',
+		'turbo-count-down': 'Turbo Count Down',
+		'ls-up': 'Left Stick Up',
+		'ls-down': 'Left Stick Down',
+		'ls-left': 'Left Stick Left',
+		'ls-right': 'Left Stick Right',
+		'rs-up': 'Right Stick Up',
+		'rs-down': 'Right Stick Down',
+		'rs-left': 'Right Stick Left',
+		'rs-right': 'Right Stick Right',
 	},
 	'forced-setup-mode-label': 'Forced Setup Mode',
 	'forced-setup-mode-options': {
@@ -152,7 +169,6 @@ export default {
 	'forced-setup-mode-modal-body':
 		'If you reboot to Controller mode after saving, you will no longer have access to the web-config. Please type "<strong>{{warningCheckText}}</strong>" below to unlock the Save button if you fully acknowledge this and intend it. Clicking on Dismiss will revert this setting which then is to be saved.',
 	'4-way-joystick-mode-label': '4-Way Joystick Mode',
-	'lock-hotkeys-label': 'Lock Hotkeys',
 	'keyboard-mapping-header-text': 'Keyboard Mapping',
 	'keyboard-mapping-sub-header-text':
 		'Use the form below to reconfigure your button-to-key mapping.',
@@ -167,4 +183,5 @@ export default {
 		'product-id': 'Product ID',
 		'vendor-id': 'Vendor ID',
 	},
+	'input-mode-device-type-label': 'Input Mode Controller Type',
 };
