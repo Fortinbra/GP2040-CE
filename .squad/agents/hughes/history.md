@@ -251,4 +251,65 @@ Edward's detailed protocol analysis revealed that the original "Battery Level Re
 
 **Dependency on Edward's Analysis:** This fix is derived entirely from Edward's `.squad/agents/edward/bt-battery-protocol-analysis.md`, which grounded the analysis in BTStack SDK 2.2.0 source code (`lib/btstack/src/classic/hid_device.h`, `lib/btstack/src/ble/gatt-service/battery_service_server.h`) and SDK examples (`hid_keyboard_demo.c` vs. `hog_keyboard_demo.c`).
 
+### Deferred Dependency Upgrade Planning Docs (Session 9)
+
+**Four Feature Planning Documents Created:**
+
+1. **tinyusb-upstream-port.md** — Porting OpenStickCommunity TinyUSB fork (0.17.0 + 18 custom commits) to upstream 0.20.0. Covers:
+   - Patch audit process (determine which of 18 commits are still necessary)
+   - Conflict resolution and rebase strategy
+   - Hardware regression testing on real gamepad controllers
+   - Remote URL mismatch fix (`.gitmodules` → upstream)
+   - Risk assessment: HIGH (USB HID is core functionality)
+   - Timeline: 9–13 days total across 4 phases
+
+2. **pico-pio-usb-upstream-port.md** — Porting OpenStickCommunity pico-pio-usb fork (0.5.3 + 10 custom commits) to upstream 0.7.2. Covers:
+   - Compatibility verification with Pico SDK 2 (likely already in upstream)
+   - Patch audit of SDK 2 migration fixes
+   - Hardware USB host testing on RP2040/RP2350
+   - Risk assessment: MEDIUM (lower risk than TinyUSB because upstream is more likely to have SDK 2 support already)
+   - Timeline: 3–6 days total across 4 phases
+   - Dependency note: Must coordinate with TinyUSB port (both affect USB host mode)
+
+3. **nanopb-stable-migration.md** — Migrating vendored nanopb from 0.4.8-dev (dev snapshot) to 0.4.8 stable release. Covers:
+   - Snapshot identification and version comparison
+   - Proto file compatibility analysis (serialization format, memory layout)
+   - Round-trip testing (serialize → deserialize → verify)
+   - Flash config backward compatibility (critical: must not break existing saved configs)
+   - Risk assessment: LOW-MEDIUM (0.4.x has stable API, but wire format must be verified)
+   - Timeline: 4–7 days total across 5 phases
+
+4. **npm-major-upgrades.md** — Five-phase roadmap for major npm dependency upgrades in web configurator (`www/`). Includes:
+   - **Comprehensive package upgrade table:** 13 packages with current, available, and key breaking changes
+   - **Phase 1 (Tooling):** ESLint v9 (flat config migration) + @typescript-eslint v8 + express v5 (2–3 days)
+   - **Phase 2 (Build):** Vite v8 (skips v5,v6,v7) + @vitejs/plugin-react v6 (2–3 days)
+   - **Phase 3 (Runtime):** TypeScript v6 (stricter checks) + Zustand v5 (1–2 days)
+   - **Phase 4 (Framework, HIGH RISK):** React 19 + react-router-dom v7 (new routing paradigm) + react-i18next v17 + i18next v26 (5–7 days)
+   - **Phase 5 (Proto, HIGH RISK):** protobufjs-cli v2 (output format may change, affects firmware communication) (2–3 days)
+   - **npm audit findings:** 11 vulnerabilities (2 moderate, 9 high) to be evaluated per phase
+   - **Sass deprecation warnings:** Bootstrap 5 legacy imports to be resolved before/with Vite upgrade
+   - **Total timeline:** 2–3 weeks for complete upgrade path
+   - Risk strategy: Never combine phases; Phase 4 and Phase 5 are isolated due to high complexity/risk
+
+**Document structure employed:**
+- Overview with scope and status
+- Current state table (version pinning, locations, usage context)
+- Clear goals section
+- Phased approach with implementation details, timelines, and success criteria per phase
+- Risks identified with specific mitigation strategies
+- Dependencies cross-referenced to related docs
+- Overall success criteria tying all phases together
+
+**Style conventions enforced:**
+- 4-space indentation in all code blocks
+- SDK version: 2.2.0 (Pico SDK) consistently referenced
+- No AI agent names in public-facing documentation
+- Maintained by: GP2040-CE core team
+- Timestamps: 2026-03-28
+- All cross-references to related docs (dependency-updates.md, etc.)
+
+**Commit:** `49bd6797` (feature/dependency-updates branch)
+
+**Purpose & Scope:** These docs provide future contributors with clear roadmaps for dependency migration. Each doc stands alone and includes risk/timeline assessments to help project leads prioritize and schedule work. The docs capture institutional knowledge about why these dependencies were deferred (not "forgotten," but deliberately flagged for significant effort) and what effort they require.
+
 
