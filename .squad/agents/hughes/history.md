@@ -58,3 +58,36 @@
 3. PIO USB host timing tested in CI but hardware pass-through testing recommended
 
 **Documentation Created:** `docs/development/rp2350-support.md` (commit bf3d2f4d)
+
+### Bluetooth HID Support (Session 4)
+**Feature Planning Document Created:** `docs/development/bluetooth-support.md` (commit 897ce397)
+
+**Key Technical Findings:**
+- Pico W (RP2040 + CYW43) has unused Bluetooth hardware; CYW43 currently only used for WiFi
+- No existing Bluetooth code in firmware; feature is entirely new
+- `GPDriver` abstraction is USB-centric but extensible for parallel output types (BTDriver)
+- `DriverManager` is boot-time-only; runtime output switching requires new `OutputManager` layer
+- CYW43 and USB PHY are separate hardware — can coexist (no competing resources)
+- Pico 2 W (RP2350 + CYW43) is a future dependency pending CYW43 stack porting to RP2350
+
+**Architectural Decisions Captured:**
+1. Bluetooth HID Classic (not BLE) for Phase 1 — best platform support (Switch, PS5, Android, PC, macOS, Windows)
+2. Single primary HID output at a time (USB OR BT, not both simultaneously) — prevents host confusion
+3. WiFi coexistence supported — CYW43 time-multiplexes WiFi and BT internally
+4. Runtime mode switching via OutputManager + runtime driver swapping (may require reboot in early impl)
+5. Bonding keys persisted in `GamepadOptions` protobuf in flash
+
+**Implementation Roadmap Documented:**
+- Phase 1 (Core BT on Pico W): CMake linkage, BTHIDDriver class, CYW43 init, config persistence, UI, mode switching, bonding, testing (~10–15 days)
+- Phase 2 (Polish): Troubleshooting guides, API reference, user docs
+- Phase 3 (Future): Pico 2 W support (after CYW43 porting), BLE HID, button-combo switching
+
+**Documentation Style Notes:**
+- SDK version: 2.2.0 (never 2.1.1) — enforced in CMakeLists.txt FATAL_ERROR
+- 4-space indentation in all code blocks
+- No internal AI agent names in public docs
+- Related docs cross-linked: RP2350 Support, Dependency Updates, DDI-SOCD
+
+**Round-1 Review & Lockout:** Hughes's initial draft was technically sound but incomplete: missing explicit out-of-scope declaration for GPIO retro console output, incomplete CMake linkage (missing pico_cyw43_arch_lwip_threadsafe_background), const qualifiers stripped from simplified GPDriver listing, and cross-document tension with rp2350-support.md. Riza (QA) rejected and locked out Hughes per reviewer lockout policy.
+
+**Round-2 Revision by Edward:** Fixed all 4 issues (scope statement added to Overview, CMake linkage completed at both locations, const qualifiers restored, cross-doc tension resolved with clarifying note + rp2350-support.md tense fix). Riza approved after full sweep clean. Document ready for PR #7.

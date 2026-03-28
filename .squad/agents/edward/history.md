@@ -46,3 +46,53 @@
 ### 2026-03-28T024429: Review Gauntlet — Round 1 Revision (cross-agent update from Scribe)
 
 Edward's round-1 revision (`688582e4`) passed technical content checks in all subsequent rounds. The SDK version ground truth established here (2.2.0 project-wide) held through all 6 review rounds and became a recorded team decision. The Pico2W / CYW43 wireless porting gap explanation and SDK verification method correction were accepted as-is and survived to final approval.
+
+### 2026-03-28T024429: Bluetooth & Multi-Output Architecture Survey
+
+**Tasked by:** Fortinbra (via Coordinator). Survey findings written to `.squad/agents/edward/bt-analysis.md`.
+
+**GPDriver abstraction:** `headers/gpdriver.h` defines a pure-virtual `GPDriver` interface. `DriverManager` singleton (singleton pattern, `headers/drivermanager.h`) maps `InputMode` enum → one concrete driver at boot. All 17 USB profiles are subclasses. `src/usbdriver.cpp` is pure glue — delegates all TinyUSB callbacks to `DriverManager::getDriver()`. The interface is USB-centric (descriptor callbacks, HID reports, vendor XFER). No output transport abstraction above GPDriver exists.
+
+**Mode selection is boot-time only:** `DriverManager::setup(inputMode)` called once in `gp2040.cpp:195`. No runtime switching. Mode changes require flash save + reboot.
+
+**GPIO retro console support is INPUT-only:** `SNESpadInput` and `TG16padInput` addons READ from retro controllers (SNES/NES via clock/latch/data; TG16 via OE/select/4-data). The "Reflex CTRL" boards use these to adapt retro controller ports to USB output. There is NO GPIO output code to emulate a retro console peripheral. This is a gap.
+
+**Zero Bluetooth code in the project:** No btstack, no CYW43 BT APIs, no INPUT_MODE_BLUETOOTH, no stubs. The `BLUETOOTH_PAIR_REQUEST` constant in `SwitchProDriver.cpp:300` is a USB HID command ID from the Nintendo Switch, not BT functionality. CYW43 is used for WiFi only (`lwip-port`, RNDIS).
+
+**CYW43 BT hardware is available:** CYW43439 on PicoW has native BT Classic + BLE. Pico SDK provides `pico_btstack`. USB HID (USB PHY) and BT HID (CYW43) CAN coexist simultaneously — different hardware. The constraint that USB and BT cannot run simultaneously does NOT apply here.
+
+**Pico2W blocker confirmed again:** No `Pico2W` config. Blocker is CYW43 stack validation for RP2350, not base firmware. Base firmware compiles fine for RP2350.
+
+**For runtime multi-output:** Need a new `GPOutputTransport` abstraction above `GPDriver`, an `OutputManager` that can fan-out to USB + BT + GPIO simultaneously. `pico_btstack_hid_device` linkage needed (conditional on PicoW boards). PIO state machines needed for GPIO retro console output protocols (SNES, N64, Dreamcast).
+
+**Round-1 & Round-2 Revision:** Edward's analysis was reassigned after Hughes's draft was rejected (Riza review). Edward fixed all 4 issues (out-of-scope statement, CMake linkage, const qualifiers, cross-doc tension). Riza's round-2 approval holds all architectural findings from this survey without contradiction. Document approved and ready for PR #7.
+
+### 2026-03-28: Review Gauntlet — Round 1 Revision (cross-agent update from Scribe)
+
+Edward's round-1 revision (`688582e4`) passed technical content checks in all subsequent rounds. The SDK version ground truth established here (2.2.0 project-wide) held through all 6 review rounds and became a recorded team decision. The Pico2W / CYW43 wireless porting gap explanation and SDK verification method correction were accepted as-is and survived to final approval.
+
+### 2026-03-28: Bluetooth & Multi-Output Architecture Survey
+
+**Tasked by:** Fortinbra (via Coordinator). Survey findings written to `.squad/agents/edward/bt-analysis.md`.
+
+**GPDriver abstraction:** `headers/gpdriver.h` defines a pure-virtual `GPDriver` interface. `DriverManager` singleton (singleton pattern, `headers/drivermanager.h`) maps `InputMode` enum → one concrete driver at boot. All 17 USB profiles are subclasses. `src/usbdriver.cpp` is pure glue — delegates all TinyUSB callbacks to `DriverManager::getDriver()`. The interface is USB-centric (descriptor callbacks, HID reports, vendor XFER). No output transport abstraction above GPDriver exists.
+
+**Mode selection is boot-time only:** `DriverManager::setup(inputMode)` called once in `gp2040.cpp:195`. No runtime switching. Mode changes require flash save + reboot.
+
+**GPIO retro console support is INPUT-only:** `SNESpadInput` and `TG16padInput` addons READ from retro controllers (SNES/NES via clock/latch/data; TG16 via OE/select/4-data). The "Reflex CTRL" boards use these to adapt retro controller ports to USB output. There is NO GPIO output code to emulate a retro console peripheral. This is a gap.
+
+**Zero Bluetooth code in the project:** No btstack, no CYW43 BT APIs, no INPUT_MODE_BLUETOOTH, no stubs. The `BLUETOOTH_PAIR_REQUEST` constant in `SwitchProDriver.cpp:300` is a USB HID command ID from the Nintendo Switch, not BT functionality. CYW43 is used for WiFi only (`lwip-port`, RNDIS).
+
+**CYW43 BT hardware is available:** CYW43439 on PicoW has native BT Classic + BLE. Pico SDK provides `pico_btstack`. USB HID (USB PHY) and BT HID (CYW43) CAN coexist simultaneously — different hardware. The constraint that USB and BT cannot run simultaneously does NOT apply here.
+
+**Pico2W blocker confirmed again:** No `Pico2W` config. Blocker is CYW43 stack validation for RP2350, not base firmware. Base firmware compiles fine for RP2350.
+
+**For runtime multi-output:** Need a new `GPOutputTransport` abstraction above `GPDriver`, an `OutputManager` that can fan-out to USB + BT + GPIO simultaneously. `pico_btstack_hid_device` linkage needed (conditional on PicoW boards). PIO state machines needed for GPIO retro console output protocols (SNES, N64, Dreamcast).
+
+**Key file references:**
+- `proto/enums.proto:143–160` — InputMode enum
+- `src/drivermanager.cpp` — driver factory
+- `src/gp2040.cpp:281–353` — main loop
+- `src/addons/snes_input.cpp` — SNESpadInput (GPIO input, not output)
+- `src/addons/tg16_input.cpp` — TG16padInput (GPIO input, not output)
+- `configs/PicoW/PicoW.cmake` — only wireless board config

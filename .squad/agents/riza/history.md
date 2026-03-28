@@ -70,3 +70,28 @@ Rounds 4 & 5 escalated to Fortinbra (human governance decisions)
 - Verify exact version strings against CMakeLists.txt — not docs, not memory
 - `cmake --version` ≠ Pico SDK version — always catch this as a review error
 - Round-4+ issues that are pure governance decisions escalate to Fortinbra, not agents
+
+### Review Cycle: BT Support Doc Round 2 (2026-03-28)
+
+**Reviewed:**
+- `docs/development/bluetooth-support.md` (revision by Edward, commit ba070e0c)
+- `docs/development/rp2350-support.md` (tense fix by Edward)
+
+**Verdict:** ✅ APPROVED
+
+**All 4 Round-1 Issues Resolved:**
+1. Out-of-scope GPIO retro console declaration added to Overview (line 27) — exact language matches requirement
+2. `pico_cyw43_arch_lwip_threadsafe_background` added to both locations: Minimum Requirements (line 47) and Task 1.1 (line 268)
+3. `const` qualifiers restored on both GPDriver method return types (lines 88–89)
+4. Cross-document tension resolved: clarifying note in bt-support.md Related Documentation + rp2350-support.md tense changed from "was developed for" → "is being developed for"
+
+**Full sweep clean:**
+- No agent names in either document
+- SDK 2.2.0 consistent across bt-support.md and rp2350-support.md
+- No false claims of BT being implemented
+- CMake targets complete at both required locations
+- rp2350-support.md tense fix introduced no regressions
+
+**Findings written to:** `.squad/agents/riza/bt-review-2.md`
+
+**BT Docs Approved:** All four documentation files ready for PR #7 (copilot-instructions.md, rp2350-support.md, dependency-updates.md, bluetooth-support.md)

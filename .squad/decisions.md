@@ -59,6 +59,21 @@ Documented gaps:
 
 **Commit:** `bf3d2f4d` (docs/copilot-instructions branch)
 
+### 2026-03-28T024429: Bluetooth and Multi-Output Architecture — Constraints from Edward's Survey
+
+**By:** Edward  
+**What:** Deep codebase survey identified 8 architectural constraints and findings for multi-output support:
+1. GPDriver is USB-only; output transport abstraction needed above it
+2. No runtime output switching exists; mode selection is boot-time only
+3. USB HID and CYW43 Bluetooth CAN coexist on PicoW (separate hardware)
+4. GPIO retro console OUTPUT does not exist (only INPUT adapters present)
+5. Zero Bluetooth code in firmware; feature is entirely new
+6. Pico2W (RP2350 + CYW43) missing pending CYW43 wireless stack porting to RP2350
+7. Output transport abstraction layer required before BT or GPIO can be peer output modes
+8. InputMode enum is source of truth for output modes; new mode requires protobuf change + web configurator cascade
+
+**Why:** Requested by Fortinbra as technical foundation for Bluetooth feature planning documentation. Findings form the basis for Hughes's feature doc and Edward's final approval by Riza.
+
 ## Governance
 
 - All meaningful changes require team consensus
