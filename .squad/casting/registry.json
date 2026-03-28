@@ -1,0 +1,58 @@
+{
+  "agents": [
+    {
+      "persistent_name": "Roy Mustang",
+      "folder": "mustang",
+      "universe": "full-metal-alchemist",
+      "role": "Lead",
+      "created_at": "2026-03-28T01:48:57Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Maes Hughes",
+      "folder": "hughes",
+      "universe": "full-metal-alchemist",
+      "role": "Technical Writer",
+      "created_at": "2026-03-28T01:48:57Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Edward",
+      "folder": "edward",
+      "universe": "full-metal-alchemist",
+      "role": "Firmware Dev",
+      "created_at": "2026-03-28T01:48:57Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Winry",
+      "folder": "winry",
+      "universe": "full-metal-alchemist",
+      "role": "Frontend Dev",
+      "created_at": "2026-03-28T01:48:57Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Riza",
+      "folder": "riza",
+      "universe": "full-metal-alchemist",
+      "role": "QA/Reviewer",
+      "created_at": "2026-03-28T01:48:57Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    {
+      "persistent_name": "Scribe",
+      "folder": "scribe",
+      "universe": null,
+      "role": "Session Logger",
+      "created_at": "2026-03-28T01:48:57Z",
+      "legacy_named": false,
+      "status": "active"
+    }
+  ]
+}

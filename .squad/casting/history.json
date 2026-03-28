@@ -1,0 +1,16 @@
+{
+  "assignments": [
+    {
+      "assignment_id": "gp2040-ce-2026-03-28",
+      "universe": "full-metal-alchemist",
+      "created_at": "2026-03-28T01:48:57Z",
+      "agents": [
+        { "name": "Roy Mustang", "role": "Lead" },
+        { "name": "Maes Hughes", "role": "Technical Writer" },
+        { "name": "Edward", "role": "Firmware Dev" },
+        { "name": "Winry", "role": "Frontend Dev" },
+        { "name": "Riza", "role": "QA/Reviewer" }
+      ]
+    }
+  ]
+}
