@@ -156,9 +156,21 @@ When working in VS Code, prefer using the built-in tasks:
 ## Git and Branching Policy
 
 ### CRITICAL RULES
-- **NEVER commit directly to `main`** — Always use a feature branch
+- **NEVER commit directly to `main`** — `main` tracks upstream only
 - **NEVER commit to `upstream` under any circumstances**
+- **`develop` is the integration branch** — all feature branches target `develop`
 - **All changes must be on a feature branch** before creating a pull request
+
+### Branch Structure
+```
+upstream/main  ──►  origin/main   (upstream sync only — never commit here directly)
+                         │
+                         ▼
+                    origin/develop  ◄──  feature branches merge here
+                         │
+                         ▼
+                    feature/*, fix/*, docs/*, chore/*, test/*
+```
 
 ### Branch Naming Convention
 Use descriptive names with prefixes:
@@ -169,11 +181,12 @@ Use descriptive names with prefixes:
 - `test/` — Tests and test improvements (e.g., `test/input-validation`)
 
 ### Workflow
-1. Create a feature branch from `main`: `git checkout -b feature/your-feature`
+1. Create a feature branch from `develop`: `git checkout develop && git checkout -b feature/your-feature`
 2. Make commits with clear, descriptive messages
 3. Reference related issues in commit messages: `Fixes #123`
-4. When ready, push the branch and create a pull request
+4. When ready, push the branch and create a pull request **targeting `develop`**
 5. After approval and merging, the branch can be deleted
+6. `develop` is periodically merged to `main` only when releasing a stable batch of features
 
 ### Commit Messages
 - Use imperative mood: "Add feature" not "Added feature"
@@ -270,7 +283,7 @@ When contributing as GitHub Copilot:
 3. **Test before suggesting** — ensure code compiles and works as intended
 4. **Document your changes** — include comments explaining non-obvious decisions
 5. **Respect constraints** — remember the RP2040's limited resources
-6. **Follow branching rules** — create a feature branch, never commit to main or upstream
+6. **Follow branching rules** — create a feature branch from `develop`, never commit to `main` or `upstream`
 
 ---
 
