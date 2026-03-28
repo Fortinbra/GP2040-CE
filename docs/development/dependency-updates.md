@@ -12,19 +12,31 @@ The project prioritizes **no breaking changes to user configurations**. When dep
 
 | Dependency | Current Version | Source | Purpose |
 |---|---|---|---|
-| Raspberry Pi Pico SDK | 2.2.0+ (min) | `pico_sdk_import.cmake` | Core microcontroller SDK — provides APIs for GPIO, USB, timers, and platform-specific functionality |
+| Raspberry Pi Pico SDK | 2.2.0 | `CMakeLists.txt` (`sdkVersion`), CI (`cmake.yml`) | Core microcontroller SDK — provides APIs for GPIO, USB, timers, and platform-specific functionality |
 
 The `pico_sdk_import.cmake` file manages SDK sourcing. It supports three modes:
 1. **PICO_SDK_PATH** (environment variable) — Use a locally installed SDK
 2. **PICO_SDK_FETCH_FROM_GIT** — Fetch the SDK from GitHub at the specified tag
 3. **Default behavior** — Look for SDK in the user's `.pico-sdk/` directory (VS Code extension standard)
 
-**Minimum version requirement:** The CMakeLists.txt enforces a minimum Pico SDK version 2.2.0 at configuration time:
+**Minimum version requirement:** The `CMakeLists.txt` enforces Pico SDK 2.2.0 as the project-wide minimum for **all** builds — RP2040 and RP2350 alike. This version is pinned in `CMakeLists.txt` (`set(sdkVersion 2.2.0)`) and in CI. The build will halt with a fatal error if an older SDK is used:
 ```cmake
 if (PICO_SDK_VERSION_STRING VERSION_LESS "2.2.0")
   message(FATAL_ERROR "Raspberry Pi Pico SDK version 2.2.0 (or later) required...")
 endif()
 ```
+
+> **Note:** `copilot-instructions.md` currently references SDK 2.1.1 as a default — this is a stale value. The authoritative minimum is 2.2.0 as enforced by the build system and CI.
+
+### Verifying your SDK version
+
+Check the SDK version file at `$PICO_SDK_PATH/pico_sdk_version.cmake`:
+```bash
+cat $PICO_SDK_PATH/pico_sdk_version.cmake
+# Look for: set(PICO_SDK_VERSION_STRING "2.2.0")
+```
+
+Or let CMake confirm it during configuration — the output includes the detected SDK version, and a version below 2.2.0 will produce a `FATAL_ERROR`.
 
 ### FetchContent Libraries
 
@@ -65,6 +77,8 @@ Each vendored library has its own `CMakeLists.txt` and is included via `add_subd
 
 The web configurator (`www/` directory) is a React application built with Vite and compiled into the firmware as a static asset. All npm dependencies are locked in `www/package-lock.json` for reproducible builds.
 
+> **Version format note:** The "Current Version" column shows the caret ranges defined in `package.json` (e.g., `^18.2.0`), which allow compatible minor/patch updates. The exact pinned versions for each dependency are in `www/package-lock.json` and are what actually gets installed during a build. Always commit both files.
+
 | Dependency | Current Version | Source | Purpose |
 |---|---|---|---|
 | **react** | ^18.2.0 | npm | UI framework |
@@ -95,10 +109,12 @@ The web configurator (`www/` directory) is a React application built with Vite a
 - **protobufjs-cli** (^1.1.3) — Protocol Buffers code generation
 - **sass** (^1.62.1) — SCSS compilation
 
-The web build process is integrated into CMake. During firmware compilation, if `SKIP_WEBBUILD` is not set, CMake:
+The web build process is integrated into CMake. By default in development builds, `SKIP_WEBBUILD=TRUE` is set (this is also the CI default), which skips the web build step entirely. When `SKIP_WEBBUILD` is not set or is set to `FALSE`, CMake:
 1. Runs `npm ci` (clean install with lock file)
 2. Runs `npm run build` (generates TypeScript from Protobuf, bundles React)
 3. Runs `makefsdata.js` (packages static files into firmware)
+
+> **When is `SKIP_WEBBUILD=FALSE` needed?** Only when you need to rebuild the web configurator UI from source — for example, when making changes to `www/` React code. Standard firmware-only development always uses `SKIP_WEBBUILD=TRUE`. The pre-built web assets are provided as build artifacts and downloaded by CI separately (the `fsData` artifact step in `cmake.yml`).
 
 ## Updating Dependencies
 

@@ -45,13 +45,24 @@ All boards are CI-tested and release-ready.
 
 ## Minimum Requirements
 
-- **Pico SDK 2.2.0 or later** — required for RP2350 support
+- **Pico SDK 2.2.0 or later** — required by the GP2040-CE build system for all targets (enforced in `CMakeLists.txt`; the build will fail with a fatal error if an older SDK is detected)
 - **CMake 3.13+** — standard requirement
 - **ARM Embedded Toolchain** — e.g., `arm-none-eabi-gcc`
 
-Verify your SDK version:
+> **Note on SDK version:** SDK 2.2.0 is the minimum for the entire GP2040-CE project, not just RP2350 boards. RP2040 boards also require SDK 2.2.0. The project-wide version is pinned in `CMakeLists.txt` (`set(sdkVersion 2.2.0)`) and in CI.
+
+### Verifying your SDK version
+
+Check the Pico SDK version file directly:
 ```bash
-cmake --version
+cat $PICO_SDK_PATH/pico_sdk_version.cmake
+# Look for: set(PICO_SDK_VERSION_STRING "2.2.0")
+```
+
+Or confirm during CMake configuration — the configure step prints the SDK version and will halt with a `FATAL_ERROR` if the version is below 2.2.0:
+```bash
+cmake -B build -S .
+# Output includes: "Pico SDK is 2.2.0"
 ```
 
 ---
@@ -230,7 +241,9 @@ RP2350 runs at 150 MHz by default (vs 133 MHz for RP2040). This can affect PIO t
 
 ### Pico 2 W Config
 
-The **Raspberry Pi Pico 2 W** (RP2350A + CYW43439 WiFi) is not yet supported in the main branch. A configuration file will be added in a future release.
+The **Raspberry Pi Pico 2 W** (RP2350A + CYW43439 WiFi) is not yet supported in the main branch.
+
+**Why it's missing:** GP2040-CE's wireless feature stack (Bluetooth HID, WiFi-based web configurator access) was developed for the RP2040-based Pico W and the CYW43439 driver integration specific to that platform. The Pico 2 W uses the same CYW43439 chip but on an RP2350A, and the wireless integration layer needs dedicated porting and validation work before a `Pico2W` board config can be released. The base firmware compiles and runs on RP2350A without issues — the gap is specifically the CYW43 wireless feature integration. A configuration will be added in a future release once this work is complete.
 
 ### RISC-V Mode
 

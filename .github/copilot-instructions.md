@@ -71,13 +71,13 @@ target_include_directories(gp2040_firmware PRIVATE
 - Only suggest alternative boards (Pico W, Pico 2, etc.) when explicitly requested
 
 ### Pico SDK Version
-- **Always use Pico SDK version 2.1.1** for official releases
+- **Always use Pico SDK version 2.2.0** for all builds (RP2040 and RP2350)
 - SDK path: `${env:USERPROFILE}/.pico-sdk/`
 - SDK is imported via `pico_sdk_import.cmake`
 
 ### Build Tools
 - **Ninja**: v1.12.1
-- **Picotool**: 2.1.1 (for flashing and device operations)
+- **Picotool**: 2.2.0 (for flashing and device operations)
 - **OpenOCD**: 0.12.0+dev (for debugging)
 - **CMake**: 3.10+
 
