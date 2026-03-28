@@ -17,6 +17,20 @@
 
 ## Learnings
 
+### 2026-03-28: BT Battery Protocol Analysis — Classic HID vs BLE HID
+
+**Tasked by:** Fortinbra (via Coordinator). Full findings in `.squad/agents/edward/bt-battery-protocol-analysis.md`.
+
+**`battery_service_server_set_battery_value()` is BLE GATT only.** Confirmed from BTStack SDK source: the function lives in `lib/btstack/src/ble/gatt-service/battery_service_server.h`. It requires `att_server_init()`, `sm_init()`, and an active BLE connection. It has no effect over a BT Classic L2CAP HID connection. The SDK's `hog_keyboard_demo.c` (BLE HID) uses it; `hid_keyboard_demo.c` (Classic HID) does not include `battery_service_server.h` at all.
+
+**BT Classic HID battery = HID descriptor Feature report.** Correct mechanism: add a `Battery Strength` item (Usage Page 0x06 / Generic Device Controls, Usage 0x20) as a `Feature` report to the HID descriptor. Host reads it via `GET_REPORT(Feature)` over L2CAP control channel. Handled in BTStack via `hid_device_register_report_request_callback()`. No GATT, no UUID 0x180F, no BLE required.
+
+**`bluetooth-support.md` battery section is incorrect.** The Battery Level Reporting section documents the GATT path (`battery_service_server_init`, UUID 0x180F, GATT notifications) but the doc chose BT Classic as the transport. This is a direct contradiction. The section must be replaced with HID descriptor battery reporting. The ADC reading logic (GPIO29, voltage divider, LiPo %) is transport-agnostic and unchanged.
+
+**BTStack API surface for Classic HID battery:** `hid_device_register_report_request_callback(cb)` — in the callback, respond to `HID_REPORT_TYPE_FEATURE` + battery Report ID by returning `readBatteryPercent()`. Full descriptor and `hid_sdp_record_t` already include the descriptor so the host discovers the battery Feature report via SDP.
+
+**BLE HID future note:** If BLE HID is added in a future phase, GATT Battery Service (UUID 0x180F) + `battery_service_server_set_battery_value()` + `pico_btstack_ble` CMake target would then be correct. The doc should note this explicitly as a future path.
+
 ### 2026-03-28: Power Management & Battery Reporting Analysis
 
 **Tasked by:** Fortinbra (via Coordinator). Full findings in `.squad/agents/edward/power-battery-analysis.md`.
