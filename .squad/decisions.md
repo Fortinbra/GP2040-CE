@@ -74,6 +74,37 @@ Documented gaps:
 
 **Why:** Requested by Fortinbra as technical foundation for Bluetooth feature planning documentation. Findings form the basis for Hughes's feature doc and Edward's final approval by Riza.
 
+### 2026-03-28T024429: GPIO Output Architecture Constraints
+
+**By:** Edward (via survey for Hughes's GPIO output feature doc)  
+**What:** Deep technical survey of GPIO retro console OUTPUT mode established the following architectural constraints and decisions:
+
+1. **GPIOOutputAddon is a `GPAddon` subclass, not a `GPDriver`** — enables simultaneous USB HID + GPIO retro output. GPIO output runs in `addon->process()` after USB report is sent per main loop iteration.
+
+2. **No new `InputMode` enum value required** — GPIO output protocol is selected within the addon config, not at the DriverManager/InputMode level. Avoids cascade changes to protobuf, DriverManager, and web configurator mode selector.
+
+3. **Level shifting is mandatory for NES, SNES, Genesis/MD, TurboGrafx-16/PC Engine** — these consoles use 5V TTL. RP2040/RP2350 GPIO inputs are NOT 5V tolerant. Hardware requirement: 74AHCT125 (output) + 74LVC245 or resistor divider (input). This is a hardware design constraint to document.
+
+4. **N64 and Dreamcast are 3.3V native** — no level shifting needed. RP2040/RP2350 GPIO compatible out of the box.
+
+5. **N64 output requires PIO — non-negotiable** — 1 MHz NRZ serial, 500 ns/bit tolerance. Bit-bang and interrupt approaches fail at this tolerance. One PIO state machine needed.
+
+6. **Dreamcast MAPLE bus requires PIO — non-negotiable** — ~2 Mbps, bidirectional, CRC-checked frames, <200 µs response window. Two PIO SMs needed (TX + RX). Most complex retro console target. No Dreamcast code exists in the project today.
+
+7. **SNES/NES output: interrupt-driven is viable, PIO is optional** — timing window is 6–12 µs per clock edge. GPIO IRQ response latency on RP2040 is typically <1 µs. Both approaches achievable; PIO provides jitter-free guarantee.
+
+8. **Genesis/MD and TurboGrafx-16: bit-bang fully sufficient** — parallel protocols with slow console polling rates (60 Hz). No PIO needed.
+
+9. **PIO state machines are not a bottleneck** — RP2040 has 8 total. Worst case (PIO-USB passthrough + WS2812 + N64 + Dreamcast) = 8 SMs fully consumed. More typical retro-output board (no USB passthrough) uses at most 4. RP2350B has 12 SMs.
+
+10. **Pico W loses GPIO 23–25 to CYW43** — pins are used for CYW43 SPI/SDIO bus. Only GPIO 22, 26, 27, 28 are free candidates (4 pins). Sufficient for NES/SNES/N64/TG16/Dreamcast; tight for Genesis 6-button (needs 9 signal pins).
+
+11. **SNES protocol timing ground truth** — from `lib/SNESpad/SNESpad.cpp`: Latch HIGH = 12 µs, setup delay = 6 µs, clock LOW = 6 µs, clock HIGH = 6 µs. Frame = 16 bits (SNES) / 8 bits (NES). Data active-low.
+
+12. **New protobuf fields needed** — `GPIOOutputOptions` message in `proto/config.proto` with fields: enabled, protocol enum, per-protocol pin assignments. Wire into `AddonOptions` alongside existing `SNESOptions`, `TG16Options`.
+
+**Why:** Requested by Fortinbra as technical foundation for Hughes's GPIO output feature documentation. Full analysis in `.squad/agents/edward/gpio-analysis.md`.
+
 ## Governance
 
 - All meaningful changes require team consensus
