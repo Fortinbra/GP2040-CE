@@ -188,3 +188,34 @@
 
 **Ready for Review:** Document now contains sufficient technical depth for Phase 1 implementation to begin. All major architectural decisions (power states, battery reporting, namespace isolation) are documented and grounded in codebase analysis.
 
+### Battery Level Reporting Correction (Session 7)
+
+**Critical Technical Error Identified and Fixed:**
+
+Edward's detailed protocol analysis revealed that the original "Battery Level Reporting" section incorrectly documented the GATT Battery Service (UUID 0x180F) and `battery_service_server_set_battery_value()` as the mechanism for BT Classic HID battery reporting. These are **BLE GATT APIs that have no effect over a BT Classic HID connection** — they operate on a completely different transport layer (ATT/GATT over BLE, not L2CAP over Classic BR/EDR).
+
+**Correction made:**
+1. Replaced the entire Battery Level Reporting section with the correct BT Classic mechanism: **HID descriptor Feature report** (Usage Page 0x06, Usage 0x20)
+2. Battery level is now correctly documented as a Feature report in the HID descriptor itself
+3. The host queries via `GET_REPORT(Feature)` over L2CAP (HID control channel, PSM 0x0011)
+4. The device responds via `hid_device_register_report_request_callback()` with current battery percentage
+5. Added forward-looking note: GATT Battery Service applies only if BLE HID is added in a future phase (separate decision)
+6. ADC hardware logic (GPIO29, 3:1 divider, LiPo range) and VBUS detection (GPIO24) remain unchanged — they are transport-agnostic measurement mechanisms
+7. Polling interval guidance updated: host controls polling cadence, no "notification flooding" concern for Classic HID
+
+**Key Learning:** BTStack SDK divides battery reporting by transport:
+- **BT Classic HID:** Battery in descriptor, Feature report, `hid_device_register_report_request_callback()`
+- **BLE HID:** GATT Battery Service UUID 0x180F, `battery_service_server_init()`, `battery_service_server_set_battery_value()`
+- The split is absolute — mixing them causes dead code and wasted flash on the unused layer
+
+**Documentation Impact:**
+- Section "Battery Level Reporting" rewritten for accuracy and clarity
+- Cross-reference added to `hid_device_register_report_request_callback()` in btstack_hid.h
+- Example callback shown with USB detection (GPIO24) inline
+- References to gamepad->auxState remain correct (transport-agnostic power tracking)
+
+**Commit:** `09daa13b` (docs/copilot-instructions branch)
+
+**Dependency on Edward's Analysis:** This fix is derived entirely from Edward's `.squad/agents/edward/bt-battery-protocol-analysis.md`, which grounded the analysis in BTStack SDK 2.2.0 source code (`lib/btstack/src/classic/hid_device.h`, `lib/btstack/src/ble/gatt-service/battery_service_server.h`) and SDK examples (`hid_keyboard_demo.c` vs. `hog_keyboard_demo.c`).
+
+
