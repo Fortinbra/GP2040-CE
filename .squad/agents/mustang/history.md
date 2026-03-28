@@ -16,3 +16,11 @@
 - docs/ — existing documentation
 
 ## Learnings
+
+### Copilot Instructions (2025-03-28)
+- Created `.github/copilot-instructions.md` on branch `docs/copilot-instructions` (commit `6308f5c0`)
+- Documented comprehensive guidance for GitHub Copilot contributions
+- Locked Pico SDK version to 2.1.1 as standard
+- **Critical branching policy:** Never commit directly to main or upstream; always use feature branches
+- Indentation standard: 4 spaces only, never tabs — enforced across all file types
+- Covers code style (C/C++, CMake), platform config, build system, project structure, git workflow, documentation, PR guidelines, testing, performance, and hardware constraints

@@ -1,0 +1,3 @@
+chore: log copilot-instructions session and merge decisions
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
