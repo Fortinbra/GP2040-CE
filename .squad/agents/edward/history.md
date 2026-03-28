@@ -17,6 +17,40 @@
 
 ## Learnings
 
+### 2026-03-28: Power Management & Battery Reporting Analysis
+
+**Tasked by:** Fortinbra (via Coordinator). Full findings in `.squad/agents/edward/power-battery-analysis.md`.
+
+**No Pimoroni board config exists.** Zero Pimoroni entries among 56 `configs/` directories. A new `configs/PimoroniPicoLipo2XLW/` must be created with `PICO_BOARD=pico2_w` / `PICO_PLATFORM=rp2350-arm-s`.
+
+**`GamepadAuxPower` struct already exists** in `headers/gamepad/GamepadAuxState.h` with `charging`, `pluggedIn`, and `level` fields — hardcoded to `pluggedIn=true`, `level=100` in `src/gp2040.cpp:75–78`. Battery reporting replaces this hardcode.
+
+**ADC pattern confirmed** (from `src/addons/analog.cpp`): `adc_gpio_init(pin)` → `adc_select_input(pin - 26)` → `adc_read()` → 12-bit (0–4095). ADC_PIN_OFFSET = 26. Battery pin is GPIO29/ADC3. Voltage formula: `V_BAT = (raw/4095.0) * 3.3 * divider_factor`. LiPo range: 3.0 V (0%) to 4.2 V (100%). Pimoroni standard divider = 3.0 (200k/100k) — needs schematic confirmation.
+
+**BTStack Battery Service:** `battery_service_server_init(uint8_t 0–100)` + `battery_service_server_set_battery_value(uint8_t)`. Lives in Pico SDK's BTStack submodule — NOT in GP2040-CE's `lib/`. BLE GATT service UUID 0x180F, characteristic 0x2A19. Requires `#import <battery_service.gatt>` in GATT profile file.
+
+**Zero power management exists.** No `pico/sleep.h`, no `cyw43_wifi_pm()`, no sleep/dormant entry anywhere in the codebase. BT+battery builds are the first power-constrained paradigm.
+
+**Proposed state machine:** USB_CONNECTED (full power, report 100%) → ACTIVE (battery ADC, CYW43_PERFORMANCE_PM) → IDLE (clock reduction, CYW43_DEFAULT_PM or CYW43_AGGRESSIVE_PM, BT sniff mode 40 ms) → DEEP_SLEEP (RP2350 DORMANT via `sleep_goto_dormant_until_pin()`, CYW43 deinit first, wake on button GPIO edge, re-init CYW43 + BT on wake).
+
+**CYW43 DORMANT caveat:** CYW43 must be gracefully deinit'd before RP2350 enters DORMANT. Re-init + BT re-advertisement on wake adds unknown latency (estimated 500 ms–2 s) — needs hardware testing.
+
+**Namespace conflict mitigation confirmed:** Translation-unit isolation (BT driver code in `src/drivers/bt/` includes only BTStack headers; existing TinyUSB files unchanged). `gp_hid_report_type_t` project-local enum optional for abstraction boundaries. `#undef` approach rejected. Gate all BT/power code on `PICO_CYW43_SUPPORTED`.
+
+### 2026-03-28: TinyUSB / BTStack Namespace Conflict Analysis
+
+**Tasked by:** Fortinbra (via Coordinator). Full findings in `.squad/agents/edward/bt-namespace-analysis.md`.
+
+**Primary confirmed collision:** `hid_report_type_t` is defined as a `typedef enum` by BOTH TinyUSB (`lib/tinyusb/src/class/hid/hid.h:84`) and BTStack (`<sdk>/lib/btstack/src/btstack_hid.h:109`). Same name, different first enum value (`HID_REPORT_TYPE_INVALID` vs `HID_REPORT_TYPE_RESERVED`). Including both in the same translation unit causes a compile error. This type is pervasive in GP2040-CE's existing HID driver layer.
+
+**No CMake mutual exclusion:** Neither `pico_btstack` nor `tinyusb` CMakeLists in SDK 2.2.0 enforces a FATAL_ERROR when both are linked simultaneously. They can coexist in the same firmware binary. The conflict is header-level (compile-time), not link-time.
+
+**Other collisions investigated:** `hid_protocol_mode_t` (different typedef names — no collision), `HID_USAGE_PAGE_*` (different design patterns — no collision), `TU_ATTR_PACKED` (BTStack doesn't define `PACKED` the same way — no collision), `HID_KEY_*` (TinyUSB-only — no collision).
+
+**RP2350 + CYW43 CONFIRMED for BTStack:** `pico2_w.h` in SDK 2.2.0 sets `PICO_CYW43_SUPPORTED=1` and `PICO_PLATFORM=rp2350`. `pico_btstack` cmake registers all sub-libraries when CYW43 is supported. Previous uncertainty was incorrect. Pimoroni Pico Lipo 2 XL W (RP2350A+CYW43) is a confirmed working hardware target per Fortinbra.
+
+**Recommended approach:** Translation-unit isolation — BT driver code lives in `src/drivers/bt/` and includes only BTStack headers. Existing TinyUSB files unchanged. Gated by `PICO_CYW43_SUPPORTED` (SDK-provided, no custom flag needed). Optional: `gp_hid_report_type_t` project-local enum at the abstraction boundary to avoid any cross-stack type exposure.
+
 ### 2026-03-28: RP2350 Analysis
 
 **SDK version:** Project requires **Pico SDK 2.2.0** (CMakeLists.txt fatal error if < 2.2.0). CI checks out SDK at tag `2.2.0`. RP2350 support was introduced in SDK 2.0.0 — project is already compatible.
@@ -96,3 +130,36 @@ Edward's round-1 revision (`688582e4`) passed technical content checks in all su
 - `src/addons/snes_input.cpp` — SNESpadInput (GPIO input, not output)
 - `src/addons/tg16_input.cpp` — TG16padInput (GPIO input, not output)
 - `configs/PicoW/PicoW.cmake` — only wireless board config
+
+### 2026-03-28: GPIO Retro Console OUTPUT Architecture Survey
+
+**Tasked by:** Fortinbra (via Coordinator). Survey findings written to `.squad/agents/edward/gpio-analysis.md`.
+
+**SNES/NES protocol timing (from `lib/SNESpad/SNESpad.cpp`):** Console drives CLOCK and LATCH. Latch HIGH = 12 µs, LOW setup = 6 µs. Clock cycle: 6 µs LOW + 6 µs HIGH = 12 µs per bit. 16 bits for SNES (12 buttons + 4 device ID), 8 bits for NES. Data is active-low. For OUTPUT mode, MCU flips: DATA becomes output, CLOCK/LATCH become inputs (IRQ-driven). Bit-bang feasible at this timing; PIO is jitter-free alternative.
+
+**TG16/PC Engine protocol (from `src/addons/tg16_input.cpp`):** 6 pins. Console drives OE (active-low) and SELECT. For output, MCU drives DATA0–DATA3 (4-bit nibble) based on SELECT state. Timing is loose (1 ms sleep in existing code). Bit-bang sufficient.
+
+**N64 protocol:** Single-wire NRZ serial at 1 MHz (1 µs/bit). 3.3V native — no level shifting needed. PIO mandatory — 500 ns per-bit tolerance cannot be met with bit-bang or interrupts. Community PIO programs exist for reference.
+
+**Dreamcast MAPLE bus:** 2-wire (SDCKA/SDCKB), half-duplex, ~2 Mbps, 3.3V native. Bidirectional with CRC and frame protocol. No code exists in the project. Two PIO SMs needed (TX + RX). Most complex retro console target — frame parsing, CRC, response timing within ~200 µs window.
+
+**Voltage levels — critical hardware constraint:**
+- NES, SNES, Genesis/MD, TG16/PC Engine: **5V TTL** — level shifting required both directions (RP2040 inputs are NOT 5V tolerant; 74AHCT125 for output, 74LVC245 for bidirectional)
+- N64: **3.3V** — RP2040 native, no level shifting
+- Dreamcast: **3.3V** — RP2040 native, no level shifting
+
+**PIO state machine budget (RP2040):** 8 total. Current usage: PIO-USB host = 3 SMs (default config, only when USB_PERIPHERAL_ENABLED), WS2812 = 1 SM (pio0/sm0 in neopicoleds.cpp:282). A full retro-output implementation (N64 + Dreamcast + LEDs) = 4 SMs. Not a bottleneck on RP2040; RP2350B has 12 SMs.
+
+**GPIOOutputAddon architecture:** Must be a `GPAddon` subclass (NOT a new `GPDriver`). This enables USB + GPIO simultaneous operation — GPIO output runs in `process()` after USB report is sent. No new `InputMode` enum value needed; enabled via a new `GPIOOutputOptions` block in `AddonOptions` protobuf. Pin assignments configurable per protocol via web configurator.
+
+**PicoW GPIO constraints:** GPIO 23–25 reserved for CYW43 SPI/SDIO bus. Free GPIO candidates: 22, 26, 27, 28 (4 pins). Sufficient for NES/SNES/N64/Dreamcast/TG16 but tight for Genesis 6-button (needs 9 pins).
+
+**Genesis/Mega Drive:** Parallel + SELECT mux. 7–9 signal lines. Console drives SELECT at ~60 Hz. Bit-bang fully sufficient — no PIO needed. Level shifting required (5V).
+
+**Key file references:**
+- `lib/SNESpad/SNESpad.cpp` — SNES/NES timing constants (12 µs latch, 6 µs clock)
+- `lib/pico_pio_usb/src/pio_usb_configuration.h` — PIO-USB SM allocation (PIO0 sm0 TX, PIO1 sm0/sm1 RX)
+- `lib/NeoPico/src/NeoPico.h` + `src/addons/neopicoleds.cpp:282` — WS2812 on pio0/sm0
+- `headers/helper.h:38–40` — `isValidPin()` using `NUM_BANK0_GPIOS`
+- `configs/Pico/BoardConfig.h` — standard Pico pin allocation (GPIO 2–21 for buttons, 0–1 I2C, 28 LEDs)
+- `configs/PicoW/BoardConfig.h` — Pico W same layout; GPIO 23–25 reserved (CYW43)

@@ -105,6 +105,31 @@ Documented gaps:
 
 **Why:** Requested by Fortinbra as technical foundation for Hughes's GPIO output feature documentation. Full analysis in `.squad/agents/edward/gpio-analysis.md`.
 
+### 2026-03-28T04:14: RP2350 + BTStack confirmed working
+
+**By:** Fortinbra  
+**What:** RP2350 with CYW43 wireless fully supports BTStack — confirmed by Fortinbra who has built a working BT controller project on the Pimoroni Pico Lipo 2 XL W (RP2350 + CYW43). The previous note that RP2350 CYW43 BT was blocked/unverified is incorrect and must be removed from docs.  
+**Also:** TinyUSB and BTStack have conflicting namespaces — this must be documented as a known integration concern in bluetooth-support.md.  
+**Why:** User-confirmed hardware fact — supersedes prior analysis uncertainty.
+
+### 2026-03-28T04:20: Pimoroni Pico Lipo 2 XL W as BT reference board
+
+**By:** Fortinbra  
+**What:** The Pimoroni Pico Lipo 2 XL W (RP2350 + CYW43 + onboard LiPo charger) is the designated reference board for initial Bluetooth development and testing.  
+**Why:** User-confirmed working BT target with battery hardware present.
+
+### 2026-03-28T04:20: BT must include battery level reporting
+
+**By:** Fortinbra  
+**What:** Bluetooth feature must include battery level reporting (BT HID Battery Service, UUID 0x180F). Battery percentage must be reported to the connected host over BT.  
+**Why:** Wireless devices must report battery state; this is expected by all modern OSes.
+
+### 2026-03-28T04:20: Power management required for BT/battery builds
+
+**By:** Fortinbra  
+**What:** GP2040-CE must implement power management for wireless (battery-powered) builds. USB builds always have VBUS so power management was never needed. BT+battery builds require: sleep/dormant modes when idle, CYW43 radio power saving, VBUS detection to switch power profiles between USB and battery operation.  
+**Why:** First time the firmware must manage its own power budget — foundational for any battery-powered use.
+
 ## Governance
 
 - All meaningful changes require team consensus
