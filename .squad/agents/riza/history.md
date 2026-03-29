@@ -141,3 +141,46 @@ Rounds 4 & 5 escalated to Fortinbra (human governance decisions)
 **Findings written to:** `.squad/agents/riza/rm2-review-2.md`
 
 **Pattern reinforced:** Single-character version suffix `+` triggers round rejection; lockout rule works correctly — Edward (non-author) applied the fix cleanly.
+
+### Review Cycle: Deferred Dependency Upgrade Planning Docs (2026-03-28T234414Z)
+
+**Reviewed:**
+- `docs/development/tinyusb-upstream-port.md`
+- `docs/development/pico-pio-usb-upstream-port.md`
+- `docs/development/nanopb-stable-migration.md`
+- `docs/development/npm-major-upgrades.md`
+
+**Verdict:** ✅ APPROVED (all 4 documents)
+
+**Technical Accuracy Verified:**
+- SDK 2.2.0 correctly referenced throughout (matches squad decision 2026-03-28T024429)
+- TinyUSB: 0.17.0 base + 18 custom commits verified; upstream 0.20.0 correct; remote mismatch (gitmodules→OpenStickCommunity, origin→hathach/tinyusb) accurately documented
+- pico-pio-usb: 0.5.3 base + 10 custom commits verified; dev branch correctly noted; upstream 0.7.2 correct
+- nanopb: 0.4.8-dev confirmed as vendored snapshot (not submodule); identified as development snapshot vs. stable release
+- npm packages: All version pairs match confirmed facts exactly (React 18.3.1→19, Vite 4.5.14→8, react-router-dom 6.30.3→7, ESLint 8.57.1→9, TypeScript 5.9.3→6, Zustand 4.5.7→5, protobufjs-cli 1.2.0→2)
+
+**Standards Compliance:**
+- ✓ Author attribution: "GP2040-CE core team" only; no internal Squad agent names
+- ✓ Code formatting: No violations (all planning/roadmap docs without code blocks)
+- ✓ Formatting consistency: Markdown structure consistent with project standards
+- ✓ No ambiguity: All instructions and technical claims clear and specific
+
+**Completeness Assessment:**
+- Clear problem statement and motivation
+- Current state inventory (versions, locations, custom patches)
+- Well-defined goals and success criteria
+- Detailed phase-by-phase approach with durations and effort estimates
+- Risk analysis with specific mitigation strategies
+- Dependency coordination notes (TinyUSB ↔ pico-pio-usb, protobufjs ↔ firmware communication)
+- Hardware testing requirements where applicable
+- Documentation update references
+
+**Planning Quality:**
+- TinyUSB & pico-pio-usb: Risk levels appropriately assessed (HIGH and MEDIUM); hardware regression testing strategy thorough (5+ controller models, latency verification)
+- nanopb: Flash compatibility risk correctly identified with specific mitigation
+- npm: Staged rollout strategy sound, separating high-risk packages (React, react-router-dom) into dedicated phases
+
+**Findings written to:** `.squad/agents/riza/deferred-deps-review.md`
+
+**Recommendation:** All four documents ready for merge. No revisions required.
+
