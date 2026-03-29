@@ -310,6 +310,92 @@ Edward's detailed protocol analysis revealed that the original "Battery Level Re
 
 **Commit:** `49bd6797` (feature/dependency-updates branch)
 
+### I2C Feature Docs Technical Corrections (Session 10)
+
+**Task:** Apply all technical corrections from Edward (firmware accuracy) and Riza (QA) to two I2C planning docs.
+
+**Documents corrected:**
+1. `docs/development/i2c-peripheral-expansion.md`
+2. `docs/development/hid-over-i2c.md`
+
+**i2c-peripheral-expansion.md corrections applied:**
+
+1. **Timing figure correction** — Fixed I2C write timing from ~530µs to ~500µs at 400 kHz (21 bytes × 22.5µs/byte + overhead). Updated both the "Timing" section and the latency calculation section.
+
+2. **Proto field number correction (CRITICAL)** — Fixed incorrect guidance. Changed from "use field 28 or higher" to "next available field is 32". Fields 28–31 are already occupied in AddonOptions.
+
+3. **EMA fields clarification** — Added note in packet format section clarifying that the 21-byte packet serializes output gamepad state fields only, excluding internal float EMA fields (ema_1_x, ema_1_y, etc.) from GamepadState.
+
+**hid-over-i2c.md corrections applied:**
+
+4. **i2c_slave_init() does not exist (MAJOR REWRITE)** — The doc incorrectly described using `i2c_slave_init(i2c1, addr, callback)` with high-level event callbacks (`I2C_SLAVE_RECEIVE`, `I2C_SLAVE_REQUEST`, `I2C_SLAVE_FINISH`). This API does not exist in Pico SDK 2.2.0. Replaced with correct low-level approach:
+   - `i2c_set_slave_mode(i2c1, true, I2C_SLAVE_ADDR)` for hardware config
+   - `irq_set_exclusive_handler(I2C1_IRQ, hoi2c_irq_handler)` to register IRQ handler
+   - `irq_set_enabled(I2C1_IRQ, true)` to enable interrupt
+   - Manual inspection of `i2c_get_hw(i2c)->raw_intr_stat` and `data_cmd` registers in handler
+   - Added complexity callout: "RP2040 I2C slave mode requires low-level IRQ handling — this is expert-level embedded work."
+
+5. **Atomic primitive correction** — Replaced incorrect suggestion to use `__atomic_store` or C11 `_Atomic` (RP2040 lacks native C11 atomics for this use case) with correct Pico SDK primitives:
+   - `critical_section_t` (disables/re-enables IRQs — appropriate for Core0/IRQ shared state)
+   - `spin_lock_t` (hardware spinlock, IRQ-safe)
+   - Added code example using `critical_section_init()`, `critical_section_enter_blocking()`, and `critical_section_exit()`
+
+6. **Open-drain GPIO correction** — Fixed INT# line description. RP2040 GPIO has no true open-drain mode. Documented two correct patterns:
+   - **Direction-toggle method (recommended):** Assert = `gpio_set_dir(pin, GPIO_OUT)` + `gpio_put(pin, 0)`; Release = `gpio_set_dir(pin, GPIO_IN)` (high-Z, external pull-up takes over)
+   - **Override method:** Use `gpio_set_oeover()` to disable the driver
+
+7. **Kernel module name clarification** — Clarified that the kernel module is `i2c-hid.ko` (not `hid-over-i2c`), while the device tree `compatible` string `"hid-over-i2c"` IS correct. Added inline comment in DTS example: `compatible = "hid-over-i2c"; /* matches i2c-hid.ko kernel module */`
+
+8. **Open Questions section update** — Updated item 5 ("Double-buffer safety") to reference `critical_section_t` instead of "atomic pointer", aligning with the corrected synchronization section.
+
+**Key learnings:**
+- Pico SDK 2.2.0 I2C slave API is low-level only — no callback abstraction layer exists
+- RP2040 has no native C11 atomics; use Pico SDK primitives (`critical_section_t`, `spin_lock_t`)
+- RP2040 GPIO has no true open-drain mode; direction-toggle is the standard workaround
+- Timing calculations must be precise: 21 bytes × 22.5µs/byte ≈ 500µs (not 530µs)
+- Proto field number conflicts must be checked against actual current codebase state (fields 28–31 occupied)
+
+**Commit:** `cde93e8b` (develop branch)
+
+**Branch workflow:** Stashed uncommitted changes from feature/ble-hid, switched to develop, applied corrections, committed, will return to feature/ble-hid after completion.
+
 **Purpose & Scope:** These docs provide future contributors with clear roadmaps for dependency migration. Each doc stands alone and includes risk/timeline assessments to help project leads prioritize and schedule work. The docs capture institutional knowledge about why these dependencies were deferred (not "forgotten," but deliberately flagged for significant effort) and what effort they require.
 
 
+
+### 2026-03-29T201441: I2C Documentation Corrections — Technical Accuracy Applied
+
+**Task:** Apply all technical accuracy corrections identified by Edward (Firmware Dev) to two I2C feature planning documents.
+
+**Docs Corrected:**
+- docs/development/i2c-peripheral-expansion.md
+- docs/development/hid-over-i2c.md
+
+**Branch:** develop  
+**Commit:** cde93e8b
+
+**Corrections Applied:**
+
+**i2c-peripheral-expansion.md:**
+- ✅ **Timing calculation** — Corrected 530µs → ~500µs at 400 kHz with full bit-rate breakdown
+- ✅ **Proto field number** — Corrected "field 28+" → "next available is 32" with documentation of occupied fields
+- ✅ **EMA field clarification** — Added explicit note that float EMA fields are internal smoothing state, excluded from 21-byte packet format
+
+**hid-over-i2c.md:**
+- ✅ **i2c_slave_init() replacement** — Complete rewrite of I2C slave setup section with correct Pico SDK 2.2.0 pattern
+- ✅ **Atomic primitives fix** — Replaced _Atomic with correct Pico SDK critical_section_t and code example
+- ✅ **INT# open-drain GPIO pattern** — Documented RP2040 limitation and direction-toggle method
+- ✅ **Kernel module naming clarity** — Specified distinction: i2c-hid.ko (module) vs ""hid-over-i2c"" (device tree)
+- ✅ **Updated Open Questions** — Replaced "atomic pointer" reference with correct SDK capabilities
+
+**Technical Validation:**
+- All corrections grounded in Pico SDK 2.2.0 API documentation
+- RP2040 hardware limitations verified
+- Timing calculations verified against I2C bit-rate specifications
+- Proto field allocation verified against config.proto
+
+**Status:** ✅ **COMPLETE**
+
+Both documents now accurately reference Pico SDK 2.2.0 APIs and RP2040 hardware capabilities. Ready for PR targeting develop branch.
+
+**Output:** Completion note written to .squad/decisions/inbox/hughes-i2c-corrections.md. All changes committed with Co-authored-by trailer.

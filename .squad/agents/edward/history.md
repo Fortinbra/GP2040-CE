@@ -109,6 +109,38 @@
 
 Edward's round-1 revision (`688582e4`) passed technical content checks in all subsequent rounds. The SDK version ground truth established here (2.2.0 project-wide) held through all 6 review rounds and became a recorded team decision. The Pico2W / CYW43 wireless porting gap explanation and SDK verification method correction were accepted as-is and survived to final approval.
 
+### 2026-03-29T201441: I2C Documentation Review — Technical Accuracy Assessment
+
+**Task:** Technical accuracy review of two I2C feature planning documents authored by Hughes.
+
+**Docs Reviewed:**
+- `docs/development/i2c-peripheral-expansion.md` (I2C master mode, GP2040-CE → satellites)
+- `docs/development/hid-over-i2c.md` (I2C slave mode, GP2040-CE ← host)
+
+**Findings:** 6 critical SDK/API inaccuracies requiring correction:
+
+1. **i2c_slave_init() API** — Does not exist in Pico SDK 2.2.0. Correct function: `i2c_set_slave_mode(i2c_inst_t *i2c, bool slave, uint8_t addr)`. Developer must additionally set up IRQ handler manually via `irq_set_exclusive_handler()`.
+
+2. **I2C slave callback API** — Docs describe event callbacks (I2C_SLAVE_RECEIVE, I2C_SLAVE_REQUEST, I2C_SLAVE_FINISH) that are **not provided by Pico SDK**. Developer must implement state machine by manually inspecting hardware registers (`i2c_get_hw(i2c)->raw_intr_stat`, etc.) in IRQ handler.
+
+3. **Proto field number** — Doc claims "use field 28 or higher" but `AddonOptions` already occupies fields 28–31. Next available is **32**. Verified against `proto/config.proto` lines 911–944.
+
+4. **GPIO open-drain mode** — RP2040 has no true open-drain GPIO. To emulate: Configure GPIO as input/output toggle (assert: set GPIO_OUT + low; release: set GPIO_IN for high-Z). Alternatively, use output-enable override via `gpio_set_oeover()`.
+
+5. **Atomic primitives** — Docs incorrectly suggest `_Atomic` or `__atomic_store`. RP2040 does not support C11 atomics. Correct approach: Use `critical_section_t` (`hardware/sync.h`) for simple mutual exclusion, or `spin_lock_t` for IRQ-safe locking.
+
+6. **I2C timing calculation** — 530µs claim is slightly high. Actual: 21 bytes × 22.5µs/byte + 30µs overhead ≈ **500µs at 400 kHz**. Minor but correctable.
+
+**Minor Clarifications:**
+- EMA float fields in GamepadState should be clarified as excluded from 21-byte packet
+- 1 MHz Fast+ mode not all I2C devices support — worth noting
+- Kernel module name is `i2c-hid.ko`; device tree `compatible` is `"hid-over-i2c"` (both correct, different purposes)
+
+**Overall Assessment:** Both docs architecturally feasible and demonstrate solid understanding of I2C and GP2040-CE addon patterns. Corrections are surgical and restore technical accuracy without affecting architecture.
+
+**Output:** Full findings written to `.squad/decisions/inbox/edward-i2c-accuracy.md`. All corrections applied by Hughes (commit cde93e8b) on develop branch.
+
+
 ### 2026-03-28T024429: Bluetooth & Multi-Output Architecture Survey
 
 **Tasked by:** Fortinbra (via Coordinator). Survey findings written to `.squad/agents/edward/bt-analysis.md`.

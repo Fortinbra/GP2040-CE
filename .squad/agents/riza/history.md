@@ -184,3 +184,38 @@ Rounds 4 & 5 escalated to Fortinbra (human governance decisions)
 
 **Recommendation:** All four documents ready for merge. No revisions required.
 
+### 2026-03-29T201441: I2C Documentation Review — Quality Assurance
+
+**Task:** Consistency and documentation quality review of two I2C feature planning documents (Hughes authored, Edward reviewed for accuracy).
+
+**Docs Reviewed:**
+- `docs/development/i2c-peripheral-expansion.md`
+- `docs/development/hid-over-i2c.md`
+
+**10-Point Consistency Audit:**
+
+1. **Terminology** ✅ — Both docs use master/slave and controller/target terms uniformly
+2. **Mutual cross-references** ✅ — Bidirectional citing; inverse relationship (master vs. slave) is unambiguous
+3. **Output ecosystem table** ✅ — Identical table in both; relationship between features clearly distinguished
+4. **Hardware conflicts** ✅ — I2C bus allocation strategy (i2c0 master, i2c1 slave) specified with no architectural clash
+5. **Section headers** ✅ — Markdown hierarchy consistent with project baseline (BLE HID doc)
+6. **Code blocks** ⚠️ — Language identifiers present on most blocks; 1 minor gap (hid-over-i2c.md line 166 struct missing ` ```c ` tag — cosmetic, not blocking)
+7. **Clarity & "why" explanations** ✅ — All major decisions explained; no ambiguous instructions
+8. **Limitations & caveats** ✅ — Explicitly stated in "Out of Scope" and "Open Questions" sections; not buried
+9. **Phase breakdown consistency** ✅ — 1/2/3 structure aligns with BLE HID doc and between the two I2C docs
+10. **Squad decision alignment** ✅ — Both docs respect USB-as-primary-output, SDK 2.2.0, no internal agent names
+
+**Verdict:** ✅ **APPROVE WITH NOTES**
+
+**No blocking issues.** Both documents internally consistent, technically rigorous (pending Edward's SDK corrections), and ready for implementation planning.
+
+**Notes for Hughes:**
+1. hid-over-i2c.md line 166: Add language identifier ` ```c ` to struct code block
+2. i2c-peripheral-expansion.md line 33: Output ecosystem table row could be one line clearer
+3. hid-over-i2c.md line 387: Double-buffer safety requirement is critical — flag for firmware feasibility confirmation
+
+**Forward to implementation:** Both docs are technically sound and ready to guide satellite MCU firmware development and main board integration.
+
+**Output:** Full QA findings written to `.squad/decisions/inbox/riza-i2c-review.md`.
+
+

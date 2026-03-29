@@ -162,6 +162,51 @@ Documented gaps:
 
 **Commit:** `49bd6797` (feature/dependency-updates branch)
 
+### 2026-03-29T201441: I2C Peripheral Expansion & HID over I2C — Technical Accuracy Verified
+
+**By:** Edward (Firmware Dev)  
+**What:** Comprehensive technical accuracy review of two I2C feature planning documents:
+- `docs/development/i2c-peripheral-expansion.md` — GP2040-CE as I2C master to satellite MCUs
+- `docs/development/hid-over-i2c.md` — GP2040-CE as I2C slave to host (e.g., Raspberry Pi)
+
+**Findings:** Both docs architecturally feasible. 6 critical SDK/API corrections required:
+1. **i2c_slave_init() does not exist** — Use `i2c_set_slave_mode()` + manual IRQ handler via `irq_set_exclusive_handler()`
+2. **No high-level I2C slave callback API in Pico SDK** — Callback pattern (I2C_SLAVE_RECEIVE, etc.) must be implemented manually by inspecting hardware registers
+3. **Proto field number miscalculation** — Next available is 32 (fields 28–31 occupied), not "28+"
+4. **GPIO open-drain emulation** — RP2040 has no true open-drain; use direction-toggle (GPIO_IN to release) or output-enable override
+5. **Atomic primitives unavailable** — C11 `_Atomic` and `__atomic_store` not suitable for RP2040; use `critical_section_t` or `spin_lock_t`
+6. **I2C timing** — 530µs claim is slightly high; actual ~500µs at 400 kHz (minor correction)
+
+**Impact:** All corrections applied by Hughes on develop branch (commit cde93e8b). Documents now accurate and implementation-ready.
+
+**Why:** Technical accuracy review requested by Fortinbra to validate planning docs before implementation phase.
+
+### 2026-03-29T201441: I2C Documentation Quality Review — Consistency APPROVED
+
+**By:** Riza (QA)  
+**What:** 10-point consistency review across `i2c-peripheral-expansion.md` and `hid-over-i2c.md`:
+- Terminology (master/slave, controller/target usage)
+- Mutual cross-references and architectural relationship clarity
+- Hardware resource conflicts (I2C bus allocation: i2c0 vs i2c1)
+- Code block formatting and language identifiers
+- Clarity and "why" explanations for all architectural decisions
+- Limitations and caveats (explicitly stated, not buried)
+- Phase breakdown consistency (1/2/3 alignment with BLE HID baseline)
+- Squad decision alignment (USB-as-primary-output, SDK version 2.2.0, no internal agent names)
+
+**Verdict:** ✅ APPROVE WITH NOTES. No blocking issues. Minor formatting note (1 code block missing language identifier in hid-over-i2c.md — cosmetic, fixed by Hughes).
+
+**Why:** Quality assurance review to ensure both docs meet project documentation standards before merge.
+
+### 2026-03-29T201441: Dead Code Pattern Documented — BTStack Key Management
+
+**By:** Edward (Firmware Dev)  
+**What:** `src/bt_config_bridge.cpp` contains `i2c_key_save()`, `i2c_key_load()`, and `i2c_key_clear()` functions flagged as **unused**. BTstack handles Bluetooth bonding internally via TLV (tag-length-value) flash storage (`.pico-sdk/btstack_priv.tlv`). These functions were intended for manual bonding management but are superseded by BTstack's built-in persistence.
+
+**Status:** Documented for future code cleanup phase. Not an immediate fix — intended as a note for dead code removal pass.
+
+**Why:** Codebase survey for architectural clarity. Helps future contributors understand BTstack integration points.
+
 ## Governance
 
 - All meaningful changes require team consensus
