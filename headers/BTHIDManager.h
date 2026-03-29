@@ -30,8 +30,10 @@ private:
     bool _initFailed = false;
     bool _connected = false;
     bool _pairingMode = false;
+    bool _reconnectNeeded = false;
     uint16_t _hid_cid = 0;
     uint32_t _bootTimeMs = 0;
+    uint32_t _reconnectAfterMs = 0;
 
     void _doInit();
 

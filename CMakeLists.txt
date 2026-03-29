@@ -342,9 +342,10 @@ if(PICO_CYW43_SUPPORTED)
     target_compile_definitions(${PROJECT_NAME} PUBLIC
         ENABLE_BLUETOOTH=1
         PICO_CYW43_SUPPORTED=1
+        CYW43_LWIP=0
     )
     target_link_libraries(${PROJECT_NAME}
-        pico_cyw43_arch_none
+        pico_cyw43_arch_poll
         pico_btstack_cyw43
         pico_btstack_classic
         pico_btstack_run_loop_async_context

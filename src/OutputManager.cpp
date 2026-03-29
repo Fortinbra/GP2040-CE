@@ -30,8 +30,10 @@ bool OutputManager::process(Gamepad* gamepad) {
     }
 
 #ifdef ENABLE_BLUETOOTH
-    // Deferred BT init: wait until USB is mounted before starting CYW43
-    if (!_btReady && tud_mounted()) {
+    // Init BT once — BTHIDManager::_doInit() handles the USB/timeout gating internally.
+    // Do NOT gate this on tud_mounted(): when on battery with no USB, tud_mounted() is
+    // never true and the 3-second wireless-boot timeout would never start.
+    if (!_btReady) {
         BTHIDManager::getInstance().init();
         _btReady = true;
     }

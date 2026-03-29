@@ -7,9 +7,11 @@
 
 #include "btstack.h"
 #include "pico/cyw43_arch.h"
+#include "pico/btstack_run_loop_async_context.h"
 #include "classic/hid_device.h"
 #include "bluetooth.h"
 #include "pico/time.h"
+#include "btstack_run_loop.h"
 
 #include "BTHIDManager.h"
 #include "bt_config_bridge.h"
@@ -76,6 +78,9 @@ void BTHIDManager::_doInit() {
         return;
     }
 
+    // Hook BTstack into CYW43's poll async context so its timers fire
+    btstack_run_loop_init(btstack_run_loop_async_context_get_instance(cyw43_arch_async_context()));
+
     l2cap_init();
     sdp_init();
     gap_set_local_name("GP2040-CE Controller");
@@ -109,10 +114,13 @@ void BTHIDManager::_doInit() {
 
     hci_power_control(HCI_POWER_ON);
 
-    // Reconnect to previously bonded device if one is stored
+    // Reconnect to previously bonded device if one is stored;
+    // otherwise stay discoverable so a new host can pair.
     bd_addr_t bondedAddr;
     if (bt_config_get_bonded_addr(bondedAddr)) {
-        hid_device_connect(bondedAddr, &_hid_cid);
+        gap_discoverable_control(0);  // Not discoverable — we'll initiate reconnect
+        _reconnectNeeded = true;
+        _reconnectAfterMs = to_ms_since_boot(get_absolute_time()) + 1000;
     }
 
     _initialized = true;
@@ -130,6 +138,19 @@ void BTHIDManager::process() {
     if (!_initialized) {
         return;
     }
+
+    // Auto-reconnect after disconnect when a bonded device is stored
+    if (_reconnectNeeded && !_connected) {
+        uint32_t now = to_ms_since_boot(get_absolute_time());
+        if (now >= _reconnectAfterMs) {
+            _reconnectNeeded = false;
+            bd_addr_t bondedAddr;
+            if (bt_config_get_bonded_addr(bondedAddr)) {
+                hid_device_connect(bondedAddr, &_hid_cid);
+            }
+        }
+    }
+
     cyw43_arch_poll();
 }
 
@@ -177,17 +198,29 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
                         case HID_SUBEVENT_CONNECTION_OPENED:
                             if (hid_subevent_connection_opened_get_status(packet) == ERROR_CODE_SUCCESS) {
                                 mgr._connected = true;
+                                mgr._reconnectNeeded = false;
                                 mgr._hid_cid = hid_subevent_connection_opened_get_hid_cid(packet);
+
+                                // Stop advertising once connected — stays connectable but not discoverable
+                                gap_discoverable_control(0);
 
                                 // Persist bonded device address for automatic reconnect on next boot
                                 bd_addr_t addr;
                                 hid_subevent_connection_opened_get_bd_addr(packet, addr);
                                 bt_config_save_bonded_addr(addr);
+                            } else {
+                                // Connection attempt failed — retry after 2 seconds
+                                mgr._reconnectNeeded = true;
+                                mgr._reconnectAfterMs = to_ms_since_boot(get_absolute_time()) + 2000;
                             }
                             break;
                         case HID_SUBEVENT_CONNECTION_CLOSED:
                             mgr._connected = false;
                             mgr._hid_cid = 0;
+                            // Re-enable discoverability and schedule reconnect after 2 seconds
+                            gap_discoverable_control(1);
+                            mgr._reconnectNeeded = true;
+                            mgr._reconnectAfterMs = to_ms_since_boot(get_absolute_time()) + 2000;
                             break;
                         default:
                             break;
