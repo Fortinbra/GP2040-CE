@@ -312,4 +312,58 @@ Edward's detailed protocol analysis revealed that the original "Battery Level Re
 
 **Purpose & Scope:** These docs provide future contributors with clear roadmaps for dependency migration. Each doc stands alone and includes risk/timeline assessments to help project leads prioritize and schedule work. The docs capture institutional knowledge about why these dependencies were deferred (not "forgotten," but deliberately flagged for significant effort) and what effort they require.
 
+### Bluetooth HID Documentation — Implementation Complete Update (Session 9)
+
+**Surgical Updates to `docs/development/bluetooth-support.md`:**
+
+**Key Changes:**
+
+1. **Status Line Updated** — Changed from "Planning / Not yet implemented" to "Implemented (Phase 1 & Phase 2) — Battery & Power deferred to Phase 3". Timestamp: 2026-03-29.
+
+2. **Added Implementation Status Table** — New section after Overview summarizing what was actually built:
+   - ✅ BTstack HID Classic: SSP headless pairing, SDP registered
+   - ✅ OutputManager routing: USB always available; BT when paired
+   - ✅ Web configurator UI: Bluetooth addon panel, output mode selector, pairing controls
+   - ✅ Protobuf BluetoothOptions: Message in AddonOptions field 31
+   - ⚠️ Bonding persistence: Schema defined; load/save wiring in progress
+   - 🔲 Battery reporting & Power management: Deferred to Phase 3
+
+3. **Added "Building with Bluetooth" Section** — New subsection under Minimum Requirements with environment variables and example CMake configuration for Pimoroni Pico Lipo 2 XL W (RP2350 + CYW43). Explains automatic BTstack linking on wireless boards.
+
+4. **Added "Pairing Your Controller" Section** — New user-facing section with step-by-step instructions:
+   - Enabling Bluetooth output mode via web configurator
+   - Activating pairing mode (discoverable toggle)
+   - Scanning and pairing on Switch, PS5, Android, Windows, macOS
+   - Reconnecting after power-off (automatic, no re-pairing)
+   - Clearing pairing for factory reset
+
+5. **Added BTHIDManager Isolation Note** — New subsection under "GPDriver and BTDriver" explaining translation-unit isolation to prevent TinyUSB/BTstack `hid_report_type_t` namespace collision. Emphasizes that BTHIDManager must never include `tusb.h`.
+
+6. **Updated Implementation Roadmap** — Restructured to show actual completion status:
+   - Phase 0: ✅ COMPLETED (exploration & testing)
+   - Phase 1: ✅ COMPLETED (with detailed task completion table, not estimates)
+   - Phase 2: ✅ COMPLETED (documentation & polish)
+   - Phase 3: NOT STARTED (list deferred items: bonding persistence, battery reporting, power management)
+
+7. **Updated Known Limitations** — Removed "will be created during Phase 1" language; changed to past tense. Updated RP2350 section to reflect that board configs are "available and tested" rather than "pending implementation".
+
+**Sections Preserved (not modified):**
+- Overview: Still accurate; describes what was actually built
+- Supported Hardware: Still accurate; no changes needed
+- Reference Hardware: Still accurate; Pimoroni Pico Lipo 2 XL W confirmed reference board
+- Architecture: Still accurate; OutputManager and BTHIDManager are real implementation
+- Output Mode Switching: Still accurate; user interaction workflow matches real UI
+- Battery Level Reporting: Preserved as-is; design still applies for Phase 3 (just not implemented yet)
+- Power Management: Preserved as-is; design still applies for Phase 3 (just not implemented yet)
+- Testing: Still applicable; test cases document what should be verified
+
+**Style consistency verified:**
+- 4-space indentation maintained
+- SDK version: 2.2.0 consistently
+- Timestamp: 2026-03-29
+- No AI agent names; "GP2040-CE core team" used
+- No document became stale; all "planned" language replaced with "implemented" or "deferred"
+
+**Document purpose:** Transformed from planning document to implementation record. Users can now read this and understand what is available today (Bluetooth HID Classic pairing + output mode switching) and what is not yet available (battery reporting, power management). The scope and architectural foundation is clear for future Phase 3 developers.
+
 

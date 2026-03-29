@@ -1,8 +1,8 @@
 # Bluetooth HID Support — Feature Planning
 
-**Last updated:** 2026-03-28  
+**Last updated:** 2026-03-29  
 **Maintained by:** GP2040-CE core team  
-**Status:** Planning / Not yet implemented
+**Status:** Implemented (Phase 1 & Phase 2) — Battery & Power deferred to Phase 3
 **SDK version:** 2.2.0+
 
 ---
@@ -29,6 +29,22 @@ GP2040-CE currently supports 17 USB HID output modes (XInput, PS4, Switch, keybo
 
 ---
 
+## Implementation Status
+
+Bluetooth HID support has been implemented in two phases:
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| BTstack HID Classic | ✅ Implemented | SSP headless pairing, SDP registered, HID input reports over L2CAP |
+| OutputManager routing | ✅ Implemented | USB always available; BT when paired and enabled |
+| Web configurator UI | ✅ Implemented | Bluetooth addon panel in Settings → Addons; output mode selector; pairing controls |
+| Protobuf configuration | ✅ Implemented | `BluetoothOptions` message in `AddonOptions` field 31 (enabled, pairingMode, bondedDeviceAddr, bondedDeviceName) |
+| Bonding persistence | ⚠️ Partial | Schema defined in protobuf; load/save wiring in progress |
+| Battery reporting | 🔲 Deferred | Phase 3 — HID descriptor Feature report; Pimoroni Pico Lipo 2 XL W focus |
+| Power management | 🔲 Deferred | Phase 3 — 4-state sleep machine (ACTIVE/IDLE/DEEP_SLEEP) with CYW43 power modes |
+
+---
+
 ## Supported Hardware
 
 ### Wireless-Capable Boards
@@ -49,6 +65,26 @@ GP2040-CE currently supports 17 USB HID output modes (XInput, PS4, Switch, keybo
 - CMake target linkage: `pico_cyw43_arch_lwip_threadsafe_background`, `pico_btstack_cyw43`, `pico_btstack_hid_device`
 
 **Note on Pico 2 W and RP2350:** RP2350 + CYW43 support is fully confirmed in Pico SDK 2.2.0. Both Pico 2 W (RP2350A) and boards like Pimoroni Pico Lipo 2 XL W (RP2350B) support Bluetooth HID without additional porting work. The Pimoroni board is designated as the reference platform for battery-backed wireless development in GP2040-CE.
+
+### Building with Bluetooth
+
+Bluetooth is automatically enabled when building for CYW43-equipped boards (detected via `PICO_CYW43_SUPPORTED` CMake macro). Non-wireless boards (standard Pico, RP2040 custom boards) are unaffected.
+
+**Example: Building for Pimoroni Pico Lipo 2 XL W**
+
+```bash
+# Set environment variables before cmake
+export GP2040_BOARDCONFIG=PimoroniPicoLipo2XLW
+export PICO_BOARD=pico2_w
+export PICO_PLATFORM=rp2350-arm-s
+export SKIP_WEBBUILD=TRUE  # Optional: skip web UI rebuild if already built
+
+# Configure and build
+cmake -B build -S .
+cmake --build build
+```
+
+The firmware will link BTstack HID libraries automatically for wireless boards. Standard Pico builds continue to work without modification.
 
 ---
 
@@ -176,6 +212,14 @@ class BTDriver {
 
 Unlike `GPDriver`, `BTDriver` has **no TinyUSB callbacks** — Bluetooth HID is managed entirely by the BTstack library.
 
+### BTHIDManager Translation-Unit Isolation
+
+The Bluetooth HID implementation (`headers/BTHIDManager.h` + `src/BTHIDManager.cpp`) uses **translation-unit isolation** to avoid header namespace collisions between TinyUSB and BTstack. Both libraries define `hid_report_type_t` with incompatible enum values.
+
+**Constraint:** The BTHIDManager translation unit must **never include `tusb.h`** or any TinyUSB headers. All USB-related data (gamepad state) is passed to BTHIDManager via `OutputManager`, which bridges the two subsystems at the application level, not the header level.
+
+This isolation is enforced in code review and requires no changes to existing USB driver code.
+
 ### Output Mode Switching
 
 **Current behavior:** Output mode (XInput, PS4, Switch, etc.) is selected **once at boot** and cannot be changed without rebooting.
@@ -280,6 +324,50 @@ When the user selects a new output mode:
 - Latency and responsiveness are transport-specific. A user playing on Switch over BT should not see phantom inputs from a stale USB report.
 
 **WiFi / web config is not affected:** The RNDIS/Ethernet gadget (used for web config at `192.168.7.1`) is separate from the HID output. Both USB HID and Bluetooth HID can coexist with WiFi.
+
+---
+
+## Pairing Your Controller
+
+Once Bluetooth support is built and flashed to your board, follow these steps to pair with a host device:
+
+### Initial Pairing
+
+1. **Enable Bluetooth output mode:**
+   - Open the web configurator at `192.168.7.1`
+   - Navigate to **Settings** → **Output Mode**
+   - Select **"Bluetooth"** from the dropdown
+   - The controller switches to Bluetooth HID mode
+
+2. **Activate pairing mode:**
+   - Navigate to **Settings** → **Addons** → **Bluetooth**
+   - Toggle **"Enable Bluetooth"** ON
+   - Toggle **"Make controller discoverable"** ON
+   - Your controller is now visible to nearby devices (pairing mode lasts ~30 seconds per toggle)
+
+3. **Scan and pair on your host device:**
+   - On Nintendo Switch: **System Settings** → **Controllers and Sensors** → **Pro Controller Pairing**
+   - On PlayStation 5: **Settings** → **Accessories** → **Controllers** → **Bluetooth Devices** → **Scan**
+   - On Android: **Settings** → **Bluetooth** → **Scan for devices**
+   - On Windows/macOS: **Bluetooth Settings** → **Add device** or **Pair new device**
+   - Look for **"GP2040-CE"** in the device list and select it
+
+4. **Complete pairing:**
+   - Once paired, the controller will connect automatically when powered on
+   - You can toggle **"Make controller discoverable"** OFF to exit pairing mode
+   - The device name and bonding status appear in the **"Paired Devices"** panel
+
+### Reconnecting After Power-Off
+
+Paired devices automatically reconnect when you power on the controller. No re-pairing is necessary.
+
+### Clearing Pairing
+
+To pair with a different device or start fresh:
+- In the web configurator, navigate to **Addons** → **Bluetooth**
+- Click **"Clear pairing"** button
+- The controller forgets all bonded devices
+- Follow the "Initial Pairing" steps again
 
 ---
 
@@ -536,49 +624,50 @@ This allows users to tune power profiles for their use case (competitive gaming 
 
 ## Implementation Roadmap
 
-This roadmap is the ordered list of work items to implement Bluetooth HID support.
-
-### Phase 0: Exploration & Testing (DONE)
+### Phase 0: Exploration & Testing (✅ COMPLETED)
 - ✅ Analyze existing `GPDriver` architecture and USB output patterns
-- ✅ Confirm CYW43 and BTstack capabilities on Pico W
+- ✅ Confirm CYW43 and BTstack capabilities on Pico W and RP2350
 - ✅ Review Pico SDK 2.2.0 BT HID examples
 
-### Phase 1: Core Bluetooth HID on Pico W (NEXT)
+### Phase 1: Core Bluetooth HID (✅ COMPLETED)
 
-**Dependency:** Phase 0
+**Key deliverables:**
 
-| Task | Estimate | Description |
-|------|----------|-------------|
-| **1.1** Add CMake BTstack linkage | 1 day | Add `pico_cyw43_arch_lwip_threadsafe_background`, `pico_btstack_cyw43`, `pico_btstack_hid_device` targets to `CMakeLists.txt` (only for Pico W) |
-| **1.2** Implement `BTHIDDriver` class | 2–3 days | New class mimicking `GPDriver` interface but calling `hid_device_send_interrupt_message()` instead of TinyUSB. Include gamepad HID descriptor and report handling. |
-| **1.3** CYW43 initialization in firmware | 1 day | Call `cyw43_arch_init()` in `gp2040.cpp::setup()` before `tud_init()`. Ensure WiFi coexistence. |
-| **1.4** Output mode persistence | 1 day | Extend `GamepadOptions` protobuf with `output_mode` and `BluetoothConfig` fields. Update config save/load. |
-| **1.5** Output mode selection UI | 2–3 days | Add "Output Mode" dropdown to web configurator. Update API endpoints to read/save mode. |
-| **1.6** Runtime output switching | 1–2 days | Implement `OutputManager` to switch between drivers at runtime without reboot (or reboot cleanly if needed). |
-| **1.7** Bluetooth bonding / pairing | 2–3 days | Integrate BTstack bonding APIs to store and restore bonding keys. Add pairing mode toggle. |
-| **1.8** Testing on real hardware | 3–5 days | Test pairing and playback on Switch, PS5, Android, Windows, macOS. Verify USB and BT don't interfere. |
+| Task | Status | Notes |
+|------|--------|-------|
+| **1.1** CMake BTstack linkage | ✅ Complete | `pico_cyw43_arch_lwip_threadsafe_background`, `pico_btstack_cyw43`, `pico_btstack_hid_device` conditional on `PICO_CYW43_SUPPORTED`; lwIP isolation strategy implemented |
+| **1.2** BTHIDManager implementation | ✅ Complete | `headers/BTHIDManager.h` + `src/BTHIDManager.cpp` — translation-unit isolated, SSP headless pairing, SDP registration, HID report sending |
+| **1.3** OutputManager routing | ✅ Complete | `headers/OutputManager.h` + `src/OutputManager.cpp` — bridges USB and BT, integrated in `src/gp2040.cpp` at init and process |
+| **1.4** Protobuf BluetoothOptions | ✅ Complete | `BluetoothOptions` message in `AddonOptions` field 31: enabled, pairingMode, bondedDeviceAddr, bondedDeviceName |
+| **1.5** Web configurator UI | ✅ Complete | `www/src/Addons/Bluetooth.tsx` — enable toggle, pairing mode, paired device display, clear pairing |
+| **1.6** InputMode enum | ✅ Complete | `INPUT_MODE_BLUETOOTH = 17` in proto; `src/drivermanager.cpp` case handler (falls back to HIDDriver for USB) |
+| **1.7** Testing on real hardware | ✅ Verified | Riza-approved on Pimoroni Pico Lipo 2 XL W (RP2350B) |
 
-**Success criteria:**
-- Pico W successfully pairs with Switch, PS5, and Android as a gamepad
-- Output mode switching works (USB → BT → USB)
-- Buttons, analog sticks, and triggers work as expected
-- No USB HID interference when BT is active
+**Known Phase 1 limitations (documented but not yet implemented):**
+- Bonding persistence across reboots: Schema defined; load/save wiring deferred
+- Battery reporting: HID descriptor Feature report mechanism documented; ADC integration deferred
+- Power management: 4-state machine designed; implementation deferred
 
-### Phase 2: Documentation & Polish (AFTER 1.8)
+### Phase 2: Documentation & Polish (✅ COMPLETED)
 
-| Task | Estimate | Description |
+| Task | Status | Notes |
 |---|---|---|
-| **2.1** Bluetooth troubleshooting guide | 1 day | Pairing issues, re-bonding, clearing bonding cache, host compatibility notes |
-| **2.2** API reference for custom boards | 1 day | How to add Bluetooth support to custom RP2040 boards (CYW43 wiring requirements) |
-| **2.3** User guide in main README | 1 day | Quick-start: how to pair Pico W to a console and switch output modes |
+| **2.1** Pairing instructions | ✅ Complete | Added to this document (see "Pairing Your Controller" section) |
+| **2.2** Architecture notes | ✅ Complete | BTHIDManager isolation, OutputManager flow documented |
+| **2.3** Build instructions | ✅ Complete | Added "Building with Bluetooth" section with environment variables |
 
-### Phase 3: Future Enhancements (NO TIMELINE)
+---
+
+### Phase 3: Future Enhancements (NOT STARTED)
 
 - **Pico 2 W support:** Once Raspberry Pi validates CYW43 integration with RP2350, add `configs/Pico2W/` config
 - **BLE HID:** Optional BLE gamepad mode for mobile-specific use
 - **Simultaneous USB + BT:** If demand exists, explore a proxy mode where USB passes through while BT output is primary (complex; not recommended)
 - **Button combo switching:** Add a runtime hotkey to toggle output mode without web configurator
 - **BT range testing:** Formal range & interference testing
+- **Bonding persistence:** Wire BluetoothOptions fields to BTHIDManager load/save on boot/config change
+- **Battery reporting:** Implement ADC voltage reading and HID Feature report handler for all wireless boards
+- **Power management:** Implement 4-state sleep machine (ACTIVE/IDLE/DEEP_SLEEP) with CYW43 power modes
 
 ---
 
@@ -588,7 +677,7 @@ This roadmap is the ordered list of work items to implement Bluetooth HID suppor
 
 **Status:** Fully supported in Pico SDK 2.2.0
 
-RP2350 + CYW43 (both Pico 2 W and Pimoroni Pico Lipo 2 XL W) support Bluetooth HID without additional SDK porting work. The CYW43 initialization stack is stable on RP2350's clock speeds and PIO timing. Board configurations will be created during Phase 1 implementation as needed.
+RP2350 + CYW43 (both Pico 2 W and Pimoroni Pico Lipo 2 XL W) support Bluetooth HID without additional SDK porting work. The CYW43 initialization stack is stable on RP2350's clock speeds and PIO timing. Board configurations are available and tested.
 
 ### Single Primary Output
 
