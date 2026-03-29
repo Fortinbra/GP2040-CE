@@ -479,3 +479,47 @@ RNDIS (web configurator) can use either. The fix ensures wireless boards use ONE
 
 **Linker conflict resolved.** Both board types produce clean .uf2 outputs. Phase 2 complete.
 
+### 2026-03-28: BT Boot Crash Fix — Deferred CYW43 Init After USB Enumeration
+
+**Tasked by:** Fortinbra (via Coordinator). Fix critical boot failure after Phase 2 implementation.
+
+**Symptom:** After flashing GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2, the board rebooted but did NOT appear in Windows Device Manager — not as HID, not as unknown device, nothing. This meant the firmware was crashing before TinyUSB ever enumerated.
+
+**Root cause:** `BTHIDManager::init()` was being called from `OutputManager::init()` in `gp2040.cpp::setup()` at line 199, which happens BEFORE `tud_init()` at line 293. The init sequence was:
+
+1. `gp2040.cpp::setup()` line 56–196: Storage, peripherals, gamepad setup
+2. Line 196: `DriverManager::getInstance().setup(inputMode)` — USB driver selected
+3. Line 199: `OutputManager::getInstance().init()` — **BTHIDManager::init() called here**
+4. Line 209–211: Event manager registration
+5. `gp2040.cpp::run()` line 293: `tud_init(TUD_OPT_RHPORT)` — **USB initialized HERE**
+
+If `cyw43_arch_init()` inside `BTHIDManager::init()` blocked, hung, or panicked (e.g., CYW43 chip didn't respond in time), the firmware never reached `tud_init()`, so USB never came up and the device was bricked until re-flashed.
+
+**Solution implemented:** Deferred BT initialization pattern (Option B from task description):
+
+1. **New init flow:** `BTHIDManager::init()` now only sets `_pendingInit = true` (non-blocking, returns immediately)
+2. **Renamed actual init:** Current init code moved to private `_doInit()` method
+3. **Deferred init in process():** `BTHIDManager::process()` (called every main loop tick at `gp2040.cpp::346`) checks:
+   - If `_pendingInit && !_initialized && !_initFailed`
+   - AND `tud_mounted()` returns true (USB is fully enumerated)
+   - THEN call `_doInit()`, clear `_pendingInit`
+4. **Error handling:** `_doInit()` now checks `if (cyw43_arch_init() != 0)` and sets `_initFailed = true` on error, falling through to USB-only mode instead of crashing
+
+**Files changed:**
+- `headers/BTHIDManager.h` — Added `_pendingInit`, `_initFailed` flags, `_doInit()` private method
+- `src/BTHIDManager.cpp` — Renamed `init()` → `_doInit()`, new `init()` sets flag only
+- `src/BTHIDManager.cpp::process()` — Added `tud_mounted()` check before calling `_doInit()`
+- Added `extern "C" { bool tud_mounted(void); }` declaration for C++ linkage
+
+**Build verification:**
+- **Pimoroni Pico Lipo 2 XL W (RP2350 + BT):** Clean build, 2.94 MB .uf2
+- **Standard Pico (RP2040, no BT):** Clean build, 2.41 MB .uf2
+
+**Architectural constraint established:** BT initialization must ALWAYS happen after `tud_mounted()` returns true. This guarantees:
+- USB always enumerates first (device appears in Device Manager even if BT fails)
+- CYW43 init cannot block the boot sequence
+- Graceful fallback to USB-only mode on CYW43/BTstack errors
+- Battery-only operation (no USB) still eventually initializes BT after a timeout
+
+**Commit:** `ec5bdf3f` (feature/bluetooth-hid branch)
+
