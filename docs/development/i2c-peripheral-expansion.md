@@ -143,6 +143,8 @@ Offset  Size  Type      Field           Description
 Total: 21 bytes
 ```
 
+**Note:** This packet serializes output gamepad state fields only. Internal signal smoothing state (such as float EMA fields: `ema_1_x`, `ema_1_y`, etc.) is excluded from transmission — satellites receive only the finalized button/axis values.
+
 #### Button Bitmask Reference
 
 The `buttons` field uses GP2040-CE's internal button numbering, documented in `headers/gamepad/GamepadState.h`:
@@ -171,8 +173,8 @@ Satellite firmware that implements a specific console output simply maps the rel
 
 At 400 kHz I2C (Fast Mode):
 - Each byte costs ~22.5 µs (9 bit-times including ACK)
-- 21-byte payload + I2C start/address/stop overhead ≈ **530 µs per satellite**
-- Two satellites on one bus: ~1.1 ms — exceeds the 1 ms USB frame budget
+- 21-byte payload + I2C start/address/stop overhead ≈ **500 µs per satellite**
+- Two satellites on one bus: ~1 ms — at the limit of the 1 ms USB frame budget
 
 For builds with multiple satellites, the addon should use **change detection**: skip the I2C write if `GamepadState` has not changed since the last transmission. In practice, during idle frames (no input) the bus is silent, and the write only occurs on active frames where a button is pressed or an axis moves. Multiple satellites are only a throughput concern during continuous axis input (joystick movement).
 
@@ -198,7 +200,7 @@ message I2CExpansionOptions {
 }
 ```
 
-This message is added to `AddonOptions` at the next available field number. Existing field numbers in `AddonOptions` run up through at least field 27 (`reactiveLEDOptions`) — use field 28 or higher.
+This message is added to `AddonOptions` at the next available field number. Existing field numbers in `AddonOptions` run up through field 31 — the next available field is **32**.
 
 ### Web Configurator UI
 
@@ -366,7 +368,7 @@ GPIO press → debounce → gamepad loop → I2CExpansionAddon::process() → i2
 → satellite receives packet → satellite updates output
 ```
 
-Total satellite update latency ≈ USB frame latency (1ms) + I2C write time (~530µs) = **~1.5ms** from button press to satellite state update. This is acceptable for retro console output; N64 and SNES console polling rates are 60Hz (16.7ms between polls), so the satellite state is always fresh well within one console poll cycle.
+Total satellite update latency ≈ USB frame latency (1ms) + I2C write time (~500µs) = **~1.5ms** from button press to satellite state update. This is acceptable for retro console output; N64 and SNES console polling rates are 60Hz (16.7ms between polls), so the satellite state is always fresh well within one console poll cycle.
 
 ---
 

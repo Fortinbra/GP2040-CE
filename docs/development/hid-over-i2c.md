@@ -96,6 +96,14 @@ GND                 ────► GND (pin 6 or any GND pin)
 
 The INT# line is **open-drain, active low** — GP2040-CE drives it low when a new report is ready, and releases it (high-Z) after the host reads the report. The Raspberry Pi (or any host) configures its GPIO as input with pull-up and triggers an interrupt on the falling edge.
 
+**RP2040 GPIO open-drain implementation:**
+
+The RP2040 has no true hardware open-drain mode. Use the **direction-toggle method**:
+- **Assert (drive low):** `gpio_set_dir(pin, GPIO_OUT); gpio_put(pin, 0);`
+- **Release (high-Z):** `gpio_set_dir(pin, GPIO_IN);` — external pull-up takes over
+
+An alternative is to use `gpio_set_oeover()` to disable the output driver.
+
 If INT# is not available (no spare GPIO on the board), the host can fall back to **polling mode**: read the Input Register on a timer (e.g., every 1ms). This works but adds host CPU overhead and slightly degrades latency. INT# is strongly recommended.
 
 ### Voltage Compatibility
@@ -124,17 +132,20 @@ At 400 kHz and a 12-byte HID report (+ 2-byte length prefix = 14 bytes), each re
 
 ### Pico SDK Slave Mode
 
-The Pico SDK provides `i2c_slave_init()` (in `hardware/i2c.h`) and an IRQ-driven callback mechanism. The slave callback receives three events:
+**Note: RP2040 I2C slave mode requires low-level IRQ handling — there is no high-level callback API in the Pico SDK. This is expert-level embedded work.**
 
-| Event | When | Action |
-|---|---|---|
-| `I2C_SLAVE_RECEIVE` | Master writes a byte | Receive register address or output report data |
-| `I2C_SLAVE_REQUEST` | Master requests a read | Provide next byte from the active register |
-| `I2C_SLAVE_FINISH` | Transaction complete | Reset internal state, assert INT# if needed |
+The Pico SDK provides `i2c_set_slave_mode()` (in `hardware/i2c.h`) to configure the I2C hardware as a slave, but it does **not** provide a high-level callback mechanism. Developers must implement a low-level IRQ handler from scratch.
+
+**Slave mode setup:**
+1. Call `i2c_set_slave_mode(i2c1, true, I2C_SLAVE_ADDR)` to configure hardware
+2. Register interrupt handler: `irq_set_exclusive_handler(I2C1_IRQ, hoi2c_irq_handler)`
+3. Enable interrupt: `irq_set_enabled(I2C1_IRQ, true)`
+4. In the handler: manually inspect `i2c_get_hw(i2c)->raw_intr_stat` and `data_cmd` registers to determine the transaction state (read vs. write, data byte vs. register address, transaction complete)
 
 The slave firmware implements a simple register-read state machine:
-- On `RECEIVE`: if this is the first byte of a transaction, treat it as the register address
-- On `REQUEST`: stream bytes from the selected register's buffer
+- On first write byte: treat it as the register address
+- On subsequent read requests: stream bytes from the selected register's buffer
+- On transaction complete: reset internal state, deassert INT# if input report was read
 
 ### Coexistence with I2C Master Addons
 
@@ -163,7 +174,28 @@ Core0: I2C slave IRQ (i2c1_irq_handler)
   → I2C_SLAVE_FINISH:  deassert INT# after input report read
 ```
 
-The IRQ fires on the I2C bus event — no polling needed. The shared state between the gamepad loop and the IRQ handler (`_inputReportBuffer`) must be protected with a lightweight critical section or double-buffer to avoid tearing.
+The IRQ fires on the I2C bus event — no polling needed. The shared state between the gamepad loop and the IRQ handler (`_inputReportBuffer`) must be protected to avoid tearing.
+
+**Synchronization with critical_section_t:**
+
+The RP2040 lacks native C11 atomic primitives for this use case. Use Pico SDK's `critical_section_t` (disables/re-enables IRQs — appropriate for Core0/IRQ shared state):
+
+```c
+critical_section_t report_lock;
+critical_section_init(&report_lock);
+
+// In IRQ handler (read):
+critical_section_enter_blocking(&report_lock);
+// ... read buffer ...
+critical_section_exit(&report_lock);
+
+// In Core0 gamepad loop (write):
+critical_section_enter_blocking(&report_lock);
+// ... write buffer ...
+critical_section_exit(&report_lock);
+```
+
+Alternatively, use `spin_lock_t` (hardware spinlock, IRQ-safe) if multi-core coordination is needed.
 
 ---
 
@@ -171,7 +203,7 @@ The IRQ fires on the I2C bus event — no polling needed. The shared state betwe
 
 ### Linux: `i2c-hid` Kernel Module
 
-The Linux `i2c-hid` module (available since kernel 3.6, standard in all modern distros) handles the full HoI2C protocol. When the device is properly described to the kernel, it appears as `/dev/input/eventX` — indistinguishable from a USB HID gamepad.
+The Linux `i2c-hid` kernel module (`i2c-hid.ko`, available since kernel 3.6, standard in all modern distros) handles the full HoI2C protocol. When the device is properly described to the kernel, it appears as `/dev/input/eventX` — indistinguishable from a USB HID gamepad.
 
 The kernel needs to know the device exists via either **Device Tree** (Raspberry Pi / embedded) or **ACPI** (x86 systems). For Raspberry Pi, a device tree overlay is used.
 
@@ -194,7 +226,7 @@ Create `/boot/overlays/gp2040-hoi2c.dts`:
             status = "okay";
 
             gp2040_gamepad: gamepad@20 {
-                compatible = "hid-over-i2c";
+                compatible = "hid-over-i2c";           /* matches i2c-hid.ko kernel module */
                 reg = <0x20>;                          /* I2C address */
                 hid-descr-addr = <0x0001>;             /* HID descriptor register */
                 interrupt-parent = <&gpio>;
@@ -384,4 +416,4 @@ HoI2C and I2C expansion can coexist on the same board using separate I2C blocks 
 
 4. **Polling fallback without INT#**: Not all board designs will have a free GPIO for INT#. The polling fallback (host polls at 1ms interval) should be documented clearly and the device tree overlay should include a no-INT# variant.
 
-5. **Double-buffer safety**: The `_inputReportBuffer` is written by the gamepad loop (Core0) and read by the I2C slave IRQ (also Core0 in the current architecture). Since both run on Core0, the IRQ handler preempts the gamepad loop — a partial write to the buffer is possible. A double-buffer swap with an atomic pointer is the correct solution; this must be in the initial implementation, not deferred.
+5. **Buffer safety**: The `_inputReportBuffer` is written by the gamepad loop (Core0) and read by the I2C slave IRQ (also Core0 in the current architecture). Since both run on Core0, the IRQ handler preempts the gamepad loop — a partial write to the buffer is possible. Use `critical_section_t` or a double-buffer swap to ensure atomicity; this must be in the initial implementation, not deferred.
