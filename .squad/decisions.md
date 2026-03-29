@@ -162,6 +162,97 @@ Documented gaps:
 
 **Commit:** `49bd6797` (feature/dependency-updates branch)
 
+### 2026-03-28T20-42-18: User directive — AI support files not in main branch
+
+**By:** Fortinbra (via Copilot)  
+**What:** AI support files (.squad/, .github/copilot-instructions.md, .github/agents/, .github/workflows/squad-*.yml) must NEVER be merged into the main branch. The main branch must remain 100% identical to upstream/OpenStickCommunity/GP2040-CE at all times. These files live on develop and feature branches only.  
+**Why:** User request — main mirrors upstream; all AI/squad tooling stays on the develop tree
+
+### 2026-03-28T21:00: Bluetooth HID Phase 1 — Foundation Implementation
+
+**By:** Edward (Firmware Dev)  
+**What:** Phase 1 of Bluetooth HID implementation establishes three foundational changes:
+1. VBUS detection refactor — Use `tud_mounted()` instead of GPIO24 to avoid CYW43 conflict (GPIO24 serves dual function: VBUS sense and CYW43 WL_DATA)
+2. CMake conditional BT compilation — Define ENABLE_BLUETOOTH=1 on wireless boards via PICO_CYW43_SUPPORTED check
+3. Protobuf BluetoothOptions — Added INPUT_MODE_BLUETOOTH (17) enum and BluetoothOptions message (enabled, pairingMode, bondedDeviceAddr, bondedDeviceName)
+
+All changes compile cleanly for both wireless and non-wireless boards. Zero runtime code modified — purely structural.
+
+**Files:** CMakeLists.txt, configs/Pico2W/BoardConfig.h, configs/PimoroniPicoLipo2XLW/BoardConfig.h, proto/enums.proto, proto/config.proto, headers/display/ui/screens/MainMenuScreen.h
+
+**Why:** Requested by Fortinbra. Foundation for Phase 2 (BTHIDManager + OutputManager) and Phase 3 (battery reporting, power management).
+
+### 2026-03-28T21:00: Bluetooth HID Integration Analysis — Architecture Mapping
+
+**By:** Edward (Firmware Dev)  
+**What:** Deep codebase survey mapped all integration points for Bluetooth HID support. Key findings:
+
+1. **USB-centric architecture** — GPDriver is USB-only; DriverManager selects boot-time only
+2. **Output abstraction needed** — Decouple transport layer (USB/BT) from protocol (XInput/PS4)
+3. **InputMode enum cascade** — Adding BT requires protobuf → web configurator → storage → boot action mapper updates
+4. **Namespace collision** — TinyUSB and BTstack both define `hid_report_type_t`; requires translation-unit isolation in CMake
+5. **Power management required** — First time GP2040-CE must manage sleep/wake (USB builds always had VBUS)
+
+**Hardest parts:** Output abstraction refactor (18 drivers), namespace isolation, power management integration.
+
+**Why:** Requested by Fortinbra as technical foundation for Phase 1 documentation. Findings directly enable Edward's Phase 2 implementation.
+
+### 2026-03-28T21:00: Bluetooth Web Configurator UI Implementation
+
+**By:** Winry (Frontend Dev)  
+**What:** Implemented Bluetooth configuration UI in React web configurator:
+
+1. **Bluetooth output mode** — Added INPUT_MODE_BLUETOOTH (17) to input mode selector (SettingsPage)
+2. **Bluetooth addon section** — New www/src/Addons/Bluetooth.tsx following addon pattern
+3. **UI elements** — Enable toggle, pairing mode toggle, paired device display, clear pairing button
+4. **Localization** — en/AddonsConfig.jsx and en/SettingsPage.jsx strings
+
+**Files Modified:**
+- Created: www/src/Addons/Bluetooth.tsx
+- Modified: www/src/Pages/AddonsConfigPage.tsx, SettingsPage.jsx
+- Modified: www/src/Locales/en/AddonsConfig.jsx, en/SettingsPage.jsx
+
+**Build verified:** npm run build successful, no TypeScript errors
+
+**Why:** Phase 2 deliverable. Implements user-facing configuration for Bluetooth feature.
+
+### 2026-03-28T23:00: Conditional lwIP Linking Strategy — Wireless Board Support
+
+**By:** Edward (Firmware Dev)  
+**What:** Resolved linker conflict in Bluetooth Phase 2 by implementing conditional lwIP strategy:
+
+**Problem:** When linking wireless boards (Pico W, Pico 2 W) with Bluetooth, two lwIP implementations collide:
+- pico_lwip_nosys (stub) linked for RNDIS web configurator
+- Full lwIP linked for BTstack + CYW43 coexistence
+- Result: `sys_now`, `sys_arch_protect`, `sys_arch_unprotect` multiple definition errors
+
+**Solution (Hard Constraint):**
+- **Non-wireless boards** (Pico, RP2040 custom): Link `pico_lwip_nosys` (minimal, ~1KB)
+- **Wireless boards** (Pico W, Pico 2 W, RP2350 + CYW43): Link full lwIP via `pico_cyw43_arch_lwip_threadsafe_background` ONLY
+
+**Implementation:**
+- Conditional linking in lib/lwip-port/CMakeLists.txt (check PICO_CYW43_SUPPORTED)
+- Conditional linkage in lib/httpd/CMakeLists.txt (skip pico_lwip when CYW43 supported)
+- Compile definition in lib/rndis/CMakeLists.txt (PICO_CYW43_SUPPORTED)
+- Source-level guards in lib/rndis/rndis.c (#ifndef PICO_CYW43_SUPPORTED on sys_* stubs)
+- Preprocessor macro in CMakeLists.txt (define PICO_CYW43_SUPPORTED when wireless board)
+
+**Verification (Build Matrix):**
+| Board | SDK | Platform | lwIP | Build | Size |
+|-------|-----|----------|------|-------|------|
+| Pico | 2.2.0 | RP2040 | nosys | ✅ Clean | 2.41 MB |
+| Pico 2 W | 2.2.0 | RP2350 | Full | ✅ Clean | 2.94 MB |
+
+Both builds link cleanly without symbol conflicts.
+
+**Constraints for future development:**
+- NEVER link pico_lwip_nosys when PICO_CYW43_SUPPORTED = true
+- NEVER define sys_now/sys_arch_* on wireless boards
+- WiFi/BLE features must use full lwIP from CYW43 arch
+- RNDIS web config continues to work on both board types
+
+**Why:** Discovered during Phase 2 integration testing. Required immediate resolution before merging. Now a hard architectural constraint for all future wireless/CYW43 features.
+
 ## Governance
 
 - All meaningful changes require team consensus

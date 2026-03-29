@@ -441,3 +441,41 @@ Edward's round-1 revision (`688582e4`) passed technical content checks in all su
 - Proto schema ready for config storage
 - CMake knows which boards support BT
 - Next: Implement BTHIDManager, add btstack_config.h, link BTstack libraries
+
+
+### 2026-03-28: BT Phase 2 — sys_now Linker Conflict Fix
+
+**Tasked by:** Fortinbra (via Coordinator). Fix linker conflict when building wireless boards with Bluetooth.
+
+**Root cause:** Phase 2 compilation succeeded but linking failed on wireless boards (pico2_w, pico_w) with multiple definition errors for sys_now, sys_arch_protect, and sys_arch_unprotect.
+
+TinyUSB's RNDIS (web configurator at 192.168.7.1) links pico_lwip_nosys — a minimal no-OS lwIP stub. pico_cyw43_arch_lwip_threadsafe_background (required for BTstack) provides full lwIP with OS support. Both define the same symbols, causing linker collision.
+
+**Fix strategy:** Conditional lwIP linking. When PICO_CYW43_SUPPORTED (wireless boards), use ONLY the full lwIP from CYW43 arch. The pico_lwip_nosys stub is only for non-wireless boards.
+
+**Files changed:**
+
+1. **lib/lwip-port/CMakeLists.txt** — Conditional pico_lwip linkage. When PICO_CYW43_SUPPORTED, don't link pico_lwip (CYW43 arch provides it); only add lwIP include paths.
+
+2. **lib/httpd/CMakeLists.txt** — Conditional pico_lwip linkage. When PICO_CYW43_SUPPORTED, don't link pico_lwip; add lwIP include paths for header access.
+
+3. **lib/rndis/CMakeLists.txt** — Added PICO_CYW43_SUPPORTED=1 compile definition and conditional lwIP include paths.
+
+4. **lib/rndis/rndis.c** — Guarded sys_now(), sys_arch_protect(), sys_arch_unprotect() with #ifndef PICO_CYW43_SUPPORTED. These are nosys stub functions that conflict with full lwIP's implementations.
+
+5. **CMakeLists.txt** (main) — Added PICO_CYW43_SUPPORTED=1 as a preprocessor define alongside ENABLE_BLUETOOTH=1 when building for wireless boards.
+
+**Build verification:**
+
+- **Standard Pico (no BT):** Clean build, 2.41 MB .uf2 (same as baseline)
+- **Pico 2 W (with BT):** Clean build, 2.94 MB .uf2 (includes BTstack + full lwIP)
+
+**Technical insight:** The Pico SDK provides TWO lwIP implementations:
+
+- pico_lwip_nosys — Minimal stub for single-threaded, no-RTOS environments. Defines dummy sys_* functions.
+- Full lwIP (via pico_cyw43_arch_lwip_threadsafe_background) — Complete TCP/IP stack with mutex support, required for BTstack + CYW43 WiFi coexistence.
+
+RNDIS (web configurator) can use either. The fix ensures wireless boards use ONE lwIP variant (full), while non-wireless boards continue using the nosys stub. This is an architectural constraint for all future CYW43-based features.
+
+**Linker conflict resolved.** Both board types produce clean .uf2 outputs. Phase 2 complete.
+
