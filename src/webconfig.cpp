@@ -1889,6 +1889,22 @@ std::string setAddonOptions()
     docToValue(heTriggerOptions.emaSmoothing, doc, "heTriggerSmoothing");
     docToValue(heTriggerOptions.smoothingFactor, doc, "heTriggerSmoothingFactor");
 
+    BluetoothOptions& bluetoothOptions = Storage::getInstance().getAddonOptions().bluetoothOptions;
+    docToValue(bluetoothOptions.enabled, doc, "BluetoothAddonEnabled");
+    docToValue(bluetoothOptions.pairingMode, doc, "bluetoothPairingMode");
+    if (doc.containsKey("bluetoothBondedDeviceName")) {
+        strncpy(bluetoothOptions.bondedDeviceName, doc["bluetoothBondedDeviceName"], sizeof(bluetoothOptions.bondedDeviceName) - 1);
+        bluetoothOptions.bondedDeviceName[sizeof(bluetoothOptions.bondedDeviceName) - 1] = '\0';
+    }
+    // Clear bonded address if web UI sends empty string
+    if (doc.containsKey("bluetoothBondedDeviceAddr")) {
+        const char* addrStr = doc["bluetoothBondedDeviceAddr"].as<const char*>();
+        if (addrStr == nullptr || strlen(addrStr) == 0) {
+            memset(bluetoothOptions.bondedDeviceAddr.bytes, 0, sizeof(bluetoothOptions.bondedDeviceAddr.bytes));
+            bluetoothOptions.bondedDeviceAddr.size = 0;
+        }
+    }
+
     EventManager::getInstance().triggerEvent(new GPStorageSaveEvent(true));
 
     return serialize_json(doc);
@@ -2346,6 +2362,23 @@ std::string getAddonOptions()
     writeDoc(doc, "muxADCPin3", cleanPin(heTriggerOptions.muxADCPin3));
     writeDoc(doc, "heTriggerSmoothing", heTriggerOptions.emaSmoothing);
     writeDoc(doc, "heTriggerSmoothingFactor", heTriggerOptions.smoothingFactor);
+
+    const BluetoothOptions& bluetoothOptions = Storage::getInstance().getAddonOptions().bluetoothOptions;
+    writeDoc(doc, "BluetoothAddonEnabled", bluetoothOptions.enabled);
+    writeDoc(doc, "bluetoothPairingMode", bluetoothOptions.pairingMode);
+    writeDoc(doc, "bluetoothBondedDeviceName", bluetoothOptions.bondedDeviceName);
+    // Serialize BD address as 12-char hex string (empty if no device bonded)
+    char addrHex[13] = {0};
+    if (bluetoothOptions.bondedDeviceAddr.size == 6) {
+        snprintf(addrHex, sizeof(addrHex), "%02X%02X%02X%02X%02X%02X",
+            bluetoothOptions.bondedDeviceAddr.bytes[0],
+            bluetoothOptions.bondedDeviceAddr.bytes[1],
+            bluetoothOptions.bondedDeviceAddr.bytes[2],
+            bluetoothOptions.bondedDeviceAddr.bytes[3],
+            bluetoothOptions.bondedDeviceAddr.bytes[4],
+            bluetoothOptions.bondedDeviceAddr.bytes[5]);
+    }
+    writeDoc(doc, "bluetoothBondedDeviceAddr", addrHex);
 
     return serialize_json(doc);
 }

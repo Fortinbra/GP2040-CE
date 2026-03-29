@@ -9,7 +9,6 @@ import { AddonPropTypes } from '../Pages/AddonsConfigPage';
 export const bluetoothScheme = {
     BluetoothAddonEnabled: yup
         .number()
-        .required()
         .label('Bluetooth Addon Enabled'),
     bluetoothPairingMode: yup
         .number()
