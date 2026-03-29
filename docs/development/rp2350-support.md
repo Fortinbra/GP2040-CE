@@ -36,10 +36,12 @@ GP2040-CE includes configuration support for the following RP2350-based boards:
 | **Raspberry Pi Pico 2** | RP2350A | `Pico2` | 30 | Reference RP2350A board; pin layout identical to original Pico |
 | **Flatbox Rev. 8** | RP2350A | `FlatboxRev8` | 30 | USB peripheral passthrough for arcade stick arcade mode |
 | **SparkFun Pro Micro RP2350** | RP2350B | `SparkFunProMicroRP2350` | 48 (uses 0–29) | Compact form factor; RP2350B variant ready for expansion |
+| **Raspberry Pi Pico 2 W** | RP2350A | `Pico2W` | 30 | CYW43439 wireless; same pin layout as Pico W |
+| **Pimoroni Pico Lipo 2 XL W** | RP2350B | `PimoroniPicoLipo2XLW` | 48 (uses 0–29 for inputs) | CYW43439 wireless; onboard LiPo charging; battery ADC on GPIO29 |
 
 All boards are CI-tested and release-ready.
 
-**Planned:** `Pico2W` configuration for the Raspberry Pi Pico 2 W (RP2350A + CYW43439 WiFi module).
+Both the Raspberry Pi Pico 2 W and the Pimoroni Pico Lipo 2 XL W configurations are included. Full Bluetooth HID support for CYW43439-equipped boards is planned in a future release.
 
 ---
 
@@ -78,6 +80,8 @@ Download the appropriate UF2 firmware file from the [GP2040-CE releases page](ht
 - `GP2040-CE_*_Pico2.uf2` → for RP2350A-based Pico 2
 - `GP2040-CE_*_FlatboxRev8.uf2` → for RP2350A-based Flatbox
 - `GP2040-CE_*_SparkFunProMicroRP2350.uf2` → for RP2350B-based SparkFun module
+- `GP2040-CE_*_Pico2W.uf2` → for RP2350A-based Pico 2 W
+- `GP2040-CE_*_PimoroniPicoLipo2XLW.uf2` → for RP2350B-based Pimoroni Pico Lipo 2 XL W
 
 ### Building from Source
 
@@ -239,11 +243,11 @@ GP2040-CE uses the Pico SDK's PIO-based USB host library for gamepad passthrough
 
 RP2350 runs at 150 MHz by default (vs 133 MHz for RP2040). This can affect PIO timing and peripheral clock divisors. I²C, SPI, and display add-ons should be tested on your specific board if they rely on precise timing.
 
-### Pico 2 W Config
+### Pico 2 W and Pimoroni Pico Lipo 2 XL W
 
-The **Raspberry Pi Pico 2 W** (RP2350A + CYW43439 WiFi) is not yet supported in the main branch.
+Board configurations for both the **Raspberry Pi Pico 2 W** (RP2350A + CYW43439) and the **Pimoroni Pico Lipo 2 XL W** (RP2350B + CYW43439) are now included. The base firmware compiles and runs on both boards without issues.
 
-**Why it's missing:** GP2040-CE's wireless feature stack (Bluetooth HID, WiFi-based web configurator access) is being developed for the RP2040-based Pico W and the CYW43439 driver integration specific to that platform. The Pico 2 W uses the same CYW43439 chip but on an RP2350A, and the wireless integration layer needs dedicated porting and validation work before a `Pico2W` board config can be released. The base firmware compiles and runs on RP2350A without issues — the gap is specifically the CYW43 wireless feature integration. A configuration will be added in a future release once this work is complete.
+**Remaining gap:** Full Bluetooth HID support for CYW43439-equipped boards is not yet implemented. The CYW43 wireless driver integration (required for Bluetooth gamepad mode) is planned for a future release. USB HID works normally on both boards today.
 
 ### RISC-V Mode
 
@@ -260,4 +264,4 @@ RP2350 supports booting in RISC-V mode, but GP2040-CE targets ARM (Secure mode, 
 
 ---
 
-**Last Updated:** 2026-03-28
+**Last Updated:** 2026-03-29
