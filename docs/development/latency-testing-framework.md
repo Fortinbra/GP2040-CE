@@ -111,6 +111,81 @@ The practical floor without debounce is ~1ms average due to the USB polling inte
 
 ---
 
+## Processor Platform Comparison
+
+GP2040-CE targets three processor variants. Their clock speeds and core architecture affect component C (gamepad loop time), but **the USB polling interval (D) remains the dominant latency floor on all three**.
+
+### RP2040
+
+| Property | Value |
+|---|---|
+| Core | Dual-core ARM Cortex-M0+ |
+| Default clock | 125 MHz |
+| Overclocked (stable) | 250–300 MHz (community-validated) |
+| SRAM | 264 KB |
+| Hardware FPU | No |
+| GPIO count | 30 |
+
+The RP2040 is the original and most widely deployed GP2040-CE platform. At 125 MHz with no FPU, the gamepad loop executes each iteration in well under 0.1ms — fast enough that component C is never the bottleneck. The lack of hardware FPU is irrelevant for the gamepad loop, which performs only integer and bitwise operations.
+
+Overclocking to 250 MHz is stable on most RP2040 silicon and approximately halves the loop iteration time, but does not meaningfully reduce end-to-end latency since D (USB frame wait) is 0–1ms regardless.
+
+### RP2350A
+
+| Property | Value |
+|---|---|
+| Core | Dual-core ARM Cortex-M33 **or** RISC-V Hazard3 (software-selectable) |
+| Default clock | 150 MHz |
+| Overclocked (stable) | 300+ MHz (silicon is newer; headroom being characterised) |
+| SRAM | 520 KB |
+| Hardware FPU | Yes (Cortex-M33 with FPV5 single-precision) |
+| GPIO count | 30 (same pin count as RP2040) |
+
+The RP2350A runs 20% faster than the RP2040 at stock clocks, and the Cortex-M33 has a deeper pipeline, branch prediction, and DSP extensions compared to the M0+. None of these improvements change the USB latency floor, but they do reduce the gamepad loop time further — the loop completes well inside 50µs at stock speed, leaving more headroom for add-ons and processing-heavy features without affecting input delivery timing.
+
+The additional 256 KB of SRAM (relative to RP2040) and the hardware FPU have no direct bearing on USB latency but are relevant for future features (wireless stack, display processing).
+
+The RISC-V Hazard3 core option is architecturally different but clocked identically. GP2040-CE defaults to the ARM core. Latency characteristics on the RISC-V core are expected to be similar but should be measured independently.
+
+### RP2350B
+
+| Property | Value |
+|---|---|
+| Core | Identical to RP2350A |
+| Default clock | 150 MHz |
+| SRAM | 520 KB |
+| Hardware FPU | Yes |
+| GPIO count | 48 (18 additional GPIO vs RP2350A) |
+
+The RP2350B is electrically and architecturally identical to the RP2350A with one difference: 48 GPIO pins instead of 30. This has no effect on USB latency. The additional GPIO are relevant for boards with more buttons, LEDs, or peripherals but do not change the latency profile.
+
+### Latency Implications by Platform
+
+| Platform | Loop time (C) | USB floor (D) | Latency difference vs. RP2040 |
+|---|---|---|---|
+| RP2040 @ 125 MHz | < 0.05 ms | 0–1 ms | baseline |
+| RP2040 @ 250 MHz | < 0.025 ms | 0–1 ms | negligible (dominated by D) |
+| RP2350A/B @ 150 MHz | < 0.04 ms | 0–1 ms | negligible (dominated by D) |
+| RP2350A/B @ 300 MHz | < 0.02 ms | 0–1 ms | negligible (dominated by D) |
+
+**The key finding:** at any supported clock speed, the gamepad loop (C) is at least an order of magnitude faster than the USB polling interval (D). The processor platform choice has no measurable effect on USB input latency under the current full-speed USB HID architecture. Comparisons between RP2040 and RP2350 boards should not be expected to show latency differences in USB mode.
+
+This would change if high-speed USB (480 Mbps, 125µs microframes) were adopted — at that point the CPU would need to sustain report generation within 125µs, and the faster RP2350 cores and larger SRAM would become relevant. See Open Questions §2.
+
+### Test Matrix Implications
+
+The test matrix should include processor platform as a variable to **confirm** that results are equivalent across platforms:
+
+| Platform | Expected result vs. RP2040 baseline |
+|---|---|
+| RP2040 @ 125 MHz | Baseline |
+| RP2350A @ 150 MHz | Statistically indistinguishable |
+| RP2350B @ 150 MHz | Statistically indistinguishable |
+
+If measured results diverge between platforms at the same debounce and USB settings, the discrepancy indicates a measurement error, a firmware difference, or a USB hardware difference — not a genuine latency advantage from the faster processor.
+
+---
+
 ## Measurement Methodology
 
 ### Approach: Dual-Signal Oscilloscope / Logic Analyzer Capture
@@ -262,6 +337,7 @@ Run the full measurement procedure for each combination:
 | Debounce time | 0ms, 1ms, 2ms, 5ms (default) | `GamepadOptions.debounceDelay` (`config.proto:18`) |
 | USB mode | XInput, Generic HID | `GamepadOptions.inputMode` |
 | USB polling interval | 1ms (default) | `HIDDescriptors.h:176` — requires recompile to change |
+| Processor platform | RP2040 @ 125 MHz, RP2350A @ 150 MHz, RP2350B @ 150 MHz | Board config / `PICO_BOARD` CMake variable |
 | Firmware version | Current release vs. each PR under test | git SHA |
 | Host OS | Windows 11, Linux (Ubuntu) | — |
 
