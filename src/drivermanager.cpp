@@ -76,6 +76,9 @@ void DriverManager::setup(InputMode mode) {
         case INPUT_MODE_SWITCH_PRO:
             driver = new SwitchProDriver();
             break;
+        case INPUT_MODE_BLUETOOTH:
+            driver = new HIDDriver();
+            break;
         default:
             return;
     }

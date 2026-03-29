@@ -217,4 +217,10 @@ export default {
 	'tg16-extension-data-pin2-label': 'Data GPIO Pin 2 (D_SELECT)',
 	'tg16-extension-data-pin3-label': 'Data GPIO Pin 3 (L_RUN)',
 	'tg16-extension-desc-header': 'PC Engine/TurboGrafx-16 Extension Mapping',
+	'bluetooth-header-text': 'Bluetooth Configuration',
+	'bluetooth-info-text': 'Enable Bluetooth output mode to connect wirelessly to supported devices. Requires CYW43-based board (Pico W, Pico 2 W, etc.).',
+	'bluetooth-pairing-mode-label': 'Make Controller Discoverable (Pairing Mode)',
+	'bluetooth-paired-device-label': 'Paired Device',
+	'bluetooth-no-device-paired': 'No device paired',
+	'bluetooth-clear-pairing-button': 'Clear Pairing',
 };

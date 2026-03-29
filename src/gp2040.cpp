@@ -44,6 +44,7 @@
 
 // USB Input Class Drivers
 #include "drivermanager.h"
+#include "OutputManager.h"
 
 static const uint32_t REBOOT_HOTKEY_ACTIVATION_TIME_MS = 50;
 static const uint32_t REBOOT_HOTKEY_HOLD_TIME_MS = 4000;
@@ -194,6 +195,9 @@ void GP2040::setup() {
 	// Setup USB Driver
 	DriverManager::getInstance().setup(inputMode);
 
+	// Initialize Output Manager (handles USB and Bluetooth output)
+	OutputManager::getInstance().init();
+
 	// save to match user expectations on choosing mode at boot, and this is
 	// before USB host will be used so we can force it to ignore the check
 	if (inputMode != INPUT_MODE_CONFIG && inputMode != gamepad->getOptions().inputMode) {
@@ -312,7 +316,7 @@ void GP2040::run() {
 
 		// Config Loop (Web-Config skips Core0 add-ons)
 		if (configMode == true) {
-			inputDriver->process(gamepad);
+			OutputManager::getInstance().process(gamepad);
 			rebootHotkeys.process(gamepad, configMode);
 			checkSaveRebootState();
 			continue;
@@ -338,8 +342,8 @@ void GP2040::run() {
 		// Copy Processed Gamepad for Core1 (race condition otherwise)
 		memcpy(&processedGamepad->state, &gamepad->state, sizeof(GamepadState));
 
-		// Process Input Driver
-		bool processed = inputDriver->process(gamepad);
+		// Process Output Manager (USB + Bluetooth)
+		bool processed = OutputManager::getInstance().process(gamepad);
 
 		// TinyUSB Task update
 		tud_task();

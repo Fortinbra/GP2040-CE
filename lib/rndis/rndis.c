@@ -237,6 +237,7 @@ void rndis_task(void)
 }
 
 /* lwip has provision for using a mutex, when applicable */
+#ifndef PICO_CYW43_SUPPORTED
 sys_prot_t sys_arch_protect(void)
 {
   return 0;
@@ -252,3 +253,4 @@ uint32_t sys_now(void)
 {
   return to_ms_since_boot(get_absolute_time());
 }
+#endif

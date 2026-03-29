@@ -256,6 +256,8 @@ src/display/ui/screens/SystemErrorScreen.cpp
 src/display/GPGFX.cpp
 src/display/GPGFX_UI.cpp
 src/drivermanager.cpp
+src/OutputManager.cpp
+src/BTHIDManager.cpp
 src/eventmanager.cpp
 src/layoutmanager.cpp
 src/peripheralmanager.cpp
@@ -334,18 +336,18 @@ nanopb
 )
 
 # Conditional Bluetooth support for boards with CYW43 wireless (Pico W, Pico 2 W, etc.)
-# Phase 1: Add compile definition only. BTstack library linkage will be added in Phase 2.
 if(PICO_CYW43_SUPPORTED)
     message("Bluetooth support enabled for ${PICO_BOARD}")
     target_compile_definitions(${PROJECT_NAME} PUBLIC
         ENABLE_BLUETOOTH=1
+        PICO_CYW43_SUPPORTED=1
     )
-    # Phase 2 will add:
-    # target_link_libraries(${PROJECT_NAME}
-    #     pico_cyw43_arch_lwip_threadsafe_background
-    #     pico_btstack_classic
-    #     pico_btstack_run_loop_async_context
-    # )
+    target_link_libraries(${PROJECT_NAME}
+        pico_cyw43_arch_lwip_threadsafe_background
+        pico_btstack_cyw43
+        pico_btstack_classic
+        pico_btstack_run_loop_async_context
+    )
 endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC
