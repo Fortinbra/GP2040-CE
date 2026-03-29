@@ -1,0 +1,172 @@
+/*
+ * SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright (c) 2024 OpenStickCommunity (gp2040-ce.info)
+ */
+
+#ifdef ENABLE_BLUETOOTH
+
+#include "btstack.h"
+#include "pico/cyw43_arch.h"
+#include "classic/hid_device.h"
+#include "bluetooth.h"
+
+#include "BTHIDManager.h"
+
+static const uint8_t hid_descriptor_gamepad[] = {
+    0x05, 0x01,        // USAGE_PAGE (Generic Desktop)
+    0x09, 0x05,        // USAGE (Gamepad)
+    0xa1, 0x01,        // COLLECTION (Application)
+    0x05, 0x09,        //   USAGE_PAGE (Button)
+    0x19, 0x01,        //   USAGE_MINIMUM (Button 1)
+    0x29, 0x20,        //   USAGE_MAXIMUM (Button 32)
+    0x15, 0x00,        //   LOGICAL_MINIMUM (0)
+    0x25, 0x01,        //   LOGICAL_MAXIMUM (1)
+    0x95, 0x20,        //   REPORT_COUNT (32)
+    0x75, 0x01,        //   REPORT_SIZE (1)
+    0x81, 0x02,        //   INPUT (Data,Var,Abs)
+    0x05, 0x01,        //   USAGE_PAGE (Generic Desktop)
+    0x09, 0x39,        //   USAGE (Hat switch)
+    0x25, 0x07,        //   LOGICAL_MAXIMUM (7)
+    0x95, 0x01,        //   REPORT_COUNT (1)
+    0x75, 0x04,        //   REPORT_SIZE (4)
+    0x81, 0x42,        //   INPUT (Data,Var,Abs,Null)
+    0x95, 0x01,        //   REPORT_COUNT (1)
+    0x75, 0x04,        //   REPORT_SIZE (4)
+    0x81, 0x01,        //   INPUT (Cnst,Ary,Abs)
+    0x05, 0x01,        //   USAGE_PAGE (Generic Desktop)
+    0x26, 0xff, 0x00,  //   LOGICAL_MAXIMUM (255)
+    0x46, 0xff, 0x00,  //   PHYSICAL_MAXIMUM (255)
+    0x09, 0x30,        //   USAGE (X)
+    0x09, 0x31,        //   USAGE (Y)
+    0x09, 0x32,        //   USAGE (Z)
+    0x09, 0x35,        //   USAGE (Rz)
+    0x75, 0x08,        //   REPORT_SIZE (8)
+    0x95, 0x04,        //   REPORT_COUNT (4)
+    0x81, 0x02,        //   INPUT (Data,Var,Abs)
+    0xc0               // END_COLLECTION
+};
+
+static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
+
+BTHIDManager& BTHIDManager::getInstance() {
+    static BTHIDManager instance;
+    return instance;
+}
+
+void BTHIDManager::init() {
+    if (_initialized) {
+        return;
+    }
+
+    if (cyw43_arch_init()) {
+        return;
+    }
+
+    l2cap_init();
+    sdp_init();
+    gap_set_local_name("GP2040-CE Controller");
+    gap_discoverable_control(1);
+    gap_set_class_of_device(0x002508);
+    gap_ssp_set_io_capability(SSP_IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
+
+    hid_device_init(false, sizeof(hid_descriptor_gamepad), hid_descriptor_gamepad);
+    hid_device_register_packet_handler(packet_handler);
+
+    hid_sdp_record_t hid_params = {
+        .hid_device_subclass = 0x2508,
+        .hid_country_code = 0x00,
+        .hid_virtual_cable = 0,
+        .hid_remote_wake = 1,
+        .hid_reconnect_initiate = 1,
+        .hid_normally_connectable = 1,
+        .hid_boot_device = 0,
+        .hid_ssr_host_max_latency = 1600,
+        .hid_ssr_host_min_timeout = 3200,
+        .hid_supervision_timeout = 0x0c80,
+        .hid_descriptor = hid_descriptor_gamepad,
+        .hid_descriptor_size = sizeof(hid_descriptor_gamepad),
+        .device_name = "GP2040-CE Controller"
+    };
+
+    // static: sdp_register_service() stores a pointer — must outlive init()
+    static uint8_t hid_service_buffer[300];
+    hid_create_sdp_record(hid_service_buffer, 0x10001, &hid_params);
+    sdp_register_service(hid_service_buffer);
+
+    hci_power_control(HCI_POWER_ON);
+
+    _initialized = true;
+}
+
+void BTHIDManager::process() {
+    if (!_initialized) {
+        return;
+    }
+    cyw43_arch_poll();
+}
+
+bool BTHIDManager::sendReport(const uint8_t* report, uint16_t len) {
+    if (!_initialized || !_connected || _hid_cid == 0) {
+        return false;
+    }
+    hid_device_send_interrupt_message(_hid_cid, report, len);
+    return true;
+}
+
+void BTHIDManager::setPairingMode(bool enabled) {
+    if (!_initialized) {
+        return;
+    }
+    _pairingMode = enabled;
+    gap_discoverable_control(enabled ? 1 : 0);
+}
+
+bool BTHIDManager::isConnected() const {
+    return _connected;
+}
+
+bool BTHIDManager::isEnabled() const {
+    return _initialized;
+}
+
+static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size) {
+    UNUSED(channel);
+    UNUSED(size);
+
+    BTHIDManager& mgr = BTHIDManager::getInstance();
+
+    switch (packet_type) {
+        case HCI_EVENT_PACKET:
+            switch (hci_event_packet_get_type(packet)) {
+                case HCI_EVENT_USER_CONFIRMATION_REQUEST: {
+                    bd_addr_t addr;
+                    reverse_bd_addr(&packet[2], addr);
+                    gap_ssp_confirmation_response(addr);
+                    break;
+                }
+                case HCI_EVENT_HID_META:
+                    switch (hci_event_hid_meta_get_subevent_code(packet)) {
+                        case HID_SUBEVENT_CONNECTION_OPENED:
+                            if (hid_subevent_connection_opened_get_status(packet) == ERROR_CODE_SUCCESS) {
+                                mgr._connected = true;
+                                mgr._hid_cid = hid_subevent_connection_opened_get_hid_cid(packet);
+                            }
+                            break;
+                        case HID_SUBEVENT_CONNECTION_CLOSED:
+                            mgr._connected = false;
+                            mgr._hid_cid = 0;
+                            break;
+                        default:
+                            break;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+#endif // ENABLE_BLUETOOTH
