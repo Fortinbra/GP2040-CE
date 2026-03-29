@@ -45,9 +45,38 @@ Host USB controller receives IN token → device sends HID report
         │
         ▼  (F) OS HID driver processing
 OS delivers HID report to application / game
+        │
+   ═════╪═════ ← THIS FRAMEWORK STOPS HERE
+        │
+        ▼  (G) Game engine input polling     ┐
+Game reads input state                        │  OUT OF SCOPE
+        │                                     │
+        ▼  (H) Game logic processing          │  Game-specific,
+Collision detection, physics, etc.            │  engine-specific,
+        │                                     │  title-specific.
+        ▼  (I) Render pipeline                │  Not measured here.
+Frame rendered to framebuffer                 │
+        │                                     │
+        ▼  (J) Display pipeline               │
+Pixel appears on screen                       ┘
 ```
 
-**Total perceived latency = A + B + C + D + E + F**
+**This framework measures A through F — controller to host OS — and nothing beyond.**
+
+### Why We Stop at the Host OS
+
+The latency from button press to pixel on screen (A–J) is what players ultimately perceive, but components G–J are entirely outside the firmware's control and vary by:
+- Game engine and its input polling rate (some games poll at 60Hz, others at 1000Hz)
+- Game logic update rate (decoupled from render rate in modern engines)
+- GPU render pipeline depth (1–3 frame pipeline latency is common)
+- Display refresh rate and response time (60Hz = 16.7ms per frame; 360Hz = 2.8ms)
+- Display mode (VSync on/off, G-Sync, FreeSync)
+
+A 1ms firmware improvement is real and measurable. Whether that 1ms is perceptible in a game running at 60fps with a 6ms display depends on factors that have nothing to do with the controller. **These measurements characterize the controller's contribution in isolation** — they are game-agnostic and display-agnostic by design.
+
+Importantly: **a game's rendered frame and the USB polling interval are independent cycles.** The host OS receives a new HID report every 1ms (the USB frame boundary). The game may read that report at 60fps (every 16.7ms), 120fps (8.3ms), or any other rate depending on its engine. The controller does not know and does not care — it delivers the report to the OS on schedule regardless of what the game is doing with it. The test framework measures the USB delivery, not the game's consumption of it.
+
+**Total firmware-controlled latency = A + B + C + D + E + F**
 
 Of these, GP2040-CE firmware directly controls **B** (debounce, configurable) and **C** (gamepad loop speed). Component **D** is bounded by the USB polling interval (1ms for GP2040-CE). Components **A**, **E**, and **F** are hardware/OS constants that are not firmware-controlled.
 
