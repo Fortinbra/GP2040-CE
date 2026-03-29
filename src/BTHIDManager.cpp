@@ -12,6 +12,10 @@
 
 #include "BTHIDManager.h"
 
+extern "C" {
+    bool tud_mounted(void);
+}
+
 static const uint8_t hid_descriptor_gamepad[] = {
     0x05, 0x01,        // USAGE_PAGE (Generic Desktop)
     0x09, 0x05,        // USAGE (Gamepad)
@@ -54,11 +58,16 @@ BTHIDManager& BTHIDManager::getInstance() {
 }
 
 void BTHIDManager::init() {
-    if (_initialized) {
+    _pendingInit = true;
+}
+
+void BTHIDManager::_doInit() {
+    if (_initialized || _initFailed) {
         return;
     }
 
-    if (cyw43_arch_init()) {
+    if (cyw43_arch_init() != 0) {
+        _initFailed = true;
         return;
     }
 
@@ -99,6 +108,13 @@ void BTHIDManager::init() {
 }
 
 void BTHIDManager::process() {
+    if (_pendingInit && !_initialized && !_initFailed) {
+        if (tud_mounted()) {
+            _doInit();
+            _pendingInit = false;
+        }
+    }
+
     if (!_initialized) {
         return;
     }
