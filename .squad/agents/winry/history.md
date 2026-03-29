@@ -78,3 +78,15 @@ Web config UI delivered for Phase 2 integration:
 
 **Status:** Phase 2 complete — in review cycle
 
+### 2026-03-29T17:52: Edward's BLE Audit — Cross-Agent Learning (Input Mode Pattern)
+
+Edward's BLE HID audit identified a critical pattern for future InputMode additions:
+
+**Rule:** Any new InputMode enum value added to `proto/enums.proto` MUST have a corresponding `#define INPUT_MODE_<NAME>_NAME "<Display>"` macro in `headers/display/ui/screens/MainMenuScreen.h`.
+
+**Why:** MainMenuScreen.h uses macro expansion (InputMode_VALUELIST with INPUT_MODE_ENTRIES pattern) to generate the input mode menu. Missing display name macro causes compilation failure.
+
+**Example:** When INPUT_MODE_BLE = 18 was added to enums.proto, INPUT_MODE_BLE_NAME "BLE" was missing from MainMenuScreen.h. This is now documented as a hard rule.
+
+**Action for Winry:** If web configurator adds new input modes in future (e.g., future wireless modes), confirm firmware has corresponding display name macros before integration.
+

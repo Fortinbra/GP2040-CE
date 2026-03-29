@@ -523,3 +523,68 @@ If `cyw43_arch_init()` inside `BTHIDManager::init()` blocked, hung, or panicked 
 
 **Commit:** `ec5bdf3f` (feature/bluetooth-hid branch)
 
+
+## Learnings
+
+### 2026-03-28: BLE HID Implementation Audit (Inline Code Fixes)
+
+**Context:** Several BLE HID files were written inline without Edward's review. Build failed with BTstack API misuse and missing configuration.
+
+**Bugs Found and Fixed:**
+
+1. **BLEHIDManager.h included btstack.h in header** — CRITICAL namespace collision.  
+   - **Problem:** OutputManager.cpp includes both tusb.h and BLEHIDManager.h. Both TinyUSB and BTstack define hid_report_type_t enum, causing collision.  
+   - **Fix:** Removed #include "btstack.h" from BLEHIDManager.h. Added forward declaration 	ypedef uint16_t hci_con_handle_t; and #define HCI_CON_HANDLE_INVALID 0xFFFF. BTstack includes stay in .cpp file only.  
+   - **Rule:** **NEVER include btstack.h in ANY header that might be included alongside tusb.h**. BTstack headers MUST be confined to translation units (.cpp files).
+
+2. **SM pairing event functions don't exist** — sm_event_pairing_complete_get_identity_resolving_key() and sm_event_pairing_complete_get_long_term_key() are NOT in BTstack API.  
+   - **Problem:** BLEHIDManager.cpp tried to extract IRK/LTK from SM_EVENT_PAIRING_COMPLETE manually. These functions don't exist.  
+   - **Fix:** Removed SM_EVENT_PAIRING_COMPLETE handler entirely. BTstack's le_device_db_tlv handles bonding key persistence internally when configured with TLV storage. No manual key extraction needed.  
+   - **Reference:** hog_keyboard_demo.c and hog_mouse_demo.c in BTstack examples do NOT handle SM_EVENT_PAIRING_COMPLETE for key storage — they rely on le_device_db_tlv auto-persistence.
+
+3. **Custom ATT read/write callbacks conflict with hids_device API** — Manual ATT callbacks not needed when using #import <hids.gatt>.  
+   - **Problem:** BLEHIDManager.cpp registered custom tt_read_callback and tt_write_callback for REPORT_MAP and firmware revision. When using hids_device_init() + #import <hids.gatt>, the HIDS service handles all ATT operations internally.  
+   - **Fix:** Changed tt_server_init(profile_data, att_read_callback, att_write_callback) to tt_server_init(profile_data, NULL, NULL). Removed custom ATT callback functions entirely.  
+   - **Reference:** Both hog_keyboard_demo.c and hog_mouse_demo.c use tt_server_init(profile_data, NULL, NULL) — no custom ATT handlers when GATT services manage their own characteristics.
+
+4. **Pico SDK flash bank API mismatch** — Wrong TLV init function called.  
+   - **Problem:** Code called tstack_flash_bank_storage_get() (doesn't exist in Pico SDK) and passed one parameter to tstack_tlv_flash_bank_init_instance() (needs three).  
+   - **Fix:** Use Pico SDK's pico_flash_bank_instance() to get the HAL flash bank instance. Call tstack_tlv_flash_bank_init_instance(&tlv_context, pico_flash_bank_instance(), NULL) with three parameters. Also, le_device_db_tlv_configure(tlv_impl, NULL) needs TWO parameters, not one.  
+   - **Include:** Added #include "platform/embedded/btstack_tlv_flash_bank.h" and #include "btstack_tlv.h" to BLEHIDManager.cpp.
+
+5. **Missing btstack_config.h defines** — BTstack feature flags were incomplete.  
+   - **Problem:** BLE peripheral code uses hci_stack->le_advertisements_state field, which is ONLY compiled if ENABLE_LE_PERIPHERAL is defined. Caused "member does not exist" errors.  
+   - **Fix:** Added to btstack_config.h:  
+     - #define ENABLE_LE_PERIPHERAL — enables BLE peripheral role and advertisement state tracking  
+     - #define HAVE_MALLOC — BTstack uses malloc for dynamic ATT database instead of MAX_ATT_DB_SIZE  
+     - #define MAX_NR_LE_DEVICE_DB_ENTRIES 4 — max BLE device database entries for bonding  
+     - #define NVM_NUM_DEVICE_DB_ENTRIES 4 — TLV-backed bonding storage size
+
+6. **Missing INPUT_MODE_BLE_NAME macro** — Display UI macro not defined.  
+   - **Problem:** MainMenuScreen.h uses INPUT_MODE_##_NAME macro expansion for input mode menu. INPUT_MODE_BLE (18) was added to enums.proto but the corresponding #define INPUT_MODE_BLE_NAME "BLE" was missing.  
+   - **Fix:** Added #define INPUT_MODE_BLE_NAME "BLE" to MainMenuScreen.h after INPUT_MODE_BLUETOOTH_NAME.
+
+**Build Outcome:** ✅ **CLEAN COMPILE** for Pico W board (RP2040 + CYW43).
+
+**BTstack API Patterns (Reference for Future BLE Work):**
+
+- **GATT services manage themselves:** When using #import <hids.gatt>, #import <battery_service.gatt>, etc., the generated GATT services handle all ATT read/write internally. Use tt_server_init(profile_data, NULL, NULL) with NO custom ATT callbacks.
+- **Bonding is automatic:** le_device_db_tlv_configure(tlv_impl, tlv_context) with flash-backed TLV handles bonding key persistence. SM events notify pairing status but don't carry raw keys — BTstack manages keys internally.
+- **Pico SDK integration:** Use pico_flash_bank_instance() for flash-backed storage, not generic BTstack examples' flash APIs.
+- **Namespace isolation:** TinyUSB and BTstack CANNOT coexist in the same header. Keep BTstack includes ONLY in .cpp files. Use forward declarations in headers.
+- **BLE peripheral requires ENABLE_LE_PERIPHERAL:** This flag enables the le_advertisements_state field in hci_stack_t and all peripheral advertisement APIs.
+
+**Files Audited:**
+- src/ble_hid.gatt ✅ (already fixed to use #import style)
+- headers/BLEHIDManager.h ✅ (removed btstack.h include, added forward decls)
+- src/BLEHIDManager.cpp ✅ (fixed TLV init, removed SM key extraction, removed ATT callbacks)
+- headers/btstack_config.h ✅ (added ENABLE_LE_PERIPHERAL, HAVE_MALLOC, device DB defines)
+- headers/display/ui/screens/MainMenuScreen.h ✅ (added INPUT_MODE_BLE_NAME)
+- proto/enums.proto ✅ (INPUT_MODE_BLE = 18 already present)
+- proto/config.proto ✅ (BluetoothOptions BLE fields already present)
+- src/drivermanager.cpp ✅ (INPUT_MODE_BLE case already present)
+- src/OutputManager.cpp ✅ (scoping verified — useBLE/useClassic accessible in all blocks)
+- CMakeLists.txt ✅ (BLEHIDManager.cpp already in sources, GATT header generation correct)
+
+**No issues found in:**
+- bt_config_bridge.{h,cpp} — BLE key save/load functions compile (but may not be used since BTstack handles keys internally via TLV)

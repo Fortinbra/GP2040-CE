@@ -366,4 +366,19 @@ Edward's detailed protocol analysis revealed that the original "Battery Level Re
 
 **Document purpose:** Transformed from planning document to implementation record. Users can now read this and understand what is available today (Bluetooth HID Classic pairing + output mode switching) and what is not yet available (battery reporting, power management). The scope and architectural foundation is clear for future Phase 3 developers.
 
+### 2026-03-29T17:52: Edward's BLE Audit — Cross-Agent Learning (Documentation Patterns)
+
+Edward's BLE HID implementation audit generated 6 documented bugs and 3 major architectural constraints now merged into decisions.md:
+
+**Key Learning for Hughes's Future Work:**
+1. **Translation-unit isolation is a hard architectural constraint** — BTstack includes cannot coexist with TinyUSB in the same header. This must be documented in any future Bluetooth expansion docs (e.g., WiFi, BLE phases).
+
+2. **Self-managing GATT services pattern** — When `#import <service.gatt>` is used, the service handles its own ATT callbacks. This pattern is unique to BTstack and differs from manual GATT implementations. Future docs on Bluetooth battery service, heart rate service, etc., must reference this pattern.
+
+3. **Deferred CYW43 initialization is non-negotiable** — Boot stability constraint: CYW43 initialization must never happen before USB enumeration. This is now a hard rule for wireless boards. Any future GPIO, BLE, or WiFi features must follow this pattern.
+
+4. **New InputMode enum additions require firmware coordination** — When web configurator adds input modes, firmware must have corresponding display name macros in MainMenuScreen.h. This is a cross-agent dependency that must be documented in any future mode-addition guidelines.
+
+**Action for Hughes:** These constraints should be referenced in any future Bluetooth expansion documentation (BLE Phase 3, WiFi integration, etc.) to prevent reinvention of patterns and ensure consistency.
+
 

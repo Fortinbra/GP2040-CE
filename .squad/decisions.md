@@ -253,6 +253,119 @@ Both builds link cleanly without symbol conflicts.
 
 **Why:** Discovered during Phase 2 integration testing. Required immediate resolution before merging. Now a hard architectural constraint for all future wireless/CYW43 features.
 
+### 2026-03-29T??:??: BLE HID Implementation Audit — 6 Bugs Fixed
+
+**By:** Edward (Firmware Dev)  
+**Date:** 2026-03-29  
+**Status:** Implemented and build-verified  
+
+**What:** BLE HID implementation audit identified and fixed 6 critical bugs across BLEHIDManager, btstack_config, and MainMenuScreen:
+
+1. **TinyUSB/BTstack namespace collision** — Removed `#include "btstack.h"` from BLEHIDManager.h header; confine BTstack to .cpp via forward declarations. Both libraries define identical `hid_report_type_t` enum; translation-unit isolation prevents redefinition errors.
+
+2. **Non-existent BTstack API calls** — Removed calls to `sm_event_pairing_complete_get_identity_resolving_key()` and `sm_event_pairing_complete_get_long_term_key()`. These functions do not exist in BTstack SDK 2.2.0. Bonding keys are persisted automatically by `le_device_db_tlv`; no manual extraction required.
+
+3. **Incorrect TLV flash bank initialization** — Fixed `btstack_tlv_flash_bank_init_instance()` parameter count and signature. Corrected to use Pico SDK's `pico_flash_bank_instance()` HAL instead of non-existent BTstack API. Corrected `le_device_db_tlv_configure()` to accept two parameters (impl + tlv_ctx).
+
+4. **Redundant ATT callbacks removed** — Deleted `att_read_callback` and `att_write_callback`. BTstack GATT services (`hids_device`, `battery_service_server`, `device_information_service_server`) are self-managing when `#import <*.gatt>` is used; custom callbacks cause handler conflicts. Use `att_server_init(profile_data, NULL, NULL)`.
+
+5. **Missing BTstack configuration macros** — Added to btstack_config.h:
+   - `ENABLE_LE_PERIPHERAL` (enables `le_advertisements_state` in hci_stack)
+   - `HAVE_MALLOC` (enables dynamic ATT DB for GATT imports)
+   - `MAX_NR_LE_DEVICE_DB_ENTRIES 4` (in-memory bonding records)
+   - `NVM_NUM_DEVICE_DB_ENTRIES 4` (TLV persistent bonding entries)
+
+6. **INPUT_MODE_BLE display name missing** — Added `#define INPUT_MODE_BLE_NAME "BLE"` to MainMenuScreen.h. Input mode enum expansion requires corresponding display macro for menu rendering (INPUT_MODE_ENTRIES macro pattern).
+
+**Build Outcome:** ✅ Clean compilation for Pico W (RP2040 + CYW43) and Pico 2 W (RP2350B + CYW43). All fixes validated against BTstack SDK 2.2.0 source.
+
+**Files Modified:**  
+- headers/BLEHIDManager.h
+- src/BLEHIDManager.cpp
+- headers/btstack_config.h
+- headers/display/ui/screens/MainMenuScreen.h
+
+**Architectural Constraints (Hard Rules):**
+- Any Bluetooth manager header must NOT include BTstack headers; use forward declarations and confine includes to .cpp
+- BTstack GATT services (hids_device, battery_service_server, device_information_service_server) register their own ATT handlers; do NOT add custom callbacks
+- Bonding key persistence is automatic via le_device_db_tlv; manual SM event extraction is unsupported API
+- New InputMode enum values require corresponding INPUT_MODE_*_NAME macro in MainMenuScreen.h
+
+**Why:** Audit performed during Phase 2 to ensure API correctness before runtime hardware testing. Fixes prevent compilation errors, runtime crashes, and GATT handler conflicts.
+
+### 2026-03-29T??:??: Bluetooth Boot Sequence — Deferred Initialization Constraint
+
+**By:** Edward (Firmware Dev)  
+**Date:** 2026-03-28  
+**Status:** Implemented  
+
+**What:** Implemented deferred Bluetooth initialization pattern to prevent boot crashes on wireless boards:
+
+**Problem:** BTHIDManager::init() called CYW43 hardware initialization synchronously during setup(), before USB enumeration. CYW43 initialization failure (chip unresponsive, hardware issue) blocked USB from enumerating, causing device to appear bricked.
+
+**Solution (Hard Constraint):** Two-phase initialization:
+1. **Phase 1 (Early, non-blocking):** BTHIDManager::init() sets `_pendingInit = true` flag and returns immediately
+2. **Phase 2 (Deferred, after USB enumeration):** BTHIDManager::process() checks `tud_mounted()` before calling `_doInit()` 
+
+**Implementation:**
+- Added `bool _pendingInit` and `bool _initFailed` flags to BTHIDManager
+- Moved CYW43 initialization code to private `_doInit()` method
+- Checks `tud_mounted()` in process() loop to ensure USB enumerated before CYW43 init
+- On CYW43 failure: set `_initFailed = true` and continue in USB-only mode (graceful fallback)
+
+**Guarantees:**
+- USB always enumerates first — device appears in Device Manager even if BT fails
+- No boot blocking — CYW43 errors cannot prevent firmware startup
+- Graceful error handling — firmware runs in USB-only mode if wireless chip fails
+- Battery-only operation supported — BT eventually initializes when main loop runs
+
+**Architectural Constraint (Mandatory for all future wireless features):**
+> Bluetooth and CYW43 initialization MUST NOT happen before `tud_init()`. Use deferred init pattern: set flag during setup(), perform hardware init in process() after tud_mounted() returns true.
+
+Violating this constraint causes boot failures on wireless boards and bricking risk.
+
+**Files Modified:**
+- headers/BTHIDManager.h (added _pendingInit, _initFailed, _doInit)
+- src/BTHIDManager.cpp (split init() into early flag-set and deferred _doInit())
+- src/gp2040.cpp (confirms process() hook called every main loop iteration)
+
+**Build Verification:** Pimoroni Pico Lipo 2 XL W (RP2350B) boots successfully with Pico standard builds (RP2040) as baseline.
+
+**Why:** Critical boot stability constraint discovered during Phase 2 implementation. Non-negotiable for wireless board support.
+
+### 2026-03-29T??:??: Bluetooth Documentation Update — Phase 1 & 2 Complete
+
+**By:** Maes Hughes (Technical Writer)  
+**Date:** 2026-03-29  
+**Status:** Implemented and merge-ready  
+
+**What:** Updated `docs/development/bluetooth-support.md` to document completed Bluetooth HID Phase 1 and Phase 2 implementation:
+
+**Changes:**
+1. Status updated from "Planning" to "Implemented (Phase 1 & Phase 2)"
+2. New "Implementation Status" section with completion table (BTstack, OutputManager, web UI, protobuf, battery service wiring status)
+3. New "Building with Bluetooth" subsection (environment variables for wireless boards)
+4. New "Pairing Your Controller" user guide (host-specific pairing instructions)
+5. BTHIDManager isolation architectural note (translation-unit constraint)
+6. Roadmap restructured to show completion (Phase 0 ✅, Phase 1 ✅, Phase 2 ✅, Phase 3 deferred)
+7. RP2350 section updated from "will be created" to "are available and tested"
+
+**Sections Preserved (no changes needed):**
+- Overview, Supported Hardware, Reference Hardware (Pimoroni Pico Lipo 2 XL W)
+- Architecture (OutputManager + BTHIDManager accurate)
+- Output Mode Switching, Battery Level Reporting design, Power Management design
+- Testing framework
+
+**Style Compliance:**
+- 4-space indentation throughout
+- Pico SDK 2.2.0 consistently referenced
+- No AI agent names; "GP2040-CE core team" attribution
+- Timestamp: 2026-03-29
+
+**Purpose:** Transforms document from planning guide to implementation record. Users now understand which Bluetooth features are available, how to build for wireless boards, and how to pair controllers.
+
+**Why:** Requested by Fortinbra to document Phase 1 & 2 completion. Document now serves as practical guide for end users and Phase 3 developers (battery, power management).
+
 ## Governance
 
 - All meaningful changes require team consensus
