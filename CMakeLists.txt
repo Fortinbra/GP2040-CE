@@ -258,6 +258,7 @@ src/display/GPGFX_UI.cpp
 src/drivermanager.cpp
 src/OutputManager.cpp
 src/BTHIDManager.cpp
+src/bt_config_bridge.cpp
 src/eventmanager.cpp
 src/layoutmanager.cpp
 src/peripheralmanager.cpp
