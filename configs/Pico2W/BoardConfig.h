@@ -45,15 +45,16 @@
 //
 // IMPORTANT: GPIO24 is also WL_DATA for the CYW43439 wireless driver. Once the
 // CYW43 driver is initialized (required for Bluetooth), it takes ownership of
-// GPIO24 and direct gpio_get() reads will conflict with wireless operation.
-// When Bluetooth support is added, VBUS detection must be replaced with a
-// software-based approach (e.g., monitoring TinyUSB enumeration state via
-// tud_connected() or tud_mounted()).
+// GPIO24 and direct gpio_get() reads will CORRUPT wireless operation.
 //
-// For USB-only builds (before BT is implemented), GPIO24 can be read directly:
+// CORRECT VBUS DETECTION:
+// #ifdef ENABLE_BLUETOOTH
+//   bool usb_connected = tud_mounted();  // TinyUSB method — safe with CYW43
+// #else
 //   gpio_init(24);
 //   gpio_set_dir(24, GPIO_IN);
-//   bool usb_connected = gpio_get(24);
+//   bool usb_connected = gpio_get(24);  // Direct GPIO — USB-only builds
+// #endif
 
 // Keyboard Mapping Configuration
 //                                            // GP2040 | Xinput | Switch  | PS3/4/5  | Dinput | Arcade |

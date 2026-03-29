@@ -894,6 +894,14 @@ message HETriggerOptions
     optional int32 smoothingFactor = 13;
 }
 
+message BluetoothOptions
+{
+    optional bool enabled = 1;
+    optional bool pairingMode = 2;
+    optional bytes bondedDeviceAddr = 3 [(nanopb).max_size = 6];
+    optional string bondedDeviceName = 4 [(nanopb).max_length = 32];
+}
+
 message AddonOptions
 {
     optional BootselButtonOptions bootselButtonOptions = 1;
@@ -926,6 +934,7 @@ message AddonOptions
     optional GamepadUSBHostOptions gamepadUSBHostOptions = 28;
     optional TG16Options tg16Options = 29;
     optional HETriggerOptions heTriggerOptions = 30;
+    optional BluetoothOptions bluetoothOptions = 31;
 }
 
 message MigrationHistory
