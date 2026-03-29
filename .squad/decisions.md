@@ -371,3 +371,53 @@ Violating this constraint causes boot failures on wireless boards and bricking r
 - All meaningful changes require team consensus
 - Document architectural decisions here
 - Keep history focused on work, decisions focused on direction
+
+### 2026-03-29T17:56:02Z: BLE HID Implementation Code Review — APPROVED for Hardware Testing
+
+**By:** Roy Mustang (Code Review Lead)  
+**Developer:** Edward (Firmware Dev)  
+**Timestamp:** 2026-03-29T17:56:02Z  
+**Status:** APPROVED for hardware testing
+
+**Verdict:** Architecturally sound and ready for hardware validation on Pico W.
+
+**Architecture Review Results:**
+- ✅ Pattern consistency with BTHIDManager
+- ✅ Namespace isolation (TinyUSB/BTstack collision avoidance)
+- ✅ OutputManager integration and mode detection logic
+- ✅ CMakeLists.txt conditional compilation (wireless boards only)
+- ✅ Proto definitions and enum values
+- ✅ DriverManager mode routing
+
+**Critical Findings:** 0
+
+**Low-Priority Issue (1):**
+- Dead code in bt_config_bridge.cpp: Functions `bt_config_save_ble_keys`, `bt_config_get_ble_keys`, `bt_config_clear_ble_keys` are implemented but never called
+  - Root cause: BTstack's `le_device_db_tlv` handles BLE bonding key persistence internally when configured with TLV flash storage
+  - Impact: Zero runtime impact; static code bloat (~50 lines), proto schema fields `bleBondedAddr`, `bleIdentityResolvingKey`, `bleLongTermKey` never populated
+  - Recommendation: Document as known limitation; cleanup deferred to follow-up PR after hardware validation
+
+**Pre-Hardware Software Validation:**
+- [x] Compiles cleanly for Pico W (RP2040 + CYW43)
+- [x] Compiles cleanly for standard Pico (no BT)
+- [x] No namespace collisions verified
+- [x] No linker errors
+- [x] GATT database (ble_hid.h) generated successfully
+
+**Expected Hardware Behavior:**
+1. Power-on: BLE init delayed 3 seconds (USB enumeration priority)
+2. Advertisement: "GP2040-CE" appears in Bluetooth device list
+3. Pairing: Host can pair (Just Works, no PIN)
+4. HID reports: 9-byte gamepad reports as standard HID gamepad
+5. Reconnect: Auto-reconnect to previously paired host (TLV bonding)
+
+**Follow-up Recommendations:**
+- Edward: Add comments to dead code in bt_config_bridge.cpp and config.proto explaining BTstack TLV internal handling
+- Hughes: Document BLE bonding behavior in bluetooth-support.md (differs from BT Classic in web configurator visibility)
+- Future Phase 4: Implement read-only web configurator display for bonded BLE devices if user-requested
+
+**Responsible Parties for Next Phase:**
+- Edward: Hardware testing on Pimoroni Pico Lipo 2 XL W
+- Hughes: Documentation updates
+
+**Why:** Audit performed during Phase 2 to validate BLE HID implementation architecture before runtime hardware testing. All critical and architectural issues resolved by Edward's 6 bug fixes.

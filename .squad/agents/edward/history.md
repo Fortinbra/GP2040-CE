@@ -588,3 +588,5 @@ If `cyw43_arch_init()` inside `BTHIDManager::init()` blocked, hung, or panicked 
 
 **No issues found in:**
 - bt_config_bridge.{h,cpp} — BLE key save/load functions compile (but may not be used since BTstack handles keys internally via TLV)
+
+- **Unused BLE key functions documented:** bt_config_bridge.cpp BLE key save/load functions documented as unused since BTstack's TLV flash storage handles bonding internally; kept for potential future web configurator exposure of bonded devices.
