@@ -17,6 +17,28 @@ This creates a standardized expansion bus for add-on hardware that the core firm
 
 ---
 
+## Output Ecosystem Context
+
+**USB HID is and will remain the primary output target** for GP2040-CE. All other output methods are optional, additive features that operate alongside USB rather than replacing it.
+
+The full output ecosystem, across current and planned features:
+
+| Output Channel | Status | Doc |
+|---|---|---|
+| USB HID (XInput, HID, PS4, Switch, etc.) | ✅ Shipping | — (current implementation) |
+| I2C expansion bus (this doc) | 📋 Planned | `i2c-peripheral-expansion.md` |
+| BLE HID (HOGP over GATT) | 📋 Planned | `ble-hid-support.md` |
+| BT Classic HID | 🔧 In progress | `feature/bluetooth-hid` branch |
+| HID over I2C (slave mode, for SBCs) | 📋 Planned | `hid-over-i2c.md` |
+| WiFi web config (station mode) | 📋 Planned | `wifi-web-config.md` |
+| Retro console direct output (N64, SNES, etc.) | 📋 Planned | via I2C expansion satellites |
+
+The I2C expansion bus described in this document is the **wired peripheral extension layer** — it allows the RP2040/RP2350 to delegate complex or timing-critical output hardware to dedicated satellite MCUs over a simple two-wire bus. It is complementary to, not a replacement for, USB output.
+
+Note: **HID over I2C** (GP2040-CE acting as I2C *slave* presenting a HID interface to a host like a Raspberry Pi) is a distinct feature described in `hid-over-i2c.md`. This document covers the opposite direction: GP2040-CE as I2C *master* writing to satellites.
+
+---
+
 ## Motivation
 
 ### Problems This Solves
