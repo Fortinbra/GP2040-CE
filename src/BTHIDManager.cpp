@@ -9,8 +9,12 @@
 #include "pico/cyw43_arch.h"
 #include "classic/hid_device.h"
 #include "bluetooth.h"
+#include "pico/time.h"
 
 #include "BTHIDManager.h"
+#include "bt_config_bridge.h"
+
+#include <cstring>
 
 extern "C" {
     bool tud_mounted(void);
@@ -58,6 +62,7 @@ BTHIDManager& BTHIDManager::getInstance() {
 }
 
 void BTHIDManager::init() {
+    _bootTimeMs = to_ms_since_boot(get_absolute_time());
     _pendingInit = true;
 }
 
@@ -104,12 +109,19 @@ void BTHIDManager::_doInit() {
 
     hci_power_control(HCI_POWER_ON);
 
+    // Reconnect to previously bonded device if one is stored
+    bd_addr_t bondedAddr;
+    if (bt_config_get_bonded_addr(bondedAddr)) {
+        hid_device_connect(bondedAddr, &_hid_cid);
+    }
+
     _initialized = true;
 }
 
 void BTHIDManager::process() {
     if (_pendingInit && !_initialized && !_initFailed) {
-        if (tud_mounted()) {
+        uint32_t elapsed = to_ms_since_boot(get_absolute_time()) - _bootTimeMs;
+        if (tud_mounted() || elapsed > 3000) {
             _doInit();
             _pendingInit = false;
         }
@@ -166,6 +178,11 @@ static void packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packe
                             if (hid_subevent_connection_opened_get_status(packet) == ERROR_CODE_SUCCESS) {
                                 mgr._connected = true;
                                 mgr._hid_cid = hid_subevent_connection_opened_get_hid_cid(packet);
+
+                                // Persist bonded device address for automatic reconnect on next boot
+                                bd_addr_t addr;
+                                hid_subevent_connection_opened_get_bd_addr(packet, addr);
+                                bt_config_save_bonded_addr(addr);
                             }
                             break;
                         case HID_SUBEVENT_CONNECTION_CLOSED:

@@ -31,6 +31,7 @@ private:
     bool _connected = false;
     bool _pairingMode = false;
     uint16_t _hid_cid = 0;
+    uint32_t _bootTimeMs = 0;
 
     void _doInit();
 
