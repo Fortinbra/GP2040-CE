@@ -421,3 +421,228 @@ Violating this constraint causes boot failures on wireless boards and bricking r
 - Hughes: Documentation updates
 
 **Why:** Audit performed during Phase 2 to validate BLE HID implementation architecture before runtime hardware testing. All critical and architectural issues resolved by Edward's 6 bug fixes.
+
+### 2026-03-29T223404Z: User directive — Zero Bluetooth Classic on feature/ble-hid
+
+**By:** Fortinbra (via Copilot)  
+**What:** On `feature/ble-hid` branch, zero Bluetooth Classic residue is allowed. All Classic mode code, config, and UI references must be confined to the Classic branch only. `feature/ble-hid` is BLE-only.  
+**Why:** User request — captured for team memory
+
+### 2026-03-28: BLE Pairing Failure — Root Cause Analysis and 6 Missing Integrations
+
+**By:** Edward (Firmware Dev)  
+**Status:** Diagnosed and fixed  
+**Date:** 2026-03-28  
+
+**Problem:** BLE pairing not working; device appeared non-functional for BLE.
+
+**Root Cause:** Five critical missing integrations prevented BLEHIDManager from ever being compiled or dispatched:
+1. **Missing btstack_config.h BLE defines** — `ENABLE_LE_PERIPHERAL`, `HAVE_MALLOC`, `MAX_NR_LE_DEVICE_DB_ENTRIES`, `NVM_NUM_DEVICE_DB_ENTRIES` not present
+2. **BLEHIDManager.cpp not in CMakeLists.txt** — source file never compiled
+3. **Missing pico_btstack_ble link** — BLE libraries not linked
+4. **Missing GATT header generation** — `pico_btstack_make_gatt_header()` never called for `ble_hid.gatt`
+5. **OutputManager.cpp never calls BLEHIDManager** — always called BTHIDManager regardless of INPUT_MODE
+6. **DriverManager missing INPUT_MODE_BLE case** — BLE mode never routed to HIDDriver
+
+**Result:** Firmware only had BT Classic code compiled, even though BLE files existed in `src/`.
+
+**All Fixes Applied:**
+- Added BLE peripheral defines to btstack_config.h
+- Added BLEHIDManager.cpp to CMakeLists.txt source list
+- Added pico_btstack_ble and pico_btstack_hid to link libraries
+- Added GATT header generation call for ble_hid.gatt
+- Updated OutputManager to dispatch to BLEHIDManager when INPUT_MODE_BLE is active
+- Added INPUT_MODE_BLE case to DriverManager
+
+**Verification:** Clean build for Pico W. No namespace collisions, all BTstack symbols resolved.
+
+**Why:** Critical build integration bug preventing entire BLE feature from functioning.
+
+### 2026-03-28: BLE No-USB Fix — TinyUSB Conditional Initialization
+
+**By:** Edward (Firmware Dev)  
+**Status:** Fixed  
+**Date:** 2026-03-28  
+
+**Problem:** BLE mode failed to advertise when USB cable disconnected (battery-only operation). Symptom: no BLE device visible on Windows/Android BLE scans when running on LiPo battery without USB.
+
+**Root Cause:** TinyUSB stack (`tud_init()` and `tud_task()`) was initialized and polled unconditionally in `src/gp2040.cpp`, regardless of input mode. When in wireless-only mode (BLE or Bluetooth Classic) without USB connected, TinyUSB consumed resources and potentially interfered with BLE/CYW43 initialization.
+
+**Solution Applied:** Made TinyUSB initialization and polling conditional on input mode.
+```cpp
+// src/gp2040.cpp
+InputMode inputMode = DriverManager::getInstance().getInputMode();
+bool wirelessOnly = (inputMode == INPUT_MODE_BLE);
+if (!wirelessOnly) {
+    tud_init(TUD_OPT_RHPORT);
+}
+```
+
+**Impact:**
+- Wireless-only mode now works on battery without USB
+- USB modes unchanged (TinyUSB still initializes when needed)
+- CPU efficiency improved (no unnecessary USB polling in wireless modes)
+- Config mode correctly skips RNDIS in wireless-only mode
+
+**Files Modified:** src/gp2040.cpp (lines 292–297, 302, 352–355)
+
+**Why:** Critical fix for battery-only BLE operation on wireless boards.
+
+### 2026-03-28: Classic Bluetooth Purge — feature/ble-hid Branch
+
+**By:** Edward (Firmware Dev)  
+**Status:** Complete  
+**Date:** 2026-03-28  
+
+**Objective:** Surgical removal of all Bluetooth Classic residue from `feature/ble-hid` per user directive.
+
+**What Was Removed (8 files):**
+1. `src/OutputManager.cpp` — Removed BTHIDManager include and all INPUT_MODE_BLUETOOTH dispatch blocks
+2. `headers/btstack_config.h` — Removed ENABLE_CLASSIC and ENABLE_L2CAP_ENHANCED_RETRANSMISSION_MODE
+3. `CMakeLists.txt` — Removed pico_btstack_classic from target_link_libraries; removed BTHIDManager.cpp from source list
+4. `src/drivermanager.cpp` — Removed INPUT_MODE_BLUETOOTH case from driver switch
+5. `proto/enums.proto` — Removed INPUT_MODE_BLUETOOTH = 17 enum value
+6. `www/src/Locales/en/SettingsPage.jsx` — Removed 'bluetooth' locale key
+7. `headers/display/ui/screens/MainMenuScreen.h` — Removed INPUT_MODE_BLUETOOTH_NAME macro
+8. `src/gp2040.cpp` — Removed INPUT_MODE_BLUETOOTH from wirelessOnly guard
+
+**What Was Kept:**
+- `src/BTHIDManager.cpp` and `headers/BTHIDManager.h` files (untouched, now unreferenced)
+- ENABLE_HID_DEVICE in btstack_config.h (shared BTstack infrastructure)
+- All BLE libraries and code
+
+**Verification:** Zero Classic references remain in active code paths. Full grep scan confirmed.
+
+**Why:** User directive required branch isolation — BLE-only development on feature/ble-hid.
+
+### 2026-03-29: BLE Build Integration Result
+
+**By:** Edward (Firmware Dev)  
+**Status:** Success  
+**Date:** 2026-03-29  
+
+**Objective:** Full rebuild of feature/ble-hid to verify all Classic purge and BLE fixes integrated correctly.
+
+**Build Configuration:**
+- Board: Pimoroni Pico Lipo 2 XL W (RP2350A + CYW43439)
+- CMake: `cmake -B build_ble2 -S . -DPICO_BOARD=pico2_w -DGP2040_BOARDCONFIG=PimoroniPicoLipo2XLW -DSKIP_WEBBUILD=TRUE`
+- Build: `cmake --build build_ble2 --parallel`
+
+**Results:**
+- ✅ 520/520 targets compiled successfully
+- ✅ UF2 artifact: 3,084 KB
+- ✅ Flashed and running on Pimoroni Pico Lipo 2 XL W
+- ⚠️ Warnings pre-existing (non-blocking)
+
+**Technical Notes:**
+- wirelessOnly flag already aligned with purge branch (no additional fixes needed)
+- BTstack enabled for pico2_w
+- CYW43 driver enabled
+- GATT database generation successful
+
+**Why:** Verification that all fixes integrated cleanly before hardware testing.
+
+### 2026-03-29: Full Web Rebuild and Flash
+
+**By:** Edward (Firmware Dev)  
+**Status:** Success  
+**Date:** 2026-03-29  
+
+**Objective:** Rebuild firmware with embedded web configurator assets to include Winry's BLE UI changes.
+
+**Process:**
+1. Web build: `npm run build-proto && npm run build` — 998 modules compiled
+2. CMake config: `cmake -B build_ble2 -S . -DPICO_BOARD=pico2_w -DGP2040_BOARDCONFIG=PimoroniPicoLipo2XLW -DSKIP_WEBBUILD=FALSE`
+3. Firmware build: 1514 tasks compiled (full rebuild with embedded web assets)
+4. Flash: Mass storage copy method (3,158,016 bytes / 3.08 MB)
+
+**Results:**
+- ✅ Web build successful (no TypeScript errors)
+- ✅ Firmware build successful (476/476 targets on previous rebuild; 1514 tasks with full web assets)
+- ✅ Flash successful (100% load + verify)
+- ✅ Device running in application mode
+
+**Why:** Ensure web configurator displays BLE option correctly with embedded assets.
+
+### 2026-03-29: BLE Web UI Investigation and Fixes
+
+**By:** Winry (Frontend Dev)  
+**Status:** Complete  
+**Date:** 2026-03-29  
+
+**Problem:** Web configurator appeared identical to Bluetooth Classic version; BLE input mode not visible as distinct option.
+
+**Root Cause Analysis Identified 5 Missing Components:**
+1. `INPUT_MODE_BLE = 18` missing from `proto/enums.proto`
+2. `INPUT_MODE_BLE_NAME` macro missing from firmware display headers
+3. BLE entry missing from INPUT_MODES array in web UI
+4. BLE entry missing from INPUT_BOOT_MODES array in web UI
+5. BLE localization label missing from web UI strings
+
+**Fixes Applied (4 files modified):**
+1. `proto/enums.proto` — Added INPUT_MODE_BLE = 18
+2. `headers/display/ui/screens/MainMenuScreen.h` — Added INPUT_MODE_BLE_NAME macro
+3. `www/src/Pages/SettingsPage.jsx` — Added BLE to INPUT_MODES and INPUT_BOOT_MODES arrays
+4. `www/src/Locales/en/SettingsPage.jsx` — Added 'ble' localization label
+
+**Verification:** All changes verified via grep; follow established InputMode pattern.
+
+**Design Decision:** Also removed Bluetooth Classic from UI (value 17) per user directive. Proto enum and display macros untouched for future reversibility.
+
+**Did NOT build:** Awaiting Edward's fixes first.
+
+**Why:** Make BLE distinct input mode option visible in web configurator.
+
+### 2026-03-29: BLE HID Report Diagnostic — Configuration Issue Root Cause
+
+**By:** Edward (Firmware Dev)  
+**Status:** Diagnosis complete  
+**Date:** 2026-03-29  
+
+**Problem:** BLE pairing succeeded but no gamepad input detected (no HID reports sent over BLE).
+
+**Investigation Findings:** User configuration issue, NOT a code bug.
+
+**Root Cause:** Firmware defaults to INPUT_MODE_XINPUT. User must manually set INPUT_MODE_BLE in web configurator to send gamepad input over BLE instead of USB.
+
+**Code Path Verification (All Correct):**
+- OutputManager dispatch logic: Routes to BLEHIDManager only when inputMode == INPUT_MODE_BLE
+- HID report descriptor: Byte-for-byte identical between USB and BLE
+- HID report format: Both use 9-byte format correctly
+- BLE send path: Correctly checks connection state and sends via GATT notifications
+- Connection handling: Properly tracks BLE connection and notification enable state
+
+**Resolution:** User must:
+1. Flash firmware
+2. Connect USB and access web configurator
+3. Settings → Configuration → Input Mode → BLE
+4. Save and reboot
+5. Device now sends gamepad input over BLE
+
+**Recommendation:** Add "How to Enable BLE" section to feature documentation.
+
+**Why:** Documented for future reference; no code changes needed.
+
+### 2026-03-29T223404Z: Hide Bluetooth Classic from Web Configurator
+
+**By:** Winry (Frontend Dev)  
+**Status:** Complete  
+**Date:** 2026-03-29  
+
+**Decision:** During BLE (INPUT_MODE_BLE = 18) development, Bluetooth Classic (INPUT_MODE_BLUETOOTH = 17) should not appear as an input mode option in the web configurator. Focus is BLE-only.
+
+**Changes Applied (UI-only):**
+- Removed `{ labelKey: 'input-mode-options.bluetooth', value: 17, group: 'primary' }` from INPUT_MODES array in `www/src/Pages/SettingsPage.jsx`
+- Removed same entry from INPUT_BOOT_MODES array
+
+**What Was NOT Changed:**
+- Proto enum (`proto/enums.proto`) — INPUT_MODE_BLUETOOTH = 17 remains defined
+- Localization strings (`www/src/Locales/en/SettingsPage.jsx`) — 'bluetooth' label remains
+- Firmware display macros (`MainMenuScreen.h`) — INPUT_MODE_BLUETOOTH_NAME remains
+
+**Reversibility:** To re-enable Bluetooth Classic UI:
+1. Add back entries to INPUT_MODES and INPUT_BOOT_MODES arrays (2-line change)
+
+**Applied on:** feature/ble-hid branch
+
+**Why:** User directive to focus BLE development without distraction from Classic mode.

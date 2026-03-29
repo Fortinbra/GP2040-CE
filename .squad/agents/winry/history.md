@@ -17,6 +17,21 @@
 
 ## Learnings
 
+### 2026-03-29T20:00: Hide Bluetooth Classic from Web Configurator
+
+Removed Bluetooth Classic (INPUT_MODE_BLUETOOTH = 17) from web configurator UI at Fortinbra's request. Only BLE (INPUT_MODE_BLE = 18) should be visible during current BLE development phase.
+
+**Files Modified:**
+- `www/src/Pages/SettingsPage.jsx` — Removed Bluetooth Classic entries from INPUT_MODES array (line 205) and INPUT_BOOT_MODES array (line 252)
+
+**Pattern:**
+- Proto enum (enums.proto) and localization strings (SettingsPage locale) remain intact — only UI visibility affected
+- This is a temporary UI-only change — Bluetooth Classic can be re-enabled by adding the entries back to the two arrays
+- BLE (value: 18) entries remain untouched in both arrays
+
+**Status:** Applied on `feature/ble-hid` branch. No build needed — UI-only change.
+
+
 ### 2026-03-28T024429: Round-3 Doc Fixes
 
 Assigned to fix Riza's round-3 rejection issues (Mustang was locked out). Two fixes applied:
@@ -89,4 +104,49 @@ Edward's BLE HID audit identified a critical pattern for future InputMode additi
 **Example:** When INPUT_MODE_BLE = 18 was added to enums.proto, INPUT_MODE_BLE_NAME "BLE" was missing from MainMenuScreen.h. This is now documented as a hard rule.
 
 **Action for Winry:** If web configurator adds new input modes in future (e.g., future wireless modes), confirm firmware has corresponding display name macros before integration.
+
+### 2026-03-29T18:30: BLE Web UI Debug Investigation
+
+User reported BLE web UI "looks identical to Bluetooth Classic" — BLE was not appearing as a distinct input mode option.
+
+**Root Cause:**
+- `INPUT_MODE_BLE = 18` was never added to `proto/enums.proto` (only Bluetooth Classic = 17 exists)
+- `INPUT_MODE_BLE_NAME "BLE"` macro missing from `MainMenuScreen.h`
+- No BLE entry in `SettingsPage.jsx` INPUT_MODES or INPUT_BOOT_MODES arrays
+- No BLE localization label in `SettingsPage.jsx` locale file
+
+**Architecture Confirmed:**
+- `enums.ts` is auto-generated from proto via `npm run build-proto` — always matches proto source
+- Web UI reads INPUT_MODES array to render dropdown options (each has labelKey, value, group)
+- Localization labels are in `www/src/Locales/en/SettingsPage.jsx` under 'input-mode-options'
+- Firmware display menu macros (INPUT_MODE_*_NAME) must match proto enum values or compilation fails
+
+**Required Fix (5 files):**
+1. Add `INPUT_MODE_BLE = 18;` to `proto/enums.proto`
+2. Add `#define INPUT_MODE_BLE_NAME "BLE"` to `MainMenuScreen.h`
+3. Add BLE entry to INPUT_MODES array in `SettingsPage.jsx`
+4. Add BLE entry to INPUT_BOOT_MODES array in `SettingsPage.jsx`
+5. Add `ble: 'BLE'` to localization in `www/src/Locales/en/SettingsPage.jsx`
+6. Rebuild: `npm run build-proto && npm run build`
+
+**Pattern for Future Wireless Modes:**
+Adding any new InputMode requires coordination across proto definition, firmware display macros, web UI arrays, and localization strings. Missing any piece causes UI display failure or compilation errors.
+
+Full findings documented in `.squad/decisions/inbox/winry-ble-ui-debug.md`.
+
+### 2026-03-29T19:00: BLE Web UI Fix Implementation
+
+Applied all 5 identified fixes to add BLE as a distinct input mode (INPUT_MODE_BLE = 18) in the web configurator and firmware display system:
+
+**Files Modified:**
+1. `proto/enums.proto` — Added `INPUT_MODE_BLE = 18;` to InputMode enum
+2. `headers/display/ui/screens/MainMenuScreen.h` — Added `#define INPUT_MODE_BLE_NAME "BLE"` macro
+3. `www/src/Pages/SettingsPage.jsx` — Added BLE entry to INPUT_MODES array (line 206)
+4. `www/src/Pages/SettingsPage.jsx` — Added BLE entry to INPUT_BOOT_MODES array (line 254)
+5. `www/src/Locales/en/SettingsPage.jsx` — Added `ble: 'BLE'` localization label (line 29)
+
+**Pattern Reinforced:**
+All new InputMode additions require 5-part coordination: proto enum value, firmware display macro, web UI input modes array, boot modes array, and localization string. Missing any piece causes UI display failures or compilation errors.
+
+**Status:** Applied on `feature/ble-hid` branch. Awaiting Edward's pairing fix before final npm build and integration testing.
 

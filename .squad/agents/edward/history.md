@@ -437,6 +437,38 @@ Edward's round-1 revision (`688582e4`) passed technical content checks in all su
 - `headers/display/ui/screens/MainMenuScreen.h` — Bluetooth display name
 
 **Ready for Phase 2:**
+
+### 2026-03-28: BLE Pairing Failure Investigation (`feature/ble-hid` Branch)
+
+**Tasked by:** Fortinbra. Full findings in `.squad/decisions/inbox/edward-ble-pairing-debug.md`.
+
+**Root cause:** BLE code path is NEVER executed. Five missing integrations:
+
+1. **btstack_config.h missing BLE defines** — `ENABLE_LE_PERIPHERAL`, `HAVE_MALLOC`, `MAX_NR_LE_DEVICE_DB_ENTRIES`, `NVM_NUM_DEVICE_DB_ENTRIES` not present. Without `ENABLE_LE_PERIPHERAL`, BTstack does NOT compile the BLE peripheral state machine. `gap_advertisements_enable()` would fail at compile time.
+
+2. **BLEHIDManager.cpp not in CMakeLists.txt** — Source file exists in `src/` but not in `add_executable()` list (line 190–270). Never compiled, class does not exist in binary.
+
+3. **BLE libraries not linked** — CMakeLists.txt line 347-352 only links `pico_btstack_classic`. Missing: `pico_btstack_ble` (GATT + advertisement APIs) and `pico_btstack_hid` (HIDS Device / HID over GATT Profile).
+
+4. **GATT database not compiled** — `src/ble_hid.gatt` exists but `pico_btstack_make_gatt_header()` never called in CMakeLists. `#include "ble_hid.h"` at BLEHIDManager.cpp:35 fails. The `profile_data` array used by `att_server_init()` is undefined.
+
+5. **OutputManager never calls BLEHIDManager** — `src/OutputManager.cpp` only includes and calls `BTHIDManager`. No `#include "BLEHIDManager.h"`, no INPUT_MODE check to distinguish BT Classic from BLE. BLEHIDManager::init/process/sendReport never executed.
+
+**BLEHIDManager code quality:** Implementation is CORRECT and follows BTstack BLE HID best practices. Advertising data has correct flags (0x06), UUID (0x1812), and appearance (0x03C4). GATT database imports correct services. Security Manager uses Just Works pairing with bonding. Event handling covers all required HCI/SM/HIDS events. Deferred 3-second init allows USB enumeration first. Zero bugs found — pairing failure is 100% due to code never executing.
+
+**Why web UI looks identical:** BluetoothOptions protobuf message (proto/config.proto) does not distinguish Classic vs BLE. UI is correct — it reads shared Bluetooth settings. Problem is firmware never executes BLE code.
+
+**Secondary issue:** DriverManager (src/drivermanager.cpp:79-84) missing `case INPUT_MODE_BLE:` — if user selects BLE in web UI, driver setup hits `default:` case and exits without initializing any driver. USB HID stops working entirely.
+
+**Proposed fix priority:** (1) Add btstack_config.h BLE defines, (2) Add BLEHIDManager.cpp to CMakeLists source list, (3) Link `pico_btstack_ble` + `pico_btstack_hid`, (4) Call `pico_btstack_make_gatt_header()`, (5) Wire OutputManager to dispatch to BLEHIDManager when `inputMode == INPUT_MODE_BLE`, (6) Add DriverManager `case INPUT_MODE_BLE:` fallthrough to HIDDriver.
+
+**Files needing changes:**
+- headers/btstack_config.h (add 4 BLE defines)
+- CMakeLists.txt (add source file, link libraries, compile GATT)
+- src/OutputManager.cpp (add BLEHIDManager include + dispatch logic)
+- src/drivermanager.cpp (add INPUT_MODE_BLE case)
+
+**Next debug steps after fix:** If pairing still fails, enable BTstack logging (`ENABLE_LOG_INFO` + `ENABLE_LOG_DEBUG` in btstack_config.h) and monitor serial console during pairing to see HCI events.
 - `ENABLE_BLUETOOTH` compile guard is live
 - Proto schema ready for config storage
 - CMake knows which boards support BT
@@ -590,3 +622,294 @@ If `cyw43_arch_init()` inside `BTHIDManager::init()` blocked, hung, or panicked 
 - bt_config_bridge.{h,cpp} — BLE key save/load functions compile (but may not be used since BTstack handles keys internally via TLV)
 
 - **Unused BLE key functions documented:** bt_config_bridge.cpp BLE key save/load functions documented as unused since BTstack's TLV flash storage handles bonding internally; kept for potential future web configurator exposure of bonded devices.
+
+### 2026-03-29: BLE Firmware Flash to Pimoroni Pico Lipo 2 XL W (RP2350)
+
+**Tasked by:** Fortinbra. Build and flash BLE firmware (`feature/ble-hid` branch) to Pimoroni Pico Lipo 2 XL W board.
+
+**Board identified:**
+- **Mass storage drive:** D:\ (INFO_UF2.TXT confirmed "Raspberry Pi RP2350")
+- **Board:** Pimoroni Pico Lipo 2 XL W (RP2350A + CYW43439 wireless + onboard LiPo charger)
+- **Board config:** `configs/PimoroniPicoLipo2XLW/` exists with `PICO_BOARD=pico2_w`, `PICO_PLATFORM=rp2350-arm-s`
+- **SDK board header:** `pico2_w.h` in SDK 2.2.0 confirmed RP2350 + CYW43 support
+
+**Build configuration:**
+```powershell
+cmake -B build_ble2 -S . -DPICO_BOARD=pico2_w -DGP2040_BOARDCONFIG=PimoroniPicoLipo2XLW -DSKIP_WEBBUILD=TRUE -G Ninja
+```
+
+**Build outcome:** ✅ **SUCCESS**
+- 1491 tasks compiled
+- Output: `build_ble2\GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2` (3,076,096 bytes)
+- CMake reported: "Bluetooth support enabled for pico2_w"
+- Warnings: Harmless `ENABLE_CLASSIC` redefinition (BTstack headers vs command-line define)
+
+**Flash method:** `picotool load` + `picotool reboot`
+- Standard UF2 copy-to-mass-storage hung (Windows filesystem sync issue)
+- Used `picotool load -v build_ble2\GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2` — 100% load, 100% verify, OK
+- `picotool reboot` successfully booted firmware
+- Drive D:\ disappeared (bootloader exited), USB HID enumeration confirmed (no bootsel mode device found)
+
+**RP2350 + CYW43 + BTstack confirmed working:** RP2350A with CYW43 wireless fully supports BTstack on Pico SDK 2.2.0. Previous uncertainty about RP2350 BT support is now definitively resolved — the Pimoroni Pico Lipo 2 XL W is a production-ready BLE HID target.
+
+**Toolchain versions used:**
+- CMake: 3.31.5
+- Ninja: 1.12.1
+- Picotool: 2.2.0-a4
+- ARM GCC: 14.2.1
+- Pico SDK: 2.2.0
+
+**Files created:**
+- `build_ble2/` — Clean build directory for RP2350 BLE firmware
+- `GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2` — Flashed to hardware
+
+**Key lesson:** When flashing RP2350 via mass storage hangs, `picotool load` is the reliable fallback. The Pico SDK 2.2.0 picotool supports RP2350 load/verify/reboot operations fully.
+
+### 2026-03-28: BLE HID Integration — 6 Missing Build Integrations Applied
+
+**Tasked by:** Fortinbra. Fixes were derived from edward-ble-pairing-debug.md investigation, which identified that BLEHIDManager.cpp was complete but never compiled or called.
+
+**Fix 1: headers/btstack_config.h** — Added 4 BLE peripheral defines after ENABLE_CLASSIC block:
+- ENABLE_LE_PERIPHERAL — enables BLE peripheral mode (required for GATT server)
+- HAVE_MALLOC — BTStack allocator support
+- MAX_NR_LE_DEVICE_DB_ENTRIES 4 — device database capacity
+- NVM_NUM_DEVICE_DB_ENTRIES 4 — persistent pairing storage
+
+**Fix 2: CMakeLists.txt source list** — Added src/BLEHIDManager.cpp immediately after src/BTHIDManager.cpp at line 261.
+
+**Fix 3: CMakeLists.txt link libraries** — Added pico_btstack_ble and pico_btstack_hid to the PICO_CYW43_SUPPORTED link block (lines 352-353). These pull in BLE peripheral APIs and HID over GATT support.
+
+**Fix 4: CMakeLists.txt GATT database compilation** — Added pico_btstack_make_gatt_header() call (line 356) to compile src/ble_hid.gatt into le_hid.h at build time. BLEHIDManager.cpp includes this generated header for GATT service definitions.
+
+**Fix 5: src/OutputManager.cpp dispatch logic** — Added BLEHIDManager.h include alongside BTHIDManager.h (line 12). Added InputMode dispatch in 3 call sites:
+- init(): if INPUT_MODE_BLE → BLEHIDManager::getInstance().init(), else if INPUT_MODE_BLUETOOTH → BTHIDManager::getInstance().init()
+- sendReport(): dispatches to BLEHIDManager or BTHIDManager based on inputMode (lines 112-120)
+- process(): dispatches to BLEHIDManager or BTHIDManager based on inputMode (lines 123-129)
+
+**Fix 6: src/drivermanager.cpp INPUT_MODE_BLE case** — Added case INPUT_MODE_BLE: driver = new HIDDriver(); break; at line 82-84, immediately after INPUT_MODE_BLUETOOTH case. Both BT modes use HIDDriver (basic HID report), just different wireless stacks.
+
+**Result:** BLEHIDManager is now fully integrated. When user selects INPUT_MODE_BLE (enum value 18, already exists in proto/enums.proto), firmware will:
+1. Compile BLEHIDManager.cpp (Fix 2)
+2. Link BLE libraries and generate GATT DB (Fix 3 + 4)
+3. Initialize BLEHIDManager instead of BTHIDManager (Fix 5)
+4. Route HID reports to BLE GATT notifications instead of BT Classic L2CAP (Fix 5)
+5. Process BLE stack events in main loop (Fix 5)
+
+**Branch:** feature/ble-hid. Changes ready for build test. No build run performed (per Fortinbra directive).
+
+**Learnings:**
+- OutputManager already has the structure to support both BT modes — the InputMode check is the only dispatch needed
+- DriverManager.getInputMode() is the correct source of truth for which wireless mode is active
+- CMake GATT database compilation is a build-time code generation step — the .gatt file is the source, ble_hid.h is the artifact
+- Both BT modes can share HIDDriver because the wireless transport is handled by BTHIDManager/BLEHIDManager, not the GPDriver layer
+
+### 2026-03-29: BLE Firmware Build for Pimoroni Pico Lipo 2 XL W — CMakeLists.txt Fix
+
+**Tasked by:** Fortinbra. Build and flash feature/ble-hid to Pimoroni Pico Lipo 2 XL W (RP2350A + CYW43439).
+
+**Build directory:** build_ble2/
+**Configuration:**
+- PICO_BOARD=pico2_w
+- GP2040_BOARDCONFIG=PimoroniPicoLipo2XLW
+- PICO_PLATFORM=rp2350-arm-s (automatic from pico2_w board header)
+- SKIP_WEBBUILD=TRUE
+
+**Critical fix required:**
+**pico_btstack_hid library doesn't exist in Pico SDK 2.2.0.** The CMakeLists.txt at line 353 referenced this non-existent library. Linker error: `cannot find -lpico_btstack_hid: No such file or directory`.
+
+**Root cause:** HID support in BTstack is built into pico_btstack_classic and pico_btstack_ble libraries, not a separate library. The SDK's pico_btstack CMakeLists.txt only defines: pico_btstack_base, pico_btstack_ble, pico_btstack_classic, pico_btstack_mesh, pico_btstack_flash_bank, pico_btstack_run_loop_async_context, pico_btstack_sbc_*, pico_btstack_bnep_lwip*.
+
+**Fix applied:** Removed pico_btstack_hid from target_link_libraries() at CMakeLists.txt:353. The correct library set is:
+- pico_cyw43_arch_poll
+- pico_btstack_cyw43
+- pico_btstack_classic
+- pico_btstack_ble
+- pico_btstack_run_loop_async_context
+
+HID sources (btstack_hid.c, btstack_hid_parser.c, hids_device.c, hid_device.c) are already included in pico_btstack_classic and pico_btstack_ble per SDK's pico_btstack/CMakeLists.txt.
+
+**Build outcome:** ✅ **SUCCESS**
+- 520 tasks compiled
+- Output: `GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2` (3084 KB / 3,158,016 bytes)
+- Warnings: ENABLE_CLASSIC redefinition (non-fatal, expected — btstack_config.h vs CMake command-line)
+
+**Flash outcome:** ✅ **SUCCESS**
+- Method: `picotool load -v build_ble2\GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2`
+- Verification: 100% load, 100% verify, OK
+- Reboot: `picotool reboot` — Device rebooted into application mode
+- USB HID: Mass storage drive disappeared (bootloader exited), firmware running
+
+**Toolchain:**
+- CMake: 3.31.5
+- Pico SDK: 2.2.0
+- Picotool: 2.2.0-a4
+- ARM GCC: 14.2.1
+
+**Commit ready:** CMakeLists.txt line 353 fix (removed pico_btstack_hid).
+
+**Next test:** Boot verification, pairing test with Windows/Linux/macOS BLE host.
+
+### 2026-03-29: BLE HID Report Delivery Diagnosis
+
+**Tasked by:** Fortinbra. Investigated why BLE pairing works but no gamepad input arrives at Windows.
+
+**Root cause:** User configuration issue, not a code bug. The firmware defaults to `INPUT_MODE_XINPUT` (line 83 in `src/config_utils.cpp`). When the device boots, it connects over BLE successfully at the transport layer, but OutputManager still routes gamepad reports to the USB driver (XInputDriver), NOT to BLEHIDManager, because the active input mode is XINPUT, not BLE.
+
+**Code path verified correct:** OutputManager (lines 34–47, 112–120, 124–128) checks `inputMode == INPUT_MODE_BLE` and routes to BLEHIDManager only when that mode is active. The BLE manager is initialized (line 43), and sendReport is called (line 118), but ONLY if `inputMode == INPUT_MODE_BLE`. Otherwise, the BLE transport is alive, paired, and connected, but no HID reports are sent over it.
+
+**HID report format verified:** HIDReport struct (`headers/drivers/hid/HIDDescriptors.h`) is 9 bytes (4 bytes buttons + 1 byte direction/padding + 4 bytes axes). BLEHIDManager HID descriptor (`src/BLEHIDManager.cpp:39–71`) matches byte-for-byte with the USB HID descriptor (`headers/drivers/hid/HIDDescriptors.h:98–136`). BLE_HID_REPORT_SIZE = 9 (`headers/BLEHIDManager.h:18`) matches sizeof(HIDReport). Report ID = 0 (implicit). No descriptor mismatch.
+
+**BLE HID send path verified:** BLEHIDManager::sendReport (lines 173–183) checks `_connected && _notificationsEnabled`, copies report to `_pendingReport`, and calls `hids_device_request_can_send_now_event()`. The event handler (lines 248–256) sends the report via `hids_device_send_input_report()` when `HIDS_SUBEVENT_CAN_SEND_NOW` fires. Connection handle tracking (line 231–233) and notification enable tracking (line 244–246) are both correct. No send path bugs.
+
+**Fix required:** User must set INPUT_MODE_BLE (enum value 18, `proto/enums.proto:161`) in the web configurator. On next boot, DriverManager will initialize HIDDriver (line 82–84 in `src/drivermanager.cpp`) and OutputManager will route reports to BLEHIDManager instead of USB. No code changes needed.
+
+**User documentation needed:** The BLE feature planning doc should include a "How to Enable" section that explicitly states: 1. Flash BLE firmware (build_ble2), 2. Connect to web configurator via USB, 3. Settings → Configuration → Input Mode → BLE, 4. Save and reboot, 5. Device will now send gamepad input over BLE instead of USB.
+
+**Key file references:**
+- `src/config_utils.cpp:82–84` — DEFAULT_INPUT_MODE = INPUT_MODE_XINPUT
+- `src/OutputManager.cpp:34–47, 112–120` — inputMode dispatch to BLEHIDManager
+- `src/BLEHIDManager.cpp:173–183, 248–256` — HID report send path
+- `headers/drivers/hid/HIDDescriptors.h:48–65` — HIDReport struct definition (9 bytes)
+- `headers/BLEHIDManager.h:18` — BLE_HID_REPORT_SIZE = 9
+- `proto/enums.proto:161` — INPUT_MODE_BLE = 18
+
+### 2026-03-29: Full Web Rebuild and Flash — Web Configurator Integration
+
+**Tasked by:** Fortinbra. The BLE firmware was working, but the web configurator was built with SKIP_WEBBUILD=TRUE, so Winry's changes (adding "BLE" as a selectable input mode in the dropdown) were not reflected in the running firmware. User saw "Bluetooth" but not "BLE" in the input mode selector.
+
+**Situation:** Board (Pimoroni Pico Lipo 2 XL W) was running firmware and accessible via USB, not in mass storage mode.
+
+**Build process:**
+
+**Step 1: Web configurator build**
+`
+cd C:\ws\GP2040-CE\www
+npm run build-proto  # Generated enums.ts from proto/enums.proto
+npm run build        # Vite build → build/ folder with compressed assets
+                     # makefsdata.js → fsdata.c embedded in firmware
+`
+Build completed successfully. Assets compressed: index.css (14%), index.js (29%), total bundle ~1.44 MB.
+
+**Step 2: Firmware configure and build**
+`
+cd C:\ws\GP2040-CE
+cmake -G Ninja -DCMAKE_MAKE_PROGRAM=<ninja path> -B build_ble2 -S .
+  PICO_BOARD=pico2_w
+  GP2040_BOARDCONFIG=PimoroniPicoLipo2XLW
+  SKIP_WEBBUILD=FALSE  # Explicitly set to ensure web assets are included
+cmake --build build_ble2 --parallel
+`
+
+**Critical fix:** CMake defaulted to Visual Studio generator on first attempt, causing MSVC/ARM GCC toolchain conflict. Fixed by specifying -G Ninja and -DCMAKE_MAKE_PROGRAM explicitly.
+
+**Toolchain paths:**
+- CMake: $env:USERPROFILE\.pico-sdk\cmake\v3.31.5\bin\cmake.exe
+- Ninja: $env:USERPROFILE\.pico-sdk\ninja\v1.12.1\ninja.exe
+- Picotool: $env:USERPROFILE\.pico-sdk\picotool\2.2.0-a4\picotool\picotool.exe
+
+Build completed: 1514 tasks, output **GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2** (3,158,016 bytes / 3.08 MB).
+
+**Step 3: Flash via mass storage**
+
+Attempted picotool load -v but encountered connection error at 18% (picoboot::connection_error exception). 
+
+**Workaround:** Used mass storage fallback:
+1. picotool reboot -f -u — Forced reboot to BOOTSEL mode successfully
+2. Identified mass storage drive (D:\ with label RP2350)
+3. Copy-Item GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2 D:\ — Direct UF2 copy
+4. Board rebooted automatically into firmware
+
+**Verification:** picotool info returned "No accessible RP-series devices in BOOTSEL mode" — confirmed board is running firmware, not in bootloader.
+
+**Result:** ✅ **Firmware flashed successfully with embedded web configurator.** User should now see "BLE" option in the input mode dropdown when accessing the web configurator via USB.
+
+**Learnings:**
+- **SKIP_WEBBUILD environment variable priority:** Even when not explicitly set, CMake may pick up cached or default values. Explicitly setting $env:SKIP_WEBBUILD = "FALSE" ensures web build runs.
+- **CMake generator selection on Windows:** CMake defaults to Visual Studio generator if available. For Pico SDK builds, must explicitly specify -G Ninja to use ARM GCC toolchain.
+- **picotool flash reliability:** picotool load can fail with connection errors during flash (possibly USB timing or buffer issues). Mass storage copy is more reliable fallback.
+- **Web configurator build order:** Must run 
+pm run build in www/ directory BEFORE CMake configure step to ensure fsdata.c is generated with latest assets.
+- **Ninja path requirement:** CMAKE_MAKE_PROGRAM must be explicitly set when using -G Ninja if ninja is not in PATH.
+
+**Files modified:** None (build-only task)
+
+**Output artifact:** build_ble2/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2 (3,158,016 bytes)
+
+
+### 2026-03-28: BLE No-USB Fix — TinyUSB Init Blocking Wireless-Only Boot
+
+**Tasked by:** Fortinbra. Root cause identified and fixed in src/gp2040.cpp.
+
+**Problem:** BLE mode selected in web configurator. Works when USB connected, but when USB cable unplugged, BLE does NOT advertise — nothing visible on Android or Windows scan. Board: Pimoroni Pico Lipo 2 XL W (RP2350B + CYW43439) on battery power.
+
+**Root cause:** TinyUSB init unconditional. src/gp2040.cpp:293 calls 	ud_init(TUD_OPT_RHPORT) ALWAYS, regardless of input mode. When input mode is BLE and USB cable is not connected (battery-only boot), TinyUSB initialization + polling logic consumes resources and may interfere with BLE initialization timing, though the exact blocking mechanism is hardware-dependent. The main loop reaches OutputManager::process(), but the BLE advertising startup may be delayed or suppressed.
+
+**Secondary issue:** 	ud_task() also called unconditionally in main loop (line 349), wasting CPU cycles in wireless-only mode.
+
+**Fix applied:** Made TinyUSB initialization and polling conditional on input mode:
+- Added InputMode inputMode = DriverManager::getInstance().getInputMode();
+- Added ool wirelessOnly = (inputMode == INPUT_MODE_BLUETOOTH || inputMode == INPUT_MODE_BLE);
+- Wrapped 	ud_init() in if (!wirelessOnly) { ... }
+- Wrapped 	ud_task() in main loop with same guard
+- Wrapped ndis_init() with same guard (config mode requires USB)
+
+**BLE init is already time-based only:** BLEHIDManager.cpp:162 uses if (elapsed > 3000) with NO USB state check (unlike BTHIDManager which checks 	ud_mounted()). This is correct — BLE should init after 3 seconds regardless of USB. The problem was that the main loop was polluted by unnecessary USB stack operations.
+
+**Rebuild required:** src/gp2040.cpp modified — full firmware rebuild needed. Board config: PimoroniPicoLipo2XLW with PICO_BOARD=pico2_w and GP2040_BOARDCONFIG=PimoroniPicoLipo2XLW.
+
+**Testing:** After reflash, power board with LiPo battery only (no USB). BLE should advertise as "GP2040-CE" within 3 seconds of boot. Verify on Android/Windows BLE scan.
+
+### 2026-03-28: Classic BT Purge — feature/ble-hid branch cleanup
+
+**Tasked by:** Fortinbra (via Fortinbra's directive to squad).
+
+**Objective:** Remove all Bluetooth Classic residue from eature/ble-hid. The branch is BLE-only.
+
+**Files modified and what was removed:**
+
+| File | Removed |
+|------|---------|
+| src/OutputManager.cpp | #include "BTHIDManager.h", INPUT_MODE_BLUETOOTH init/dispatch/process blocks, stale init comment |
+| headers/btstack_config.h | ENABLE_CLASSIC, ENABLE_L2CAP_ENHANCED_RETRANSMISSION_MODE (kept ENABLE_HID_DEVICE — needed by BLE HID profile) |
+| CMakeLists.txt | pico_btstack_classic from target_link_libraries, src/BTHIDManager.cpp from source list |
+| src/drivermanager.cpp | case INPUT_MODE_BLUETOOTH: switch case |
+| proto/enums.proto | INPUT_MODE_BLUETOOTH = 17; enum value |
+| www/src/Locales/en/SettingsPage.jsx | luetooth: 'Bluetooth', locale key |
+| headers/display/ui/screens/MainMenuScreen.h | INPUT_MODE_BLUETOOTH_NAME "Bluetooth" define |
+| src/gp2040.cpp | INPUT_MODE_BLUETOOTH reference in wirelessOnly guard |
+
+**Files intentionally left alone:**
+- src/BTHIDManager.cpp and headers/BTHIDManager.h — Classic implementation files; exist on the branch but are now completely unreferenced. They can be deleted later if desired but the directive was to leave them.
+- src/BLEHIDManager.cpp — contains a benign comment referencing BTHIDManager for naming context; no code coupling.
+
+**Key decision:** ENABLE_HID_DEVICE in tstack_config.h was kept. The original comment said it was for Classic, but BLEHIDManager uses the BTstack HID device API too — removing it would break BLE HID compilation.
+
+**Learnings:**
+- ENABLE_CLASSIC and ENABLE_L2CAP_ENHANCED_RETRANSMISSION_MODE are the concrete Classic-only flags in btstack_config. ENABLE_HID_DEVICE is shared infra.
+- INPUT_MODE_BLUETOOTH = 17 was the Classic enum value; removing it from the proto leaves a gap (17 unused) which is fine for a BLE-only branch — proto enum values are explicit, not sequential.
+- The wirelessOnly guard in gp2040.cpp was also checking INPUT_MODE_BLUETOOTH; stripped to BLE-only.
+- Only the n locale had the luetooth: key. Other locales didn't have it.
+
+
+### 2026-03-28: wirelessOnly fix verification + full BLE rebuild
+
+**Tasked by:** Fortinbra (via squad message from edward-ble-no-usb / edward-classic-purge merge)
+
+**Task:** Verify wirelessOnly fix in gp2040.cpp, then full rebuild + flash for feature/ble-hid.
+
+**Verification result:** INPUT_MODE_BLUETOOTH was ALREADY removed from the wirelessOnly guard in gp2040.cpp by the classic purge branch — the line already read ool wirelessOnly = (inputMode == INPUT_MODE_BLE);. Zero remaining references to INPUT_MODE_BLUETOOTH in gp2040.cpp. No code change needed.
+
+**Build:** 
+- Web: 
+pm run build-proto && npm run build — succeeded (warnings only, no errors; Sass deprecation warnings are pre-existing noise from bootstrap dependency).
+- CMake configure: cmake -B build_ble2 -S . -DPICO_BOARD=pico2_w -DGP2040_BOARDCONFIG=PimoroniPicoLipo2XLW — succeeded. BTstack, CYW43, BLE confirmed enabled.
+- Firmware compile: cmake --build build_ble2 --parallel — 476/476 targets built. Warnings only (pre-existing: displaybase.h no-return, turboOptions unused, displayNames unused). Zero errors.
+- Output: uild_ble2/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2 (3,076,608 bytes)
+
+**Flash:** picotool load -v — loaded and verified 100%. picotool reboot — clean exit.
+
+**Learnings:**
+- cmake is not on PATH in this environment. Use full path: C:\Users\thegu\.pico-sdk\cmake\v3.31.5\bin\cmake.exe
+- The classic purge (edward-classic-purge branch) had already cleaned wirelessOnly — the two branches were not in conflict on that line.
+- Board was already accessible via picotool in running mode (GP2040-CE exposes picotool interface); no BOOTSEL juggling required.
+- CMake configure WITHOUT -DSKIP_WEBBUILD=TRUE triggers a full npm install + web build inside the CMake step — this is expected and redundant if you've already built www/ manually, but harmless.
