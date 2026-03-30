@@ -14,10 +14,12 @@ void OutputManager::dispatch(Gamepad* gamepad) {
     const GamepadOptions& opts = Storage::getInstance().getGamepadOptions();
     if (opts.inputMode != INPUT_MODE_BLE) return;
 
-    // Map GamepadState to the 9-byte BLE HID report:
+    // Map GamepadState to the 9-byte BLE HID report body (no Report ID byte — that is
+    // carried by the GATT Report Reference descriptor):
     //   bytes 0-3  : 32 buttons (little-endian bitmask)
-    //   byte  4    : hat (4 bits) | padding (4 bits)
-    //   bytes 5-8  : x, y, rx, ry axes (int8, center = 0)
+    //   byte  4    : hat (4 bits, 0-7 or 0xF=null) | padding (4 bits = 0)
+    //   bytes 5-8  : x, y, z, rz axes (uint8, unsigned 0..255, center = 0x80)
+    //                matches HIDDescriptors.h HIDReport and USB HID driver exactly
     uint8_t report[9] = {};
     const GamepadState& state = gamepad->state;
 
@@ -44,11 +46,12 @@ void OutputManager::dispatch(Gamepad* gamepad) {
     if (hat > 7) hat = 0x0F;
     report[4] = hat & 0x0F;  // lower 4 bits = hat, upper 4 bits = padding (0)
 
-    // Axes: uint16 [0, 65535] → int8 [-128, 127]; midpoint 0x8000 maps to 0
-    report[5] = (uint8_t)((int8_t)((state.lx >> 8) - 128));
-    report[6] = (uint8_t)((int8_t)((state.ly >> 8) - 128));
-    report[7] = (uint8_t)((int8_t)((state.rx >> 8) - 128));
-    report[8] = (uint8_t)((int8_t)((state.ry >> 8) - 128));
+    // Axes: uint16 [0, 65535] → uint8 [0, 255] unsigned; midpoint 0x8000 → 0x80.
+    // Matches USB HID driver (HIDDriver.cpp) and descriptor unsigned 0..255 range.
+    report[5] = (uint8_t)(state.lx >> 8);
+    report[6] = (uint8_t)(state.ly >> 8);
+    report[7] = (uint8_t)(state.rx >> 8);
+    report[8] = (uint8_t)(state.ry >> 8);
 
     BLEHIDManager::getInstance().sendReport(report, sizeof(report));
 #else

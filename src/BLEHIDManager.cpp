@@ -21,72 +21,55 @@
 // Generated GATT database header (from src/ble_hid.gatt via pico_btstack_make_gatt_header)
 #include "ble_hid.h"
 
-// HID Report Descriptor: 32 buttons + hat+padding (1 byte) + 4 axes (4 bytes) = 9 bytes
-// Report ID 1 — must match GATT Report Reference in ble_hid.gatt
+// HID Report Descriptor: Report ID 1 + 32 buttons (4 bytes) + hat+padding (1 byte) + 4 axes (4 bytes).
+// Body is identical to the USB HID descriptor in HIDDescriptors.h — only Report ID 1 is added.
+// For BLE HID the Report ID byte is NOT sent in the ATT notification payload; it is communicated
+// via the GATT Report Reference descriptor (0x2908) in ble_hid.gatt (REPORT_REFERENCE, READ, 1, 1).
+// Axes are unsigned 0..255; usages X/Y/Z/Rz match the USB driver exactly.
 static const uint8_t hid_report_descriptor[] = {
-    0x05, 0x01,        // Usage Page (Generic Desktop)
-    0x09, 0x05,        // Usage (Game Pad)
-    0xA1, 0x01,        // Collection (Application)
+    0x05, 0x01,        // USAGE_PAGE (Generic Desktop)
+    0x09, 0x05,        // USAGE (Game Pad)
+    0xA1, 0x01,        // COLLECTION (Application)
 
-    0x85, 0x01,        // Report ID (0x01)
+    0x85, 0x01,        // Report ID (1)
 
     // 32 buttons
-    0x05, 0x09,        // Usage Page (Button)
-    0x19, 0x01,        // Usage Minimum (Button 1)
-    0x29, 0x20,        // Usage Maximum (Button 32)
-    0x15, 0x00,        // Logical Minimum (0)
-    0x25, 0x01,        // Logical Maximum (1)
-    0x75, 0x01,        // Report Size (1 bit)
-    0x95, 0x20,        // Report Count (32 buttons)
-    0x81, 0x02,        // Input (Data, Variable, Absolute)
+    0x05, 0x09,        //   USAGE_PAGE (Button)
+    0x19, 0x01,        //   USAGE_MINIMUM (Button 1)
+    0x29, 0x20,        //   USAGE_MAXIMUM (Button 32)
+    0x15, 0x00,        //   LOGICAL_MINIMUM (0)
+    0x25, 0x01,        //   LOGICAL_MAXIMUM (1)
+    0x95, 0x20,        //   REPORT_COUNT (32)
+    0x75, 0x01,        //   REPORT_SIZE (1)
+    0x81, 0x02,        //   INPUT (Data,Var,Abs)
 
-    // Hat switch (4 bits)
-    0x05, 0x01,        // Usage Page (Generic Desktop)
-    0x09, 0x39,        // Usage (Hat Switch)
-    0x15, 0x00,        // Logical Minimum (0)
-    0x25, 0x07,        // Logical Maximum (7)
-    0x75, 0x04,        // Report Size (4 bits)
-    0x95, 0x01,        // Report Count (1)
-    0x81, 0x42,        // Input (Data, Variable, Absolute, Null State)
+    // hat (dpad)
+    0x05, 0x01,        //   USAGE_PAGE (Generic Desktop)
+    0x09, 0x39,        //   USAGE (Hat switch)
+    0x25, 0x07,        //   LOGICAL_MAXIMUM (7)
+    0x95, 0x01,        //   REPORT_COUNT (1)
+    0x75, 0x04,        //   REPORT_SIZE (4)
+    0x81, 0x42,        //   INPUT (Data,Var,Abs,Null)
 
-    // Padding (4 bits to align to byte boundary)
-    0x75, 0x04,        // Report Size (4 bits)
-    0x95, 0x01,        // Report Count (1)
-    0x81, 0x01,        // Input (Constant, Array)
+    // padding the hat
+    0x95, 0x01,        //   REPORT_COUNT (1)
+    0x75, 0x04,        //   REPORT_SIZE (4)
+    0x81, 0x01,        //   INPUT (Cnst,Ary,Abs)
 
-    // X Axis (Left Stick X)
-    0x09, 0x30,        // Usage (X)
-    0x15, 0x80,        // Logical Minimum (-128)
-    0x25, 0x7F,        // Logical Maximum (127)
-    0x75, 0x08,        // Report Size (8 bits)
-    0x95, 0x01,        // Report Count (1)
-    0x81, 0x02,        // Input (Data, Variable, Absolute)
+    // analogs: X (left stick X), Y (left stick Y), Z (right stick X), Rz (right stick Y)
+    // unsigned 0..255; midpoint 0x80 = center — identical to USB HID driver
+    0x05, 0x01,        //   USAGE_PAGE (Generic Desktop)
+    0x26, 0xFF, 0x00,  //   LOGICAL_MAXIMUM (255)
+    0x46, 0xFF, 0x00,  //   PHYSICAL_MAXIMUM (255)
+    0x09, 0x30,        //   USAGE (X)
+    0x09, 0x31,        //   USAGE (Y)
+    0x09, 0x32,        //   USAGE (Z)
+    0x09, 0x35,        //   USAGE (Rz)
+    0x75, 0x08,        //   REPORT_SIZE (8)
+    0x95, 0x04,        //   REPORT_COUNT (4)
+    0x81, 0x02,        //   INPUT (Data,Var,Abs)
 
-    // Y Axis (Left Stick Y)
-    0x09, 0x31,        // Usage (Y)
-    0x15, 0x80,        // Logical Minimum (-128)
-    0x25, 0x7F,        // Logical Maximum (127)
-    0x75, 0x08,        // Report Size (8 bits)
-    0x95, 0x01,        // Report Count (1)
-    0x81, 0x02,        // Input (Data, Variable, Absolute)
-
-    // Rx Axis (Right Stick X)
-    0x09, 0x33,        // Usage (Rx)
-    0x15, 0x80,        // Logical Minimum (-128)
-    0x25, 0x7F,        // Logical Maximum (127)
-    0x75, 0x08,        // Report Size (8 bits)
-    0x95, 0x01,        // Report Count (1)
-    0x81, 0x02,        // Input (Data, Variable, Absolute)
-
-    // Ry Axis (Right Stick Y)
-    0x09, 0x34,        // Usage (Ry)
-    0x15, 0x80,        // Logical Minimum (-128)
-    0x25, 0x7F,        // Logical Maximum (127)
-    0x75, 0x08,        // Report Size (8 bits)
-    0x95, 0x01,        // Report Count (1)
-    0x81, 0x02,        // Input (Data, Variable, Absolute)
-
-    0xC0,              // End Collection
+    0xC0,              // END_COLLECTION
 };
 
 static_assert(sizeof(hid_report_descriptor) > 0, "HID descriptor must not be empty");
