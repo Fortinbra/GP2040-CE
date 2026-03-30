@@ -207,6 +207,177 @@ Documented gaps:
 
 **Why:** Codebase survey for architectural clarity. Helps future contributors understand BTstack integration points.
 
+### 2026-03-29: BLE HID Feature Documentation Complete & Approved
+
+**By:** Maes Hughes (authored), Edward (revised), Riza (reviewed)  
+**What:** Comprehensive BLE HID (Bluetooth Low Energy HID) feature documentation for Phase 1–3 implementation on feature/ble-hid-v2.
+
+**Deliverable:** `docs/development/ble-hid-support.md` (679 lines, commits aa32e09c, ff1fa570, fe041066)
+
+**Content:**
+- Overview, scope, and board requirements (CYW43-only)
+- Architecture and OutputManager integration
+- 6 critical BTstack requirements from failed first attempt
+- Complete GATT service structure and HID report descriptor
+- Pairing, bonding, and SM configuration with Windows SC requirement
+- USB config fallback mechanism (S2 button hold)
+- Battery Service integration (GATT 0x180F)
+- 10 known pitfalls with corrections and code examples
+- Phased implementation plan (Phase 1: 10–15 days, Phase 2: 5–7 days, Phase 3: 8–10 days)
+- BLE vs. BT Classic comparison table
+
+**Review Cycle:**
+1. **Round 1 (Riza):** Rejected with 6 blocking API errors (SDK version, TLV signatures, GATT struct, battery API)
+2. **Round 1 Revision (Edward):** Fixed all 6 blockers + added Critical API Checklist
+3. **Round 2 (Riza):** Approved with 1 non-blocking note (duplicate setupSM call)
+4. **Polish (Edward):** Removed duplicate setupSM call, document finalized
+
+**Key Technical Decisions:**
+1. Windows 10/11 requires Secure Connections (`ENABLE_LE_SECURE_CONNECTIONS`)
+2. Advertising starts after `HCI_STATE_WORKING` event (not immediately on boot)
+3. TLV flash context initialized before `sm_init()`
+4. HID Report characteristics exclude Boot Keyboard/Mouse
+5. USB fallback via S2 button preserves web configurator access
+6. iOS/iPad support deferred to Phase 3 (pairing complexity)
+7. Nintendo Switch incompatible with BLE HID (Switch-only BT Classic support via bluetooth-support.md)
+
+**Branch Strategy:** New clean feature/ble-hid-v2 from develop (previous feature/ble-hid abandoned after connection failures). Documentation written and approved BEFORE implementation.
+
+**Status:** ✅ Complete. Edward cleared to begin Phase 1 implementation with high-confidence API guidance.
+
+**Why:** Feature planning document required comprehensive technical accuracy review to prevent implementation errors. Documentation-first methodology ensures design clarity before coding begins.
+
+### 2026-03-29: BLE Pairing & Report ID Alignment — GATT Encryption + Descriptor Fix
+
+**By:** Edward (Firmware Dev)  
+**What:** Resolved BLE pairing failure root causes in feature/ble-hid during Phase 1 attempt.
+
+**Findings & Fixes:**
+
+1. **ENCRYPTION_KEY_SIZE_16 on HID Report characteristics (Issue 1)**
+   - BTstack's standard `hids.gatt` marks Report characteristics with `ENCRYPTION_KEY_SIZE_16`
+   - Modern BLE hosts (Windows, Android) perform GATT discovery before pairing
+   - Hosts encounter encrypted characteristics, cannot read before bond, abandon discovery
+   - Result: "try connecting again" without pairing completion
+   - **Fix:** Replaced `#import <hids.gatt>` with inline HID service; removed `ENCRYPTION_KEY_SIZE_16` from Report characteristics
+   - All other HID structure (UUIDs, Report References, HID Information) preserved
+
+2. **Report ID mismatch (Issue 2)**
+   - GATT Report Reference declared Input Report ID 1, type Input
+   - HID Report Descriptor had no Report ID tag (`0x85, 0x01`)
+   - Windows maps GATT characteristic to HID report by Report ID
+   - Mismatch caused HID driver rejection
+   - **Fix:** Added `0x85, 0x01` (Report ID 1) to `hid_descriptor_gamepad[]` in first COLLECTION
+
+3. **gap_set_bondable_mode(1) investigation (Issue 3)**
+   - Suggestion: add bondable mode enable call
+   - Investigation: `hci_init()` sets `bondable = 1` by default unconditionally
+   - `gap_set_bondable_mode()` is `#ifdef ENABLE_CLASSIC` only (BLE-only builds have no symbol)
+   - Build confirmed: linker error on call
+   - **Decision:** Do not call. `SM_AUTHREQ_BONDING` alone is correct (matches BTstack hog_keyboard_demo)
+
+**Files Changed:**
+- `src/ble_hid.gatt` — Inline HID service without encryption on Report characteristics
+- `src/BLEHIDManager.cpp` — Report ID tag in HID descriptor
+
+**Commit:** 32e0447e on feature/ble-hid
+
+**Status:** Addressed; awaiting hardware verification (bonding key storage and reconnection untested until device pairing)
+
+**Why:** Phase 1 attempt revealed critical BTstack integration issues during pairing. Documenting root causes prevents repeat failures in future attempts.
+
+### 2026-03-29: BLE Connection Failures — Advertising Timing & AD Structure Fixes
+
+**By:** Edward (Firmware Dev)  
+**What:** Fixed three critical BLE connection issues in feature/ble-hid firmware.
+
+**Findings & Fixes:**
+
+1. **Advertising before HCI_STATE_WORKING (Issues 1 & 2)**
+   - Called `_startAdvertising()` (gap_advertisements_enable) immediately on boot
+   - Device appeared in BLE scans but every connection attempt failed
+   - Root: BTstack buffers advertising command; device visible but not ready to accept connections
+   - **Fix:** Removed early `_startAdvertising()` call. Added `BTSTACK_EVENT_STATE` handler:
+   ```cpp
+   case BTSTACK_EVENT_STATE:
+       if (btstack_event_state_get_state(packet) == HCI_STATE_WORKING) {
+           mgr._startAdvertising();
+       }
+   ```
+   - **Why:** Canonical BTstack pattern (all official HID demos); advertising must start after HCI ready
+
+2. **Null terminator in scan response AD data (Issue 3)**
+   - AD type 0x09 (Complete Local Name) included null byte in name length
+   - Device name announced as 11 bytes with trailing null instead of 10 name bytes
+   - Some BLE hosts reject malformed AD structures or display incorrectly
+   - **Fix:** Removed null byte, corrected length from 0x0B to 0x0A
+
+3. **SM_EVENT_PAIRING_COMPLETE handler (Issue 5)**
+   - Added explicit pairing complete handler:
+   ```cpp
+   case SM_EVENT_PAIRING_COMPLETE: {
+       uint8_t status = sm_event_pairing_complete_get_status(packet);
+       if (status != ERROR_CODE_SUCCESS) {
+           blink_cyw43_led(5, 50, 50);   // 5x fast blink = pairing failed
+           mgr._startAdvertising();
+       }
+   }
+   ```
+   - Provides faster recovery on pairing failure + visual LED debug signal
+
+**Files Changed:**
+- `src/BLEHIDManager.cpp` — Advertising timing fix, AD structure correction, pairing handler
+
+**Commit:** bb8eb42d on feature/ble-hid
+
+**Build & Flash:** ✅ Clean build, picotool flash successful  
+**Board:** Pimoroni Pico Lipo 2 XL W (RP2350B + CYW43439)
+
+**Status:** Fixed; Phase 1 connection issue resolved.
+
+**Why:** Advertising before HCI ready is the primary cause of "device visible but connection fails" symptom. BTstack requires `HCI_STATE_WORKING` event guard per official examples.
+
+### 2026-03-29: BLE Cold-Boot Hard Fault — TLV Context NULL Dereference
+
+**By:** Edward (Firmware Dev)  
+**What:** Diagnosed and fixed NULL pointer dereference causing cold-boot hard fault in BLE mode.
+
+**Root Cause (Candidate 4):**
+
+Device advertised correctly on warm resets (after USB power cycle) but hard-faulted on every cold boot. TLV context initialization bug:
+
+```cpp
+// BROKEN:
+le_device_db_tlv_configure(tlv_impl, NULL);  // Second arg = NULL
+sm_init();  // Internally calls le_device_db_tlv_scan() → get_tag(context, ...)
+```
+
+`sm_init()` calls `le_device_db_init()` → `le_device_db_tlv_scan()` → `get_tag(context, ...)`. The context is cast to `btstack_tlv_flash_bank_t*` and field-dereferenced. With NULL context, immediate hard fault. Board crashed silently; BLE never advertised.
+
+**Fix:**
+```cpp
+// FIXED:
+le_device_db_tlv_configure(tlv_impl, &tlv_context);  // Context object valid for program lifetime
+```
+
+**Additional Fix:**
+- Replaced permanent `_initFailed` gate with 5-second retry loop for cyw43_arch_init() transient failures
+
+**LED Debug Signals:**
+- 2x fast blinks (100ms) — cyw43_arch_init() succeeded
+- 3x fast blinks (100ms) — Full BTstack configured, HCI power on, advertising starting
+- No blinks — cyw43_arch_init() failed (retries in 5s)
+
+**Files Changed:**
+- `src/BLEHIDManager.cpp` — TLV context fix, retry loop, LED debug helper
+- `headers/BLEHIDManager.h` — Removed _initFailed/_pendingInit flags, added _initDelayMs
+
+**Commit:** c440b8b6 on feature/ble-hid
+
+**Status:** Fixed; board now cold-boots successfully into BLE advertising.
+
+**Why:** Transient failures during cold boot were masking the root cause (hard fault). LED debug signals provide visual feedback for field diagnostics.
+
 ## Governance
 
 - All meaningful changes require team consensus
