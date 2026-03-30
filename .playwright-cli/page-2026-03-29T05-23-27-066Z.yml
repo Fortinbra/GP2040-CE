@@ -1,0 +1,197 @@
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - generic "GP2040-CE Home" [ref=e4]:
+      - link "GP2040-CE logo" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "GP2040-CE logo" [ref=e31]
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - link "Settings" [ref=e8] [cursor=pointer]:
+          - /url: /settings
+        - button "Configuration" [active] [ref=e10] [cursor=pointer]
+        - button "Links" [ref=e12] [cursor=pointer]
+      - generic [ref=e13]:
+        - button "Reboot" [ref=e14] [cursor=pointer]
+        - button [ref=e16] [cursor=pointer]:
+          - img [ref=e17]
+        - button [ref=e21] [cursor=pointer]:
+          - img [ref=e22]
+        - combobox [ref=e26]:
+          - option "GP2040" [selected]
+          - option "Arcade"
+          - option "XInput"
+          - option "Switch"
+          - option "PS3"
+          - option "PS4"
+          - option "Generic"
+  - generic [ref=e65]:
+    - heading "Add-Ons Configuration" [level=1] [ref=e66]
+    - paragraph [ref=e67]: Use the form below to reconfigure add-on options in GP2040-CE.
+    - generic [ref=e68]:
+      - strong [ref=e70]:
+        - link "BOOTSEL Button Configuration" [ref=e71] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/bootsel-button
+      - generic [ref=e73]:
+        - checkbox "Enabled" [ref=e74]
+        - generic [ref=e75]: Enabled
+    - generic [ref=e76]:
+      - strong [ref=e78]:
+        - link "On-Board LED Configuration" [ref=e79] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/on-board-led
+      - generic [ref=e81]:
+        - checkbox "Enabled" [ref=e82]
+        - generic [ref=e83]: Enabled
+    - generic [ref=e84]:
+      - strong [ref=e86]:
+        - link "Analog" [ref=e87] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/analog
+      - generic [ref=e89]:
+        - checkbox "Enabled" [ref=e90]
+        - generic [ref=e91]: Enabled
+    - generic [ref=e92]:
+      - strong [ref=e94]:
+        - link "Turbo" [ref=e95] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/turbo
+      - generic [ref=e97]:
+        - checkbox "Enabled" [ref=e98]
+        - generic [ref=e99]: Enabled
+    - generic [ref=e100]:
+      - strong [ref=e102]:
+        - link "Input Reverse" [ref=e103] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/input-reverse
+      - generic [ref=e105]:
+        - checkbox "Enabled" [ref=e106]
+        - generic [ref=e107]: Enabled
+    - generic [ref=e108]:
+      - strong [ref=e110]:
+        - link "I2C Analog ADS1219" [ref=e111] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/i2c-analog-ads1219
+      - generic [ref=e113]:
+        - text: Cannot Enable. Peripheral "I2C" unavailable. Enable it in the
+        - link "Peripheral Mapping" [ref=e114] [cursor=pointer]:
+          - /url: /peripheral-mapping
+        - text: section.
+    - generic [ref=e115]:
+      - strong [ref=e117]:
+        - link "Analog ADS1256 (SPI)" [ref=e118] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/i2c-analog-ads1256-spi
+      - generic [ref=e120]:
+        - text: Cannot Enable. Peripheral "SPI" unavailable. Enable it in the
+        - link "Peripheral Mapping" [ref=e121] [cursor=pointer]:
+          - /url: /peripheral-mapping
+        - text: section.
+    - generic [ref=e122]:
+      - strong [ref=e124]:
+        - link "Dual Directional Input" [ref=e125] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/dual-direction-input
+      - generic [ref=e127]:
+        - checkbox "Enabled" [ref=e128]
+        - generic [ref=e129]: Enabled
+    - generic [ref=e130]:
+      - strong [ref=e132]:
+        - link "Tilt Input" [ref=e133] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/tilt-input
+      - generic [ref=e135]:
+        - checkbox "Enabled" [ref=e136]
+        - generic [ref=e137]: Enabled
+    - generic [ref=e138]:
+      - strong [ref=e140]:
+        - link "Buzzer Speaker" [ref=e141] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/buzzer-speaker
+      - generic [ref=e143]:
+        - checkbox "Enabled" [ref=e144]
+        - generic [ref=e145]: Enabled
+    - generic [ref=e146]:
+      - strong [ref=e148]:
+        - link "SOCD Cleaning Mode Selection Slider" [ref=e149] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/socd-selection-slider
+      - generic [ref=e151]:
+        - checkbox "Enabled" [ref=e152]
+        - generic [ref=e153]: Enabled
+    - generic [ref=e154]:
+      - strong [ref=e156]:
+        - link "Wii Extension" [ref=e157] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/wii-extensions
+      - generic [ref=e159]:
+        - text: Cannot Enable. Peripheral "I2C" unavailable. Enable it in the
+        - link "Peripheral Mapping" [ref=e160] [cursor=pointer]:
+          - /url: /peripheral-mapping
+        - text: section.
+    - generic [ref=e161]:
+      - strong [ref=e163]:
+        - link "SNES Extension Configuration" [ref=e164] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/snes-input
+      - generic [ref=e166]:
+        - checkbox "Enabled" [ref=e167]
+        - generic [ref=e168]: Enabled
+    - generic [ref=e169]:
+      - strong [ref=e171]:
+        - link "PC Engine/TurboGrafx-16 Extension Configuration" [ref=e172] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/tg16-input
+      - generic [ref=e174]:
+        - checkbox "Enabled" [ref=e175]
+        - generic [ref=e176]: Enabled
+    - generic [ref=e177]:
+      - strong [ref=e179]:
+        - link "Focus Mode Configuration" [ref=e180] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/focus-mode
+      - generic [ref=e182]:
+        - checkbox [ref=e183]
+        - generic [ref=e184]: Enabled
+    - generic [ref=e185]:
+      - strong [ref=e187]:
+        - link "Keyboard/Mouse Host Configuration" [ref=e188] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/keyboard-host
+      - generic [ref=e190]:
+        - text: Cannot Enable. Peripheral "USB" unavailable. Enable it in the
+        - link "Peripheral Mapping" [ref=e191] [cursor=pointer]:
+          - /url: /peripheral-mapping
+        - text: section.
+    - generic [ref=e192]:
+      - strong [ref=e194]:
+        - link "Gamepad USB Host Addon" [ref=e195] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/gamepad-usb-host
+      - generic [ref=e197]: USB host not enabled!
+    - generic [ref=e198]:
+      - strong [ref=e200]:
+        - link "Rotary Encoders" [ref=e201] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/rotary-encoders
+      - generic [ref=e203]:
+        - checkbox "Enabled" [ref=e204]
+        - generic [ref=e205]: Enabled
+    - generic [ref=e206]:
+      - strong [ref=e208]:
+        - link "PCF8575 IO Expander" [ref=e209] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/pcf8575-io-expander
+      - generic [ref=e211]:
+        - checkbox "Enabled" [ref=e212]
+        - generic [ref=e213]: Enabled
+    - generic [ref=e214]:
+      - strong [ref=e216]:
+        - link "DRV8833 Rumble Configuration" [ref=e217] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/drv8833-rumble
+      - generic [ref=e219]:
+        - checkbox "Enabled" [ref=e220]
+        - generic [ref=e221]: Enabled
+    - generic [ref=e222]:
+      - strong [ref=e224]:
+        - link "Reactive LEDs" [ref=e225] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/reactive-led
+      - generic [ref=e227]:
+        - checkbox "Enabled" [ref=e228]
+        - generic [ref=e229]: Enabled
+    - generic [ref=e230]:
+      - strong [ref=e232]:
+        - link "Hall-Effect Trigger" [ref=e233] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/he-trigger
+      - generic [ref=e235]:
+        - checkbox "Enabled" [ref=e236]
+        - generic [ref=e237]: Enabled
+    - generic [ref=e238]:
+      - strong [ref=e240]:
+        - link "Bluetooth Configuration" [ref=e241] [cursor=pointer]:
+          - /url: https://gp2040-ce.info/add-ons/bluetooth
+      - generic [ref=e243]:
+        - checkbox "Enabled" [ref=e244]
+        - generic [ref=e245]: Enabled
+    - button "Save" [ref=e247] [cursor=pointer]

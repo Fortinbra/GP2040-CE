@@ -1,0 +1,66 @@
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - generic "GP2040-CE Home" [ref=e4]:
+      - link "GP2040-CE logo" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "GP2040-CE logo" [ref=e31]
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - link "Settings" [ref=e8] [cursor=pointer]:
+          - /url: /settings
+        - generic [ref=e9]:
+          - button "Configuration" [expanded] [active] [ref=e10] [cursor=pointer]
+          - generic [ref=e55]:
+            - link "GPIO Pin Mapping" [ref=e56] [cursor=pointer]:
+              - /url: /pin-mapping
+            - link "Peripheral Mapping" [ref=e57] [cursor=pointer]:
+              - /url: /peripheral-mapping
+            - link "LED Configuration" [ref=e58] [cursor=pointer]:
+              - /url: /led-config
+            - link "Custom LED Theme" [ref=e59] [cursor=pointer]:
+              - /url: /custom-theme
+            - link "Display Configuration" [ref=e60] [cursor=pointer]:
+              - /url: /display-config
+            - link "Add-Ons Configuration" [ref=e61] [cursor=pointer]:
+              - /url: /add-ons
+            - link "Macros Configuration" [ref=e62] [cursor=pointer]:
+              - /url: /macro
+            - link "Data Backup and Restoration" [ref=e63] [cursor=pointer]:
+              - /url: /backup
+            - link "Reset Settings" [ref=e64] [cursor=pointer]:
+              - /url: /reset-settings
+        - button "Links" [ref=e12] [cursor=pointer]
+      - generic [ref=e13]:
+        - button "Reboot" [ref=e14] [cursor=pointer]
+        - button [ref=e16] [cursor=pointer]:
+          - img [ref=e17]
+        - button [ref=e21] [cursor=pointer]:
+          - img [ref=e22]
+        - combobox [ref=e26]:
+          - option "GP2040" [selected]
+          - option "Arcade"
+          - option "XInput"
+          - option "Switch"
+          - option "PS3"
+          - option "PS4"
+          - option "Generic"
+  - generic [ref=e28]:
+    - heading "Welcome to the GP2040-CE Web Configurator!" [level=1] [ref=e32]
+    - paragraph [ref=e33]: Please select a menu option to proceed.
+    - generic [ref=e34]:
+      - strong [ref=e36]: System Stats
+      - generic [ref=e38]:
+        - strong [ref=e39]: Version
+        - generic [ref=e40]: PimoroniPicoLipo2XLW (GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2)
+        - generic [ref=e41]: "Current: v0.7.12-101-g6d526d8-dirty"
+        - generic [ref=e42]: "Latest: v0.7.12"
+        - generic [ref=e43]: "Architecture: rp2350-arm-s"
+        - generic [ref=e44]: "Build Type: Release"
+        - generic [ref=e45]: "Build: 6d526d8"
+        - strong [ref=e46]: Memory (KB)
+        - generic [ref=e47]: "Flash: 1504.16 / 4096 (36.72%)"
+        - generic [ref=e48]: "Heap: 6.28 / 365.77 (1.72%)"
+        - generic [ref=e49]: "Static Allocations: 154.23"
+        - generic [ref=e50]: "Board Flash: 16384"
+        - progressbar [ref=e52]: Flash 36.72%
+        - progressbar [ref=e54]: Heap 1.72%

@@ -1,0 +1,7 @@
+Total messages: 5 (Errors: 0, Warnings: 0)
+
+[LOG] i18next: languageChanged en-US @ http://config.gp2040-ce.info/assets/index-d500cb9b.js:235
+[LOG] i18next: initialized {debug: true, initImmediate: true, ns: Array(1), defaultNS: Array(1), fallbackLng: Array(1)} @ http://config.gp2040-ce.info/assets/index-d500cb9b.js:235
+[LOG] i18next: languageChanged en-US @ http://config.gp2040-ce.info/assets/index-d500cb9b.js:235
+[LOG] i18next: initialized {debug: true, initImmediate: true, ns: Array(1), defaultNS: Array(1), fallbackLng: Array(1)} @ http://config.gp2040-ce.info/assets/index-d500cb9b.js:235
+[LOG] {turboLedColor: 16711680, keyboardHostMouseMovement: 0} @ http://config.gp2040-ce.info/assets/index-d500cb9b.js:69

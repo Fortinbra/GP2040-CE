@@ -257,7 +257,7 @@ src/display/GPGFX.cpp
 src/display/GPGFX_UI.cpp
 src/drivermanager.cpp
 src/OutputManager.cpp
-src/BTHIDManager.cpp
+src/BLEHIDManager.cpp
 src/bt_config_bridge.cpp
 src/eventmanager.cpp
 src/layoutmanager.cpp
@@ -347,9 +347,10 @@ if(PICO_CYW43_SUPPORTED)
     target_link_libraries(${PROJECT_NAME}
         pico_cyw43_arch_poll
         pico_btstack_cyw43
-        pico_btstack_classic
+        pico_btstack_ble
         pico_btstack_run_loop_async_context
     )
+    pico_btstack_make_gatt_header(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/src/ble_hid.gatt")
 endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC

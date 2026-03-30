@@ -289,13 +289,17 @@ void GP2040::run() {
 	Gamepad * processedGamepad = Storage::getInstance().GetProcessedGamepad();
 	GamepadState prevState;
 
-	// Start the TinyUSB Device functionality
-	tud_init(TUD_OPT_RHPORT);
+	// Start the TinyUSB Device functionality only if NOT in wireless-only mode
+	InputMode inputMode = DriverManager::getInstance().getInputMode();
+	bool wirelessOnly = (inputMode == INPUT_MODE_BLE);
+	if (!wirelessOnly) {
+		tud_init(TUD_OPT_RHPORT);
+	}
 
 	// Initialize our USB manager
 	USBHostManager::getInstance().start();
 
-	if (configMode == true ) {
+	if (configMode == true && !wirelessOnly) {
 		rndis_init();
 	}
 
@@ -345,8 +349,10 @@ void GP2040::run() {
 		// Process Output Manager (USB + Bluetooth)
 		bool processed = OutputManager::getInstance().process(gamepad);
 
-		// TinyUSB Task update
-		tud_task();
+		// TinyUSB Task update (skip in wireless-only mode)
+		if (!wirelessOnly) {
+			tud_task();
+		}
 
 		// Post-Process Add-ons with USB Report Processed Sent
 		addons.PostprocessAddons(processed);

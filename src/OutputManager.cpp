@@ -8,7 +8,7 @@
 #include "tusb.h"
 
 #ifdef ENABLE_BLUETOOTH
-#include "BTHIDManager.h"
+#include "BLEHIDManager.h"
 #include "drivers/hid/HIDDescriptors.h"
 #endif
 
@@ -18,8 +18,8 @@ OutputManager& OutputManager::getInstance() {
 }
 
 void OutputManager::init() {
-    // BT init is deferred — CYW43 must not start before USB enumerates.
-    // BTHIDManager::init() is called lazily in process() once tud_mounted() is true.
+    // BLE init is deferred — BLEHIDManager::init() is called lazily in process()
+    // once the 3-second wireless-boot timeout has elapsed.
 }
 
 bool OutputManager::process(Gamepad* gamepad) {
@@ -30,11 +30,15 @@ bool OutputManager::process(Gamepad* gamepad) {
     }
 
 #ifdef ENABLE_BLUETOOTH
-    // Init BT once — BTHIDManager::_doInit() handles the USB/timeout gating internally.
-    // Do NOT gate this on tud_mounted(): when on battery with no USB, tud_mounted() is
-    // never true and the 3-second wireless-boot timeout would never start.
+    InputMode inputMode = DriverManager::getInstance().getInputMode();
+    
+    // Init BLE once — BLEHIDManager::_doInit() handles the 3-second startup timeout
+    // internally. Do NOT gate this on tud_mounted(): on battery-only boot, tud_mounted()
+    // is never true and the wireless-boot timeout would never start.
     if (!_btReady) {
-        BTHIDManager::getInstance().init();
+        if (inputMode == INPUT_MODE_BLE) {
+            BLEHIDManager::getInstance().init();
+        }
         _btReady = true;
     }
 
@@ -102,13 +106,15 @@ bool OutputManager::process(Gamepad* gamepad) {
                 hidReport.buttons |= GAMEPAD_MASK_R2;
         }
 
-        if (BTHIDManager::getInstance().isConnected()) {
-            BTHIDManager::getInstance().sendReport(reinterpret_cast<const uint8_t*>(&hidReport), sizeof(HIDReport));
+        if (inputMode == INPUT_MODE_BLE) {
+            if (BLEHIDManager::getInstance().isConnected()) {
+                BLEHIDManager::getInstance().sendReport(reinterpret_cast<const uint8_t*>(&hidReport), sizeof(HIDReport));
+            }
         }
     }
 
-    if (_btReady) {
-        BTHIDManager::getInstance().process();
+    if (_btReady && inputMode == INPUT_MODE_BLE) {
+        BLEHIDManager::getInstance().process();
     }
 #endif
 

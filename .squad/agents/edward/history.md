@@ -913,3 +913,81 @@ pm run build-proto && npm run build — succeeded (warnings only, no errors; Sas
 - The classic purge (edward-classic-purge branch) had already cleaned wirelessOnly — the two branches were not in conflict on that line.
 - Board was already accessible via picotool in running mode (GP2040-CE exposes picotool interface); no BOOTSEL juggling required.
 - CMake configure WITHOUT -DSKIP_WEBBUILD=TRUE triggers a full npm install + web build inside the CMake step — this is expected and redundant if you've already built www/ manually, but harmless.
+
+### 2026-03-29: BLE Cold-Boot NULL TLV Context — Root Cause Found and Fixed
+
+**Tasked by:** Fortinbra. Board: Pimoroni Pico Lipo 2 XL W (RP2350B + CYW43439). Symptom: BLE never advertises on cold battery-only boot despite wirelessOnly USB gate fix being applied and working.
+
+**Root cause (Candidate 4 confirmed):** `le_device_db_tlv_configure(tlv_impl, NULL)` in BLEHIDManager::_doInit(). The second argument is the TLV context pointer — it gets stored in le_device_db_tlv.c and passed back as the first argument to every get_tag/store_tag call. With NULL, `sm_init()` → `le_device_db_init()` → `le_device_db_tlv_scan()` → `btstack_tlv_flash_bank_get_tag(NULL, ...)` → `self = (btstack_tlv_flash_bank_t*) NULL` → immediate NULL dereference hard fault. RP2350 crashes silently. BLE never advertises.
+
+Verified in SDK source (pico-sdk 2.2.0): btstack_tlv_flash_bank_get_tag() first line casts context to btstack_tlv_flash_bank_t*. le_device_db_init() is called synchronously inside sm_init(), which is called in _doInit(). The crash happens inside _doInit() itself, before hci_power_control() is ever called.
+
+**Fix:** `le_device_db_tlv_configure(tlv_impl, &tlv_context)`. tlv_context is a static local (btstack_tlv_flash_bank_t) in _doInit() — valid for program lifetime.
+
+**Additional changes applied:**
+- Added `blink_cyw43_led(count, on_ms, off_ms)` helper. CYW43 LED (CYW43_WL_GPIO_LED_PIN=0) only available after cyw43_arch_init() succeeds. Patterns: 2 fast blinks = CYW43 up; 3 fast blinks = HCI power on called.
+- Removed permanent `_initFailed` and `_pendingInit` flags. Replaced with `_initDelayMs` retry: if cyw43_arch_init() fails, reset boot timer and retry in 5 seconds (instead of permanent silent fail).
+- Header cleaned up: removed dead bool fields, added _initDelayMs.
+
+**Other candidates checked:**
+- Candidate 1 (config persistence): NOT the issue. Config is saved via INPUT_MODE_CONFIG web UI path. S2-hold forces INPUT_MODE_CONFIG at boot regardless of saved BLE mode — wirelessOnly = false, USB enabled. Recovery path exists but is undocumented.
+- Candidate 2 (wirelessOnly blocks web config): Limitation, not a bug. S2-hold recovery works.
+- Candidate 3 (GPIO24 CYW43 conflict): Not an issue. GP2040-CE user code never touches GPIO24; CYW43 driver owns it entirely.
+
+**Learnings:**
+- `le_device_db_tlv_configure(impl, context)`: context MUST be `&btstack_tlv_flash_bank_t`, NOT NULL. Passing NULL causes hard fault inside sm_init() on every BLE boot before any advertising happens.
+- Pico W / Pico 2 W onboard LED is CYW43_WL_GPIO_LED_PIN=0 — controlled by CYW43, NOT a direct RP2350 GPIO. Cannot blink before cyw43_arch_init() succeeds. No pre-init visual debug possible.
+- BTstack le_device_db_init() is called synchronously inside sm_init(), not lazily on first bonded-device query. Even on first boot with no bonded devices, the scan runs and dereferences the context.
+- S2-hold web-config recovery path is undocumented and should be surfaced in user docs (flag for Hughes).
+
+**Files modified:** src/BLEHIDManager.cpp, headers/BLEHIDManager.h
+**Commit:** c440b8b6 on feature/ble-hid. Rebuild + reflash required.
+
+### 2026-03-29: BLE Connection Fix — HCI state race, scan_resp null, pairing handler
+**Tasked by:** Fortinbra. Symptom: device visible in BLE scan ("GP2040-CE" appears) but connection fails on Android and Windows.
+
+**Root causes fixed:**
+
+**Issue 1 & 2 — `_startAdvertising()` before HCI_STATE_WORKING:**
+`_startAdvertising()` (→ `gap_advertisements_enable(1)`) was being called before `hci_power_control(HCI_POWER_ON)`. BTstack buffers the advertising enable so scan visibility works, but the HCI controller is not yet in a state to accept incoming connections. Connection attempts during this window fail silently. Fix: removed `_startAdvertising()` from `_doInit()`. Added `BTSTACK_EVENT_STATE` case to the packet handler — advertising now fires only when `btstack_event_state_get_state(packet) == HCI_STATE_WORKING`. This is the canonical BTstack pattern used in all official HID demos.
+
+**Issue 3 — scan_resp_data null terminator:**
+AD type 0x09 (Complete Local Name) is a raw byte array, not a C string. The null byte `0x00` at end was included in the length, making the name appear as "GP2040-CE\0" (10 chars announced as 11). Some BLE stacks reject this or display garbage. Fixed: removed `0x00`, corrected length byte from `0x0B` to `0x0A`.
+
+**Issue 4 — GATT structure:**
+Verified `ble_hid.gatt` is correct. Has `#import <hids.gatt>`, `#import <battery_service.gatt>`, `#import <device_information_service.gatt>`, `GAP_SERVICE`, and `GATT_DATABASE_HASH`. No changes needed.
+
+**Issue 5 — SM_EVENT_PAIRING_COMPLETE:**
+`SM_EVENT_JUST_WORKS_REQUEST` was already handled (auto-confirm). Added `SM_EVENT_PAIRING_COMPLETE` handler: if status != `ERROR_CODE_SUCCESS`, blinks LED 5x fast and calls `_startAdvertising()` to allow reconnect. BTstack disconnects automatically on pairing failure, so the DISCONNECTION_COMPLETE handler would eventually restart advertising anyway — but the explicit handler ensures faster recovery.
+
+**GATT file:** No changes — structure was already correct.
+
+**Learnings:**
+- NEVER call `gap_advertisements_enable(1)` before `HCI_STATE_WORKING`. BTstack buffers it for scan, but connections won't work. Always gate advertising on `BTSTACK_EVENT_STATE` == `HCI_STATE_WORKING`.
+- AD type 0x09 (Complete Local Name) must NOT include a null terminator. Length = 1 (type byte) + N (name bytes). Null-terminating is a C-string convention, not a BLE AD convention.
+- `SM_EVENT_PAIRING_COMPLETE` with non-zero status means pairing failed — restart advertising explicitly rather than relying on the DISCONNECTION_COMPLETE path for faster host retry.
+- BTstack's `BTSTACK_EVENT_STATE` is delivered via the HCI event packet handler (same `HCI_EVENT_PACKET` branch), not a separate packet_type.
+
+**Files modified:** src/BLEHIDManager.cpp
+**Commit:** bb8eb42d on feature/ble-hid. Flashed successfully.
+
+### 2026-03-28: BLE Pairing Failure — GATT Encryption + Report ID Fix
+
+**Tasked by:** Fortinbra. Symptoms: link-layer connects; Windows/Android hits "try connecting again" after reaching "connecting..." stage. Means SM pairing or GATT service discovery fails.
+
+**Root cause 1 — ENCRYPTION_KEY_SIZE_16 on HID Report characteristics (confirmed, fixed).**
+The standard BTstack `hids.gatt` marks all three Report characteristics (Input/Output/Feature) with `ENCRYPTION_KEY_SIZE_16`. Windows and Android perform GATT service discovery *before* pairing. They cannot read encrypted characteristics without a bond, so discovery deadlocks: discovery fails → pairing never starts → "try again". Fix: replaced `#import <hids.gatt>` in `src/ble_hid.gatt` with an inline copy of the HID service that removes all `ENCRYPTION_KEY_SIZE_16` flags while preserving identical UUID structure. The `hids_device_*` BTstack API is unaffected — it matches characteristics by UUID handle, not permissions.
+
+**Root cause 2 — Report ID mismatch (confirmed, fixed).**
+The inline `hids.gatt` maps the Input Report characteristic to `REPORT_REFERENCE, READ, 1, 1` (Report ID=1, type Input). The HID descriptor in `BLEHIDManager.cpp` had no `REPORT_ID` tag, meaning ID=0. Windows matches GATT report references to report IDs declared in the HID descriptor; a mismatch causes HID driver setup to fail silently. Fix: added `0x85, 0x01` (Report ID 1) as the first item inside `COLLECTION (Application)` in `hid_descriptor_gamepad[]`.
+
+**Candidate 3 — gap_set_bondable_mode(1) (investigated, NOT needed, NOT available).**
+BTstack `hci_init()` unconditionally sets `hci_stack->bondable = 1` by default. The setter `gap_set_bondable_mode()` is declared in `gap.h` but implemented inside `#ifdef ENABLE_CLASSIC` in `hci.c` — it is NOT compiled in BLE-only builds. Confirmed by build linker error + `arm-none-eabi-nm` on `hci.c.obj` showing no bondable symbol. `SM_AUTHREQ_BONDING` alone is sufficient and matches BTstack's `hog_keyboard_demo` reference.
+
+**Key lessons:**
+- Never use `#import <hids.gatt>` for a production gamepad device — its encryption requirements break first-connection GATT discovery on all major hosts.
+- BLE HID GATT Report References and HID descriptor Report IDs must agree exactly. Zero reports in the descriptor = Report Reference ID must be 0x00; Report ID 1 in descriptor = Report Reference must be 0x01.
+- `gap_set_bondable_mode()` is Classic-only. In BLE builds, bondable mode is always 1 (default). No explicit call needed.
+
+**Files modified:** src/ble_hid.gatt, src/BLEHIDManager.cpp
+**Commit:** 32e0447e on feature/ble-hid.

@@ -1,0 +1,4 @@
+Total messages: 2 (Errors: 0, Warnings: 0)
+
+[LOG] i18next: languageChanged en-US @ http://config.gp2040-ce.info/assets/index-f5b2a468.js:235
+[LOG] i18next: initialized {debug: true, initImmediate: true, ns: Array(1), defaultNS: Array(1), fallbackLng: Array(1)} @ http://config.gp2040-ce.info/assets/index-f5b2a468.js:235

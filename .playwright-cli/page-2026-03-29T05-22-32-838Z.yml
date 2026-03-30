@@ -1,0 +1,28 @@
+- generic [ref=e2]:
+  - navigation [ref=e3]:
+    - generic "GP2040-CE Home" [ref=e4]:
+      - link "GP2040-CE logo" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img "GP2040-CE logo"
+    - generic [ref=e6]:
+      - generic [ref=e7]:
+        - link "Settings" [ref=e8] [cursor=pointer]:
+          - /url: /settings
+        - button "Configuration" [ref=e10] [cursor=pointer]
+        - button "Links" [ref=e12] [cursor=pointer]
+      - generic [ref=e13]:
+        - button "Reboot" [ref=e14] [cursor=pointer]
+        - button [ref=e16] [cursor=pointer]:
+          - img [ref=e17]
+        - button [ref=e21] [cursor=pointer]:
+          - img [ref=e22]
+        - combobox [ref=e26]:
+          - option "GP2040" [selected]
+          - option "Arcade"
+          - option "XInput"
+          - option "Switch"
+          - option "PS3"
+          - option "PS4"
+          - option "Generic"
+  - status [ref=e29]:
+    - generic [ref=e30]: Loading...
