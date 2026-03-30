@@ -182,8 +182,11 @@ void BLEHIDManager::_doInit() {
         &tlv_context, pico_flash_bank_instance(), NULL);
     le_device_db_tlv_configure(tlv_impl, &tlv_context);
 
-    // Core protocol layers
+    // Core protocol layers — SM must be initialized before ATT/GATT services
     l2cap_init();
+    sm_init();
+    sm_set_io_capabilities(IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
+    sm_set_authentication_requirements(SM_AUTHREQ_BONDING);
 
     // ATT server — profile_data is generated from ble_hid.gatt by pico_btstack_make_gatt_header.
     // NULL callbacks: hids_device registers its own service handler for all HIDS characteristics.
@@ -199,11 +202,6 @@ void BLEHIDManager::_doInit() {
     device_information_service_server_set_manufacturer_name("OpenStickCommunity");
     device_information_service_server_set_model_number("GP2040-CE");
     device_information_service_server_set_firmware_revision("1.0");
-
-    // Security Manager: Just Works, bonding enabled
-    sm_init();
-    sm_set_io_capabilities(IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
-    sm_set_authentication_requirements(SM_AUTHREQ_BONDING);
 
     // Register event handlers
     hci_event_callback_registration.callback = &_hciPacketHandler;

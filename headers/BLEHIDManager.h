@@ -52,18 +52,22 @@ private:
                                  uint8_t* buffer, uint16_t bufferSize);
 
     bool     _initialized          = false;
-    bool     _connected            = false;
-    bool     _notificationsEnabled = false;
+    bool     _advStarted           = false;
     bool     _pairingMode          = false;
-    bool     _reportPending        = false;
-    uint16_t _conHandle            = 0xFFFF;
+    bool     _initFailed           = false;
     uint32_t _bootTimeMs           = 0;
     uint32_t _initDelayMs          = 3000;
-    uint8_t  _pendingReport[9]     = {};
-    uint16_t _pendingReportLen     = 0;
-    bool     _advStarted           = false;
-    bool     _initFailed           = false;
     uint32_t _retryTimeMs          = 0;
+
+    // Written by BTstack IRQ context (async_context_threadsafe_background) and
+    // read by the main thread — must be volatile so the compiler does not cache
+    // them in registers across loop iterations.
+    volatile bool     _connected            = false;
+    volatile bool     _notificationsEnabled = false;
+    volatile bool     _reportPending        = false;
+    volatile uint16_t _conHandle            = 0xFFFF;
+    volatile uint16_t _pendingReportLen     = 0;
+    uint8_t  _pendingReport[9]     = {};
 };
 
 #endif // BLE_HID_MANAGER_H
