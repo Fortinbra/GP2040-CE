@@ -23,10 +23,19 @@
 #define MAX_NR_HCI_CONNECTIONS          2
 #define NVM_NUM_LINK_KEYS               4
 
-// Enable BT Classic HID Device support
-#define ENABLE_CLASSIC
+// Enable HID device support (required for BLE HID profile)
 #define ENABLE_HID_DEVICE
-#define ENABLE_L2CAP_ENHANCED_RETRANSMISSION_MODE
+
+// Enable BLE peripheral support for BLEHIDManager
+#define ENABLE_LE_PERIPHERAL
+#define HAVE_MALLOC
+#define MAX_NR_LE_DEVICE_DB_ENTRIES 4
+#define NVM_NUM_DEVICE_DB_ENTRIES 4
+
+// LE Secure Connections — required for Windows 10/11 and modern Android.
+// Without this, BTstack has no handler for SC-bit Pairing Requests and never
+// sends a Pairing Response, causing an SMP timeout on the host side.
+#define ENABLE_LE_SECURE_CONNECTIONS
 
 // SDP support for service discovery
 #define ENABLE_SDP_DES_DUMP
