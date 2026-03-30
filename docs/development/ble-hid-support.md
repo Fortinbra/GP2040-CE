@@ -3,7 +3,7 @@
 **Last updated:** 2026-03-29  
 **Maintained by:** GP2040-CE core team  
 **Status:** Planning / Not yet implemented  
-**SDK version:** 2.2.0+
+**SDK version:** 2.2.0
 
 ---
 
@@ -71,7 +71,7 @@ BLE HID requires:
 ### Minimum Build Requirements
 
 **For BLE HID support:**
-- Pico SDK version: **2.2.0 or later** (enforced in CMakeLists.txt)
+- Pico SDK version: **2.2.0** (enforced in CMakeLists.txt)
 - CMake target linkage: `pico_cyw43_arch_lwip_threadsafe_background`, `pico_btstack_cyw43`, `pico_btstack_hid_device`
 - BTstack configuration: `btstack_config.h` with `ENABLE_LE_SECURE_CONNECTIONS` defined
 - Flash storage: Minimum 256 KB flash for bonding TLV database (RP2040/RP2350 standard)
@@ -130,21 +130,23 @@ Bonding keys must be stored in flash via BTstack's TLV (Tag-Length-Value) format
 static btstack_tlv_flash_bank_t tlv_context;
 
 void setupBLE() {
-    // Initialize TLV flash bank BEFORE any BLE/SMP init
-    const char * tlv_db_path = "btstack_priv.tlv";
-    btstack_tlv_flash_bank_init_instance(&tlv_context, &flash, 
-                                          FLASH_SECTOR_SIZE, 
-                                          tlv_db_path);
-    
-    // Configure SMP with the TLV context
-    le_device_db_tlv_configure(&tlv_context);
-    
+    // Initialize TLV flash bank BEFORE any BLE/SMP init.
+    // pico_flash_bank_instance() returns the hal_flash_bank_t* for the Pico flash bank.
+    // The third argument is a context pointer — pass NULL for Pico (unused).
+    const btstack_tlv_t* tlv_impl = btstack_tlv_flash_bank_init_instance(
+        &tlv_context, pico_flash_bank_instance(), NULL);
+
+    // Configure SMP with the TLV context — two-arg form required.
+    // le_device_db_tlv_configure(impl, context): first arg is the btstack_tlv_t* interface,
+    // second arg is the btstack_tlv_flash_bank_t* context. Both must be non-NULL.
+    le_device_db_tlv_configure(tlv_impl, &tlv_context);
+
     // Only AFTER TLV is configured, call hci_power_control(HCI_POWER_ON)
     hci_power_control(HCI_POWER_ON);
 }
 ```
 
-**Critical:** The `le_device_db_tlv_configure(&tlv_context)` call **must pass a non-NULL context**. A NULL pointer will cause `sm_init()` to skip key storage configuration, and subsequent bonding attempts will hard fault.
+**Critical:** `le_device_db_tlv_configure(tlv_impl, &tlv_context)` takes **two arguments**: the `btstack_tlv_t*` interface pointer returned by `btstack_tlv_flash_bank_init_instance()`, and the `btstack_tlv_flash_bank_t*` context. Both must be non-NULL. Passing a one-argument form will not compile; passing NULL for either will cause `sm_init()` to skip key storage configuration and subsequent bonding attempts will hard fault.
 
 #### 2. Secure Connections (SC) for Windows 10/11
 
@@ -253,75 +255,65 @@ If these mismatch, the host may misinterpret reports or fail HID validation.
 
 ## GATT Database Structure
 
-A minimal BLE HID gamepad requires the following GATT services and characteristics. This example uses BTstack's ATT database format:
+BTstack for Pico uses a `.gatt` DSL file compiled at build time by `pico_btstack_make_gatt_header` — **not C structs**. The compiled output is a `uint8_t profile_data[]` array passed to `att_server_init()`.
 
-```c
-// Generic Access Service (mandatory)
-const uint8_t adv_data[] = { /* AD struct with flags, name */ };
+**Do NOT** use `gatt_char_t gatt_db[]`, `PRIMARY_SERVICE_UUID16()`, `CHARACTERISTIC_UUID16()`, or `DESCRIPTOR_UUID16()` as C runtime array initializers — these types and macros do not exist in BTstack's C API.
 
-ATT_DB_VERSION_AND_CONST_HASH_USED(201802191544, BLE_GATT_DB_HASH)
+**Do NOT** use `#import <hids.gatt>` from BTstack's built-in service definitions — it adds `ENCRYPTION_KEY_SIZE_16` to all report characteristics, which blocks service discovery before pairing completes.
 
-// GATT Database
-static gatt_char_t gatt_db[] = {
-    // Generic Access Service (0x1800)
-    PRIMARY_SERVICE_UUID16(0x0001, 0x1800),
-    CHARACTERISTIC_UUID16(0x0002, 0x2A00, ATT_PROPERTY_READ, NULL),
-    CHARACTERISTIC_UUID16(0x0004, 0x2A01, ATT_PROPERTY_READ, NULL),
-    CHARACTERISTIC_UUID16(0x0006, 0x2A04, ATT_PROPERTY_READ, NULL),
+### GATT DSL File (`src/ble_hid.gatt`)
 
-    // Generic Attribute Service (0x1801) with GATT Service Changed notification
-    PRIMARY_SERVICE_UUID16(0x0008, 0x1801),
-    CHARACTERISTIC_UUID16(0x0009, 0x2A05, ATT_PROPERTY_INDICATE, NULL),
-    CLIENT_CHARACTERISTIC_CONFIGURATION(0x000A),
+```
+// src/ble_hid.gatt
+PRIMARY_SERVICE, GAP_SERVICE
+CHARACTERISTIC, GAP_DEVICE_NAME, READ, "GP2040-CE Gamepad"
+CHARACTERISTIC, GAP_APPEARANCE, READ, 964
 
-    // Device Information Service (0x180A)
-    PRIMARY_SERVICE_UUID16(0x000C, 0x180A),
-    CHARACTERISTIC_UUID16(0x000D, 0x2A29, ATT_PROPERTY_READ, NULL),  // Manufacturer
-    CHARACTERISTIC_UUID16(0x000F, 0x2A24, ATT_PROPERTY_READ, NULL),  // Model Number
-    CHARACTERISTIC_UUID16(0x0011, 0x2A25, ATT_PROPERTY_READ, NULL),  // Serial Number
-    CHARACTERISTIC_UUID16(0x0013, 0x2A27, ATT_PROPERTY_READ, NULL),  // Hardware Revision
-    CHARACTERISTIC_UUID16(0x0015, 0x2A28, ATT_PROPERTY_READ, NULL),  // Firmware Revision
+#import <battery_service.gatt>
+#import <device_information_service.gatt>
 
-    // Battery Service (0x180F)
-    PRIMARY_SERVICE_UUID16(0x0017, 0x180F),
-    CHARACTERISTIC_UUID16(0x0018, 0x2A19, ATT_PROPERTY_READ | ATT_PROPERTY_NOTIFY, NULL),  // Battery Level
-    CLIENT_CHARACTERISTIC_CONFIGURATION(0x0019),
+PRIMARY_SERVICE, ORG_BLUETOOTH_SERVICE_HUMAN_INTERFACE_DEVICE
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_PROTOCOL_MODE, DYNAMIC | READ | WRITE_WITHOUT_RESPONSE,
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_REPORT, DYNAMIC | READ | NOTIFY,
+REPORT_REFERENCE, READ, 1, 1
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_REPORT_MAP, DYNAMIC | READ,
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_HID_INFORMATION, READ, 01 01 00 02
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_HID_CONTROL_POINT, DYNAMIC | WRITE_WITHOUT_RESPONSE,
 
-    // HID Service (0x1812) — Core gamepad profile
-    PRIMARY_SERVICE_UUID16(0x001B, 0x1812),
-    
-    // HID Information (mandatory, read-only, no encryption required for discovery)
-    CHARACTERISTIC_UUID16(0x001C, 0x2A4A, ATT_PROPERTY_READ, NULL),
-    
-    // Report Map (mandatory, read-only, no encryption required for discovery)
-    CHARACTERISTIC_UUID16(0x001E, 0x2A4B, ATT_PROPERTY_READ, NULL),
-    
-    // Protocol Mode (optional but recommended, read/write, no encryption required)
-    CHARACTERISTIC_UUID16(0x0020, 0x2A4E, ATT_PROPERTY_READ | ATT_PROPERTY_WRITE_WITHOUT_RESPONSE, NULL),
-    
-    // Input Report with Report Reference (main gamepad report)
-    CHARACTERISTIC_UUID16(0x0022, 0x2A4D, ATT_PROPERTY_READ | ATT_PROPERTY_NOTIFY, NULL),
-    CLIENT_CHARACTERISTIC_CONFIGURATION(0x0023),
-    DESCRIPTOR_UUID16(0x0024, 0x2908, ATT_PROPERTY_READ, NULL),  // Report Reference
-    
-    // HID Control Point (write-only, no encryption required)
-    CHARACTERISTIC_UUID16(0x0026, 0x2A4C, ATT_PROPERTY_WRITE_WITHOUT_RESPONSE, NULL),
-};
+PRIMARY_SERVICE, GATT_SERVICE
+CHARACTERISTIC, GATT_DATABASE_HASH, READ,
 ```
 
-### Attribute Handles Reference
+### CMakeLists.txt Integration
 
-- `0x0001–0x0006`: GAP Service (mandatory for BLE)
-- `0x0008–0x000A`: GATT Service with Service Changed notification (for bonding re-pairing)
-- `0x000C–0x0015`: Device Information Service (product/version strings)
-- `0x0017–0x0019`: Battery Service with Level characteristic + CCCD (Client Characteristic Config Descriptor)
-- `0x001B–0x0026`: HID Service with Input Report, Report Map, and Protocol Mode
+Add this to `CMakeLists.txt` to compile the `.gatt` file and generate the GATT header:
 
-**Key points:**
-- **CCCD (Client Characteristic Config Descriptor)** at `0x0019` and `0x0023`: Allows the host to subscribe to Battery Level and Input Report notifications
-- **Report Reference** at `0x0024`: Tells the host the Report ID for the associated Input Report (must match HID descriptor)
-- **No encryption on Protocol Mode, Report Map, HID Information, HID Control Point**: Unpaired discovery only
-- **Encryption optional on Battery Level and Input Report**: Can be pairing-required after bonding (check BTstack config)
+```cmake
+pico_btstack_make_gatt_header(GP2040-CE PRIVATE "${CMAKE_CURRENT_LIST_DIR}/src/ble_hid.gatt")
+```
+
+Then in your initialization code, pass the generated `profile_data` to `att_server_init()`:
+
+```c
+#include "ble_hid.h"  // Generated from ble_hid.gatt by pico_btstack_make_gatt_header
+
+// ...
+att_server_init(profile_data, att_read_callback, att_write_callback);
+```
+
+### GATT Service Layout
+
+- **GAP Service** — Device name ("GP2040-CE Gamepad") and appearance (964 = Gamepad)
+- **Battery Service** (imported via `#import <battery_service.gatt>`) — Battery Level characteristic + CCCD for notifications
+- **Device Information Service** (imported) — Manufacturer, model, firmware revision
+- **HID Service** — Protocol Mode, Input Report (with CCCD + Report Reference), Report Map, HID Information, Control Point
+- **GATT Service** — Database Hash for cache invalidation on re-pairing
+
+**Key notes:**
+- **CCCD** on the Input Report characteristic allows the host to subscribe to ATT notifications
+- **REPORT_REFERENCE** descriptor: first value `1` = Report ID, second value `1` = Report Type (Input)
+- **No encryption required** on Report Map, HID Information, Protocol Mode — enables service discovery before pairing
+- **Report ID lives in the GATT Report Reference descriptor**, not in the ATT notification payload (see HID Report Descriptor section)
 
 ---
 
@@ -401,14 +393,18 @@ static const uint8_t hid_report_descriptor[] = {
 };
 
 // HID Input Report structure (matches the descriptor above)
+//
+// IMPORTANT: BLE HID ATT notifications do NOT carry a Report ID byte in-payload.
+// The Report ID (0x01) lives in the GATT Report Reference descriptor (0x2908), not
+// in the data bytes. Unlike USB HID where report_id IS a prefix byte in the packet,
+// hids_device_send_input_report() sends the raw payload only — no Report ID prefix.
 struct BLEHIDReport {
-    uint8_t report_id;                          // 0x01
-    uint32_t buttons;                           // Bits 0–31 for buttons 1–32
-    uint8_t hat : 4;                            // Hat switch (0–7, with null state)
-    uint8_t pad : 4;                            // Padding
-    int8_t x, y;                                // Left analog stick
-    int8_t rx, ry;                              // Right analog stick
-};
+    uint32_t buttons;                           // Bits 0–31 for buttons 1–32      (4 bytes)
+    uint8_t hat : 4;                            // Hat switch (0–7, with null state)(1 byte combined)
+    uint8_t pad : 4;                            // Padding to byte boundary
+    int8_t x, y;                                // Left analog stick               (2 bytes)
+    int8_t rx, ry;                              // Right analog stick              (2 bytes)
+} __attribute__((packed));                      // Total: 4 + 1 + 2 + 2 = 9 bytes
 static_assert(sizeof(BLEHIDReport) == 9, "Report size must be 9 bytes");
 ```
 
@@ -418,7 +414,6 @@ At each main loop iteration:
 
 ```c
 BLEHIDReport report = {
-    .report_id = 0x01,
     .buttons = gamepad->buttons,
     .hat = gamepad->dpad_as_hat(),
     .x = gamepad->lx,
@@ -454,8 +449,8 @@ void setupSM() {
         SM_AUTHREQ_BONDING | SM_AUTHREQ_SECURE_CONNECTIONS
     );
     
-    // Store bonding keys in flash TLV
-    le_device_db_tlv_configure(&tlv_context);  // (tlv_context initialized earlier)
+    // Store bonding keys in flash TLV — two-arg form (tlv_impl + &tlv_context from setupBLE)
+    le_device_db_tlv_configure(tlv_impl, &tlv_context);
 }
 ```
 
@@ -569,8 +564,10 @@ Battery level is reported via the **GATT Battery Service** (UUID 0x180F), not an
 #include "ble/battery_service_server.h"
 
 void setupBatteryService() {
-    // Initialize Battery Service
-    battery_service_server_init(NULL);  // Uses ATT db defined earlier
+    // No separate init() call is needed — the Battery Service is initialized via
+    // att_server_init() + the GATT database (via #import <battery_service.gatt>).
+    // Set the initial battery level directly with battery_service_server_set_battery_value().
+    battery_service_server_set_battery_value(100);  // Start at 100% until ADC reads
 }
 
 void updateBatteryLevel() {
@@ -631,16 +628,29 @@ The GATT Battery Service sends notifications only when the host subscribes (via 
 
 Implementation attempt 1 encountered several critical issues. This checklist consolidates those lessons for Phase 2 implementers:
 
+### Critical API Checklist (Blocking Issues)
+
+Before starting implementation, verify all 6 of these are correct in your code:
+
+- [ ] **SDK version is exactly 2.2.0** — not "2.2.0+" or "2.2.0 or later". CMakeLists.txt enforces `set(sdkVersion 2.2.0)`.
+- [ ] **`le_device_db_tlv_configure` uses the two-arg form** — `le_device_db_tlv_configure(tlv_impl, &tlv_context)`. The one-arg form does not exist in BTstack's API.
+- [ ] **`btstack_tlv_flash_bank_init_instance` takes no file path** — correct call is `btstack_tlv_flash_bank_init_instance(&tlv_context, pico_flash_bank_instance(), NULL)`. No string path, no `FLASH_SECTOR_SIZE`.
+- [ ] **`BLEHIDReport` struct has no `report_id` field** — BLE HID ATT notifications carry raw payload only. The Report ID is in the GATT Report Reference descriptor, not in the packet bytes. Struct must be `__attribute__((packed))` and 9 bytes exactly.
+- [ ] **GATT database is a `.gatt` DSL file**, not C structs — use `pico_btstack_make_gatt_header` to compile it. `gatt_char_t`, `PRIMARY_SERVICE_UUID16()`, `CHARACTERISTIC_UUID16()` do not exist in BTstack's C API.
+- [ ] **Battery service uses `battery_service_server_set_battery_value(uint8_t)`** — no separate `init()` call needed. `battery_service_server_init(NULL)` is a wrong signature; passing NULL will be treated as 0% battery.
+
+---
+
 ### 1. TLV Database Must Be Initialized Before SM
 
 **Symptom:** Hard fault in `sm_init()` or `le_device_db_tlv_configure()`  
-**Cause:** `le_device_db_tlv_configure(&tlv_context)` called with NULL context, or not called at all  
+**Cause:** Wrong API call — one-arg form used, file path passed, or not called at all  
 **Fix:**
 ```c
-btstack_tlv_flash_bank_init_instance(&tlv_context, &flash, 
-                                      FLASH_SECTOR_SIZE, 
-                                      "btstack_priv.tlv");
-le_device_db_tlv_configure(&tlv_context);  // Non-NULL context!
+static btstack_tlv_flash_bank_t tlv_context;
+const btstack_tlv_t* tlv_impl = btstack_tlv_flash_bank_init_instance(
+    &tlv_context, pico_flash_bank_instance(), NULL);
+le_device_db_tlv_configure(tlv_impl, &tlv_context);  // Two-arg form: impl + context
 sm_init();  // Only AFTER TLV is set up
 ```
 
@@ -674,22 +684,24 @@ sm_set_authentication_requirements(SM_AUTHREQ_BONDING | SM_AUTHREQ_SECURE_CONNEC
 
 **Symptom:** Host sees empty HID Service or errors during discovery  
 **Cause:** Report Map, HID Information, or Protocol Mode characteristics require encryption  
-**Fix:**
-```c
-// GATT DB definition:
-CHARACTERISTIC_UUID16(0x001E, 0x2A4B, ATT_PROPERTY_READ, NULL),  // No encryption required
-// ↑ NO "| ATT_PROPERTY_ENCRYPTED" here
+**Fix:** In the `.gatt` DSL file, do **not** add `ENCRYPTION_KEY_SIZE_*` to discovery characteristics:
 ```
+// Correct — no encryption keyword on discovery characteristics:
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_REPORT_MAP, DYNAMIC | READ,
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_HID_INFORMATION, READ, 01 01 00 02
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_PROTOCOL_MODE, DYNAMIC | READ | WRITE_WITHOUT_RESPONSE,
+```
+This is also why `#import <hids.gatt>` must not be used — BTstack's built-in HIDS adds `ENCRYPTION_KEY_SIZE_16` to all characteristics.
 
 ### 5. Boot Keyboard/Mouse Characteristics Cause Discovery Failures
 
 **Symptom:** HID discovery fails; host reports "unknown HID device type"  
 **Cause:** GATT includes Boot Keyboard or Boot Mouse characteristics for a gamepad  
-**Fix:**
-```c
-// Remove these lines from GATT DB:
-// CHARACTERISTIC_UUID16(0x..., 0x2A22, ...), // Boot Keyboard Input — DELETE
-// CHARACTERISTIC_UUID16(0x..., 0x2A33, ...), // Boot Mouse Input — DELETE
+**Fix:** Do not add these to the `.gatt` file:
+```
+// Do NOT include these for a gamepad:
+// CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_BOOT_KEYBOARD_INPUT_REPORT, ...
+// CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_BOOT_MOUSE_INPUT_REPORT, ...
 ```
 
 ### 6. Report ID Mismatch Between Descriptor and GATT Report Reference
