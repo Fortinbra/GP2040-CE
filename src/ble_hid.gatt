@@ -1,0 +1,47 @@
+// GP2040-CE BLE HID GATT Database
+// Compiled by pico_btstack_make_gatt_header into ble_hid.h
+// Follows the same pattern as BTstack hog_mouse_demo.gatt / hog_keyboard_demo.gatt
+
+PRIMARY_SERVICE, GAP_SERVICE
+CHARACTERISTIC, GAP_DEVICE_NAME, READ, "GP2040-CE Gamepad"
+CHARACTERISTIC, GAP_APPEARANCE, READ, 964   // 0x03C4 = Gamepad
+
+// Battery Service (0x180F)
+#import <battery_service.gatt>
+
+// Device Information Service (0x180A)
+#import <device_information_service.gatt>
+
+// HID Service (0x1812) — inline version of hids.gatt with ENCRYPTION_KEY_SIZE_16 removed.
+// The standard BTstack hids.gatt requires encryption on all three Report characteristics.
+// This creates a chicken-and-egg problem: Windows needs to read characteristics to discover
+// the service, but can't read them without being bonded first. Removing the encryption
+// requirement allows service discovery to complete on first connection, after which the host
+// initiates pairing and the bond is established normally.
+PRIMARY_SERVICE, ORG_BLUETOOTH_SERVICE_HUMAN_INTERFACE_DEVICE
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_PROTOCOL_MODE, DYNAMIC | READ | WRITE_WITHOUT_RESPONSE,
+
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_REPORT, DYNAMIC | READ | WRITE | NOTIFY,
+// report id = 1, type = Input (1)
+REPORT_REFERENCE, READ, 1, 1
+
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_REPORT, DYNAMIC | READ | WRITE | WRITE_WITHOUT_RESPONSE,
+// report id = 2, type = Output (2)
+REPORT_REFERENCE, READ, 2, 2
+
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_REPORT, DYNAMIC | READ | WRITE,
+// report id = 3, type = Feature (3)
+REPORT_REFERENCE, READ, 3, 3
+
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_REPORT_MAP, DYNAMIC | READ,
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_BOOT_KEYBOARD_INPUT_REPORT, DYNAMIC | READ | WRITE | NOTIFY,
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_BOOT_KEYBOARD_OUTPUT_REPORT, DYNAMIC | READ | WRITE | WRITE_WITHOUT_RESPONSE,
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_BOOT_MOUSE_INPUT_REPORT, DYNAMIC | READ | WRITE | NOTIFY,
+// bcdHID = 0x101 (v1.0.1), bCountryCode = 0, flags = 0x02 (normally connectable)
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_HID_INFORMATION, READ, 01 01 00 02
+CHARACTERISTIC, ORG_BLUETOOTH_CHARACTERISTIC_HID_CONTROL_POINT, DYNAMIC | WRITE_WITHOUT_RESPONSE,
+
+// GATT Service — required for BLE database hash used by modern hosts
+PRIMARY_SERVICE, GATT_SERVICE
+CHARACTERISTIC, GATT_DATABASE_HASH, READ,
+

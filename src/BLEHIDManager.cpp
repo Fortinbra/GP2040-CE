@@ -36,10 +36,14 @@
 
 // HID report descriptor — matches BTHIDManager.cpp for consistency across BT modes.
 // 32 buttons + 1 hat (4-bit + 4-bit padding) + 4 axes (8-bit each) = 9 bytes per report.
+// Report ID 1 is required: the GATT Report Reference descriptor maps this report to ID=1.
+// Without a Report ID tag in the descriptor, Windows cannot match the GATT report reference
+// to a report in the HID descriptor and service setup fails.
 static const uint8_t hid_descriptor_gamepad[] = {
     0x05, 0x01,        // USAGE_PAGE (Generic Desktop)
     0x09, 0x05,        // USAGE (Gamepad)
     0xa1, 0x01,        // COLLECTION (Application)
+    0x85, 0x01,        //   REPORT_ID (1)
     0x05, 0x09,        //   USAGE_PAGE (Button)
     0x19, 0x01,        //   USAGE_MINIMUM (Button 1)
     0x29, 0x20,        //   USAGE_MAXIMUM (Button 32)
@@ -149,6 +153,8 @@ void BLEHIDManager::_doInit() {
     device_information_service_server_set_model_number("GP2040-CE");
 
     // Security Manager: no display/input, bonding enabled, no MITM.
+    // SM_AUTHREQ_BONDING signals bonding intent to the host. BTstack sets hci_stack->bondable=1
+    // by default in hci_init, so no explicit gap_set_bondable_mode() call is required.
     sm_init();
     sm_set_io_capabilities(IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
     sm_set_authentication_requirements(SM_AUTHREQ_BONDING);
