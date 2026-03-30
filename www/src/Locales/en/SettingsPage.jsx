@@ -25,10 +25,12 @@ export default {
 		psclassic: 'Playstation Classic',
 		xboxoriginal: 'Original Xbox',
 		xbone: 'Xbox One',
+		ble: 'BLE HID',
 	},
 	'input-mode-group': {
 		primary: 'Primary Input Modes',
 		mini: 'Mini/Classic Console Modes',
+		wireless: 'Wireless Modes',
 	},
 	'boot-input-mode-label': 'Boot Input Modes',
 	'ps4-mode-options': {

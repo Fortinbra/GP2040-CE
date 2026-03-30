@@ -39,11 +39,18 @@
 
 #include "rndis.h"
 
-// TinyUSB
+// TinyUSB — do NOT include in the same TU as BTstack headers (hid_report_type_t collision)
 #include "tusb.h"
 
 // USB Input Class Drivers
 #include "drivermanager.h"
+
+// Wireless output
+#include "OutputManager.h"
+
+#ifdef ENABLE_BLUETOOTH
+#include "BLEHIDManager.h"
+#endif
 
 static const uint32_t REBOOT_HOTKEY_ACTIVATION_TIME_MS = 50;
 static const uint32_t REBOOT_HOTKEY_HOLD_TIME_MS = 4000;
@@ -191,8 +198,14 @@ void GP2040::setup() {
 			break;
 	}
 
-	// Setup USB Driver
+	// Setup USB Driver (no-op for BLE mode — DriverManager returns without setting a driver)
 	DriverManager::getInstance().setup(inputMode);
+
+#ifdef ENABLE_BLUETOOTH
+	if (inputMode == INPUT_MODE_BLE) {
+		BLEHIDManager::getInstance().init();
+	}
+#endif
 
 	// save to match user expectations on choosing mode at boot, and this is
 	// before USB host will be used so we can force it to ignore the check
@@ -285,13 +298,24 @@ void GP2040::run() {
 	Gamepad * processedGamepad = Storage::getInstance().GetProcessedGamepad();
 	GamepadState prevState;
 
-	// Start the TinyUSB Device functionality
-	tud_init(TUD_OPT_RHPORT);
+	// Determine if this is a wireless-only mode (no TinyUSB)
+	bool wirelessOnly = false;
+#ifdef ENABLE_BLUETOOTH
+	if (Storage::getInstance().getGamepadOptions().inputMode == INPUT_MODE_BLE) {
+		wirelessOnly = true;
+	}
+#endif
+
+	// Start the TinyUSB Device functionality (skipped in wireless-only mode)
+	if (!wirelessOnly) {
+		tud_init(TUD_OPT_RHPORT);
+	}
 
 	// Initialize our USB manager
 	USBHostManager::getInstance().start();
 
-	if (configMode == true ) {
+	// RNDIS web-config interface (skipped in wireless-only mode)
+	if (!wirelessOnly && configMode == true) {
 		rndis_init();
 	}
 
@@ -310,9 +334,18 @@ void GP2040::run() {
 		// Process USB Host on Core0
 		USBHostManager::getInstance().process();
 
+#ifdef ENABLE_BLUETOOTH
+		// Drive BTstack run loop in wireless-only mode
+		if (wirelessOnly) {
+			BLEHIDManager::getInstance().process();
+		}
+#endif
+
 		// Config Loop (Web-Config skips Core0 add-ons)
 		if (configMode == true) {
-			inputDriver->process(gamepad);
+			if (inputDriver != nullptr) {
+				inputDriver->process(gamepad);
+			}
 			rebootHotkeys.process(gamepad, configMode);
 			checkSaveRebootState();
 			continue;
@@ -338,11 +371,19 @@ void GP2040::run() {
 		// Copy Processed Gamepad for Core1 (race condition otherwise)
 		memcpy(&processedGamepad->state, &gamepad->state, sizeof(GamepadState));
 
-		// Process Input Driver
-		bool processed = inputDriver->process(gamepad);
+		// Process Input Driver (USB modes only)
+		bool processed = false;
+		if (!wirelessOnly && inputDriver != nullptr) {
+			processed = inputDriver->process(gamepad);
+		}
 
-		// TinyUSB Task update
-		tud_task();
+		// Dispatch wireless output (BLE HID)
+		OutputManager::dispatch(gamepad);
+
+		// TinyUSB Task update (skipped in wireless-only mode)
+		if (!wirelessOnly) {
+			tud_task();
+		}
 
 		// Post-Process Add-ons with USB Report Processed Sent
 		addons.PostprocessAddons(processed);

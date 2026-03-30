@@ -208,6 +208,7 @@ const INPUT_MODES = [
 	{ labelKey: 'input-mode-options.egret', value: 9, group: 'mini' },
 	{ labelKey: 'input-mode-options.astro', value: 10, group: 'mini' },
 	{ labelKey: 'input-mode-options.psclassic', value: 11, group: 'mini' },
+	{ labelKey: 'input-mode-options.ble', value: 18, group: 'wireless' },
 ];
 
 const INPUT_BOOT_MODES = [
@@ -254,11 +255,13 @@ const INPUT_BOOT_MODES = [
 	{ labelKey: 'input-mode-options.egret', value: 9, group: 'mini' },
 	{ labelKey: 'input-mode-options.astro', value: 10, group: 'mini' },
 	{ labelKey: 'input-mode-options.psclassic', value: 11, group: 'mini' },
+	{ labelKey: 'input-mode-options.ble', value: 18, group: 'wireless' },
 ];
 
 const INPUT_MODE_GROUPS = [
 	{ labelKey: 'input-mode-group.primary', value: 0, group: 'primary' },
 	{ labelKey: 'input-mode-group.mini', value: 1, group: 'mini' },
+	{ labelKey: 'input-mode-group.wireless', value: 2, group: 'wireless' },
 ];
 
 const DPAD_MODES = [

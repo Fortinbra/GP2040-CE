@@ -1,0 +1,367 @@
+// IMPORTANT: Do NOT include tusb.h or any TinyUSB header in this translation unit.
+// hid_report_type_t is defined by both TinyUSB and BTstack — including both
+// in the same translation unit causes a compile error.
+
+#include "BLEHIDManager.h"
+
+#include <string.h>
+
+// Pico SDK CYW43 / BTstack headers
+#include "pico/stdlib.h"
+#include "pico/time.h"
+#include "pico/cyw43_arch.h"
+#include "pico/btstack_run_loop_async_context.h"
+#include "pico/btstack_flash_bank.h"
+#include "platform/embedded/btstack_tlv_flash_bank.h"
+#include "ble/le_device_db_tlv.h"
+
+// BTstack core
+#include "btstack.h"
+
+// Generated GATT database header (from src/ble_hid.gatt via pico_btstack_make_gatt_header)
+#include "ble_hid.h"
+
+// HID Report Descriptor: 32 buttons + hat+padding (1 byte) + 4 axes (4 bytes) = 9 bytes
+// Report ID 1 — must match GATT Report Reference in ble_hid.gatt
+static const uint8_t hid_report_descriptor[] = {
+    0x05, 0x01,        // Usage Page (Generic Desktop)
+    0x09, 0x05,        // Usage (Game Pad)
+    0xA1, 0x01,        // Collection (Application)
+
+    0x85, 0x01,        // Report ID (0x01)
+
+    // 32 buttons
+    0x05, 0x09,        // Usage Page (Button)
+    0x19, 0x01,        // Usage Minimum (Button 1)
+    0x29, 0x20,        // Usage Maximum (Button 32)
+    0x15, 0x00,        // Logical Minimum (0)
+    0x25, 0x01,        // Logical Maximum (1)
+    0x75, 0x01,        // Report Size (1 bit)
+    0x95, 0x20,        // Report Count (32 buttons)
+    0x81, 0x02,        // Input (Data, Variable, Absolute)
+
+    // Hat switch (4 bits)
+    0x05, 0x01,        // Usage Page (Generic Desktop)
+    0x09, 0x39,        // Usage (Hat Switch)
+    0x15, 0x00,        // Logical Minimum (0)
+    0x25, 0x07,        // Logical Maximum (7)
+    0x75, 0x04,        // Report Size (4 bits)
+    0x95, 0x01,        // Report Count (1)
+    0x81, 0x42,        // Input (Data, Variable, Absolute, Null State)
+
+    // Padding (4 bits to align to byte boundary)
+    0x75, 0x04,        // Report Size (4 bits)
+    0x95, 0x01,        // Report Count (1)
+    0x81, 0x01,        // Input (Constant, Array)
+
+    // X Axis (Left Stick X)
+    0x09, 0x30,        // Usage (X)
+    0x15, 0x80,        // Logical Minimum (-128)
+    0x25, 0x7F,        // Logical Maximum (127)
+    0x75, 0x08,        // Report Size (8 bits)
+    0x95, 0x01,        // Report Count (1)
+    0x81, 0x02,        // Input (Data, Variable, Absolute)
+
+    // Y Axis (Left Stick Y)
+    0x09, 0x31,        // Usage (Y)
+    0x15, 0x80,        // Logical Minimum (-128)
+    0x25, 0x7F,        // Logical Maximum (127)
+    0x75, 0x08,        // Report Size (8 bits)
+    0x95, 0x01,        // Report Count (1)
+    0x81, 0x02,        // Input (Data, Variable, Absolute)
+
+    // Rx Axis (Right Stick X)
+    0x09, 0x33,        // Usage (Rx)
+    0x15, 0x80,        // Logical Minimum (-128)
+    0x25, 0x7F,        // Logical Maximum (127)
+    0x75, 0x08,        // Report Size (8 bits)
+    0x95, 0x01,        // Report Count (1)
+    0x81, 0x02,        // Input (Data, Variable, Absolute)
+
+    // Ry Axis (Right Stick Y)
+    0x09, 0x34,        // Usage (Ry)
+    0x15, 0x80,        // Logical Minimum (-128)
+    0x25, 0x7F,        // Logical Maximum (127)
+    0x75, 0x08,        // Report Size (8 bits)
+    0x95, 0x01,        // Report Count (1)
+    0x81, 0x02,        // Input (Data, Variable, Absolute)
+
+    0xC0,              // End Collection
+};
+
+static_assert(sizeof(hid_report_descriptor) > 0, "HID descriptor must not be empty");
+
+// BLE advertising data: Flags + Appearance (Gamepad, 964 = 0x03C4) + HID Service UUID
+static const uint8_t adv_data[] = {
+    2, BLUETOOTH_DATA_TYPE_FLAGS, 0x06,                  // LE General Discoverable, BR/EDR Not Supported
+    3, BLUETOOTH_DATA_TYPE_APPEARANCE, 0xC4, 0x03,       // Gamepad (964 = 0x03C4, little-endian)
+    7, BLUETOOTH_DATA_TYPE_COMPLETE_LIST_OF_16_BIT_SERVICE_CLASS_UUIDS,
+        0x12, 0x18,   // HID Service (0x1812)
+        0x0F, 0x18,   // Battery Service (0x180F)
+        0x0A, 0x18,   // Device Information Service (0x180A)
+};
+
+// Scan response: complete local name
+static const uint8_t scan_resp_data[] = {
+    18, BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME,
+    'G','P','2','0','4','0','-','C','E',' ','G','a','m','e','p','a','d',
+};
+
+// Static TLV context for bonding key storage in flash
+static btstack_tlv_flash_bank_t    tlv_context;
+
+// BTstack event handler registrations
+static btstack_packet_callback_registration_t hci_event_callback_registration;
+static btstack_packet_callback_registration_t sm_event_callback_registration;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public API
+// ─────────────────────────────────────────────────────────────────────────────
+
+void BLEHIDManager::init() {
+    if (_initialized || _bootTimeMs != 0) return;
+    _bootTimeMs = to_ms_since_boot(get_absolute_time());
+}
+
+void BLEHIDManager::process() {
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+
+    if (!_initialized) {
+        if (_bootTimeMs == 0) return;  // init() not called yet
+
+        // Retry-delay after a failed cyw43_arch_init
+        if (_initFailed) {
+            if ((now - _retryTimeMs) < 5000) return;
+            _initFailed = false;
+        }
+
+        // Deferred init: wait _initDelayMs ms after boot before touching the radio
+        if ((now - _bootTimeMs) < _initDelayMs) return;
+
+        _doInit();
+        return;
+    }
+
+    cyw43_arch_poll();
+
+    // Send any pending report via BTstack CAN_SEND_NOW mechanism
+    if (_reportPending && _connected && _notificationsEnabled) {
+        hids_device_request_can_send_now_event(_conHandle);
+    }
+}
+
+bool BLEHIDManager::sendReport(const uint8_t* report, uint16_t len) {
+    if (!_connected || !_notificationsEnabled) return false;
+    if (len > 9) len = 9;
+    memcpy(_pendingReport, report, len);
+    _pendingReportLen = len;
+    _reportPending    = true;
+    return true;
+}
+
+void BLEHIDManager::setPairingMode(bool enabled) {
+    _pairingMode = enabled;
+    if (_initialized) {
+        gap_advertisements_enable(enabled ? 1 : 0);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Private helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+void BLEHIDManager::_ledBlink(uint32_t count, uint32_t onMs, uint32_t offMs) {
+    for (uint32_t i = 0; i < count; i++) {
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+        sleep_ms(onMs);
+        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
+        sleep_ms(offMs);
+    }
+}
+
+void BLEHIDManager::_doInit() {
+    // Initialize CYW43 wireless chip
+    int err = cyw43_arch_init();
+    if (err != 0) {
+        _initFailed  = true;
+        _retryTimeMs = to_ms_since_boot(get_absolute_time());
+        return;
+    }
+
+    // 2 fast blinks: CYW43 init succeeded
+    _ledBlink(2, 100, 100);
+
+    // Initialize BTstack run loop integrated with the CYW43 async context
+    btstack_run_loop_init(btstack_run_loop_async_context_get_instance(cyw43_arch_async_context()));
+
+    // TLV flash-backed bonding database — MUST be initialized before sm_init / le_device_db
+    const btstack_tlv_t* tlv_impl = btstack_tlv_flash_bank_init_instance(
+        &tlv_context, pico_flash_bank_instance(), NULL);
+    le_device_db_tlv_configure(tlv_impl, &tlv_context);
+
+    // Core protocol layers
+    l2cap_init();
+
+    // ATT server — profile_data is generated from ble_hid.gatt by pico_btstack_make_gatt_header.
+    // NULL callbacks: hids_device registers its own service handler for all HIDS characteristics.
+    att_server_init(profile_data, NULL, NULL);
+
+    // HID over GATT device — boot mode 0 (no boot keyboard/mouse)
+    hids_device_init(0, hid_report_descriptor, sizeof(hid_report_descriptor));
+
+    // Battery service — set initial level; no separate init() call needed
+    battery_service_server_set_battery_value(100);
+
+    // Device Information Service
+    device_information_service_server_set_manufacturer_name("OpenStickCommunity");
+    device_information_service_server_set_model_number("GP2040-CE");
+    device_information_service_server_set_firmware_revision("1.0");
+
+    // Security Manager: Just Works, bonding enabled
+    sm_init();
+    sm_set_io_capabilities(IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
+    sm_set_authentication_requirements(SM_AUTHREQ_BONDING);
+
+    // Register event handlers
+    hci_event_callback_registration.callback = &_hciPacketHandler;
+    hci_add_event_handler(&hci_event_callback_registration);
+
+    sm_event_callback_registration.callback = &_smPacketHandler;
+    sm_add_event_handler(&sm_event_callback_registration);
+
+    // Set up advertising parameters and data (adv_type = 0 = ADV_IND, undirected connectable)
+    gap_advertisements_set_params(0x0030, 0x0060, 0, 0, NULL, 0x07, 0x00);
+    gap_advertisements_set_data(sizeof(adv_data), (uint8_t*)adv_data);
+    gap_scan_response_set_data(sizeof(scan_resp_data), (uint8_t*)scan_resp_data);
+
+    // 3 fast blinks before powering on HCI
+    _ledBlink(3, 80, 80);
+
+    // Power on the Bluetooth controller — advertising starts ONLY after
+    // BTSTACK_EVENT_STATE / HCI_STATE_WORKING fires (see _hciPacketHandler)
+    hci_power_control(HCI_POWER_ON);
+
+    _initialized = true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HCI / HIDS event handler
+// ─────────────────────────────────────────────────────────────────────────────
+
+void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
+                                      uint8_t* packet, uint16_t size) {
+    (void)channel;
+    (void)size;
+
+    BLEHIDManager& mgr = getInstance();
+
+    if (packetType != HCI_EVENT_PACKET) return;
+
+    uint8_t eventCode = hci_event_packet_get_type(packet);
+
+    switch (eventCode) {
+        case BTSTACK_EVENT_STATE:
+            if (btstack_event_state_get_state(packet) == HCI_STATE_WORKING) {
+                // Advertising starts ONLY here — not before hci_power_control returns
+                if (!mgr._advStarted) {
+                    gap_advertisements_enable(1);
+                    mgr._advStarted = true;
+                }
+            }
+            break;
+
+        case HCI_EVENT_DISCONNECTION_COMPLETE:
+            mgr._connected            = false;
+            mgr._notificationsEnabled = false;
+            mgr._conHandle            = HCI_CON_HANDLE_INVALID;
+            mgr._advStarted           = false;
+            // Restart advertising so the host can reconnect
+            gap_advertisements_enable(1);
+            mgr._advStarted = true;
+            break;
+
+        case HCI_EVENT_LE_META:
+            if (hci_event_le_meta_get_subevent_code(packet) ==
+                    HCI_SUBEVENT_LE_CONNECTION_COMPLETE) {
+                mgr._conHandle  = hci_subevent_le_connection_complete_get_connection_handle(packet);
+                mgr._connected  = true;
+                mgr._advStarted = false;
+            }
+            break;
+
+        case HCI_EVENT_HIDS_META:
+            switch (hci_event_hids_meta_get_subevent_code(packet)) {
+                case HIDS_SUBEVENT_INPUT_REPORT_ENABLE:
+                    mgr._notificationsEnabled =
+                        (hids_subevent_input_report_enable_get_enable(packet) != 0);
+                    break;
+                case HIDS_SUBEVENT_CAN_SEND_NOW:
+                    if (mgr._reportPending) {
+                        hids_device_send_input_report(mgr._conHandle,
+                                                      mgr._pendingReport,
+                                                      mgr._pendingReportLen);
+                        mgr._reportPending = false;
+                    }
+                    break;
+                default:
+                    break;
+            }
+            break;
+
+        default:
+            break;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SM (Security Manager) event handler
+// ─────────────────────────────────────────────────────────────────────────────
+
+void BLEHIDManager::_smPacketHandler(uint8_t packetType, uint16_t channel,
+                                     uint8_t* packet, uint16_t size) {
+    (void)channel;
+    (void)size;
+
+    if (packetType != HCI_EVENT_PACKET) return;
+
+    switch (hci_event_packet_get_type(packet)) {
+        case SM_EVENT_JUST_WORKS_REQUEST:
+            sm_just_works_confirm(sm_event_just_works_request_get_handle(packet));
+            break;
+        case SM_EVENT_PAIRING_COMPLETE:
+            // Pairing completed — host is now bonded
+            break;
+        default:
+            break;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ATT read callback
+// ─────────────────────────────────────────────────────────────────────────────
+
+uint16_t BLEHIDManager::_attReadCallback(uint16_t conHandle, uint16_t attHandle,
+                                          uint16_t offset, uint8_t* buffer,
+                                          uint16_t bufferSize) {
+    (void)conHandle;
+    return att_read_callback_handle_blob(
+        (const uint8_t*)hid_report_descriptor,
+        (uint16_t)sizeof(hid_report_descriptor),
+        offset, buffer, bufferSize);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ATT write callback
+// ─────────────────────────────────────────────────────────────────────────────
+
+int BLEHIDManager::_attWriteCallback(uint16_t conHandle, uint16_t attHandle,
+                                      uint16_t transactionMode, uint16_t offset,
+                                      uint8_t* buffer, uint16_t bufferSize) {
+    (void)conHandle;
+    (void)attHandle;
+    (void)transactionMode;
+    (void)offset;
+    (void)buffer;
+    (void)bufferSize;
+    return 0;
+}
