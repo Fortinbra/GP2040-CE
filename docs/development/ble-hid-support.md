@@ -448,9 +448,6 @@ void setupSM() {
     sm_set_authentication_requirements(
         SM_AUTHREQ_BONDING | SM_AUTHREQ_SECURE_CONNECTIONS
     );
-    
-    // Store bonding keys in flash TLV — two-arg form (tlv_impl + &tlv_context from setupBLE)
-    le_device_db_tlv_configure(tlv_impl, &tlv_context);
 }
 ```
 
