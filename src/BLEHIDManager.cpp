@@ -81,8 +81,9 @@ static const uint8_t adv_data[] = {
 };
 
 // Scan response: complete local name
+// Length = 0x0A (10) = 1 type byte + 9 name bytes. No null terminator — AD type 0x09 is not C-string.
 static const uint8_t scan_resp_data[] = {
-    0x0B, 0x09, 'G','P','2','0','4','0','-','C','E', 0x00,  // Complete Local Name: "GP2040-CE"
+    0x0A, 0x09, 'G','P','2','0','4','0','-','C','E',  // Complete Local Name: "GP2040-CE"
 };
 
 static void ble_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_t size);
@@ -161,9 +162,8 @@ void BLEHIDManager::_doInit() {
     hci_event_callback.callback = ble_packet_handler;
     hci_add_event_handler(&hci_event_callback);
 
-    _startAdvertising();
-
-    // 3 fast blinks: full stack configured, powering on HCI — advertising imminent.
+    // 3 fast blinks: full stack configured, powering on HCI.
+    // _startAdvertising() is called in the BTSTACK_EVENT_STATE handler once HCI_STATE_WORKING fires.
     blink_cyw43_led(3, 100, 100);
 
     hci_power_control(HCI_POWER_ON);
@@ -230,6 +230,13 @@ static void ble_packet_handler(uint8_t packet_type, uint16_t channel,
     if (packet_type == HCI_EVENT_PACKET) {
         switch (hci_event_packet_get_type(packet)) {
 
+            // HCI stack is fully up and ready — safe to start advertising now.
+            case BTSTACK_EVENT_STATE:
+                if (btstack_event_state_get_state(packet) == HCI_STATE_WORKING) {
+                    mgr._startAdvertising();
+                }
+                break;
+
             case HCI_EVENT_DISCONNECTION_COMPLETE:
                 mgr._connected = false;
                 mgr._notificationsEnabled = false;
@@ -243,9 +250,16 @@ static void ble_packet_handler(uint8_t packet_type, uint16_t channel,
                 sm_just_works_confirm(sm_event_just_works_request_get_handle(packet));
                 break;
 
-            // SM_EVENT_PAIRING_COMPLETE removed — BTstack persists bonding keys via le_device_db_tlv.
-            // No need to manually extract IRK/LTK; le_device_db_tlv handles everything.
-            // If we need to save the bonded address for reconnect, use a different SM event.
+            case SM_EVENT_PAIRING_COMPLETE: {
+                uint8_t status = sm_event_pairing_complete_get_status(packet);
+                if (status != ERROR_CODE_SUCCESS) {
+                    // Pairing failed. BTstack will disconnect; restart advertising so a
+                    // new connection attempt can be made. Blink fast 5x to signal failure.
+                    blink_cyw43_led(5, 50, 50);
+                    mgr._startAdvertising();
+                }
+                break;
+            }
 
             case HCI_EVENT_LE_META:
                 switch (hci_event_le_meta_get_subevent_code(packet)) {
