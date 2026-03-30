@@ -218,4 +218,67 @@ Rounds 4 & 5 escalated to Fortinbra (human governance decisions)
 
 **Output:** Full QA findings written to `.squad/decisions/inbox/riza-i2c-review.md`.
 
+### Review Cycle: BLE HID Support Doc Round 1 (2026-03-29)
+
+**Reviewed:** `docs/development/ble-hid-support.md` (authored by Maes Hughes, commit aa32e09c on feature/ble-hid-v2)
+
+**Verdict:** ❌ REJECTED (6 blocking issues)
+
+**Hughes locked out. Edward assigned for revision.**
+
+**Blocking Issues (all 6 are compile-time failures or critical API errors):**
+
+1. **SDK version string**: `2.2.0+` → must be `2.2.0` (same class as rm2-module-support.md round 1 rejection)
+2. **`le_device_db_tlv_configure` wrong signature**: Doc calls with one arg (`&tlv_context`); squad critical requirement documents two-arg form `le_device_db_tlv_configure(tlv_impl, &tlv_context)` — compile error + the exact hard-fault vector the doc claims to prevent
+3. **`btstack_tlv_flash_bank_init_instance` wrong params**: Doc passes a C string file path and `FLASH_SECTOR_SIZE` as parameters — BTstack Pico TLV API takes no file path; these parameters are fabricated
+4. **`BLEHIDReport` struct + `static_assert` mismatch**: Struct includes `report_id` field (10+ bytes) but `static_assert(sizeof(BLEHIDReport) == 9)` — will fail at compile time; also incorrect for BLE HID (ATT notifications don't include Report ID byte in payload)
+5. **GATT database uses non-existent BTstack types**: `gatt_char_t gatt_db[]`, `PRIMARY_SERVICE_UUID16()`, `CHARACTERISTIC_UUID16()` don't exist in BTstack's C API — actual BTstack Pico pattern is `.gatt` DSL file compiled to `uint8_t profile_data[]` header via `compile_gatt.py`
+6. **`battery_service_server_init(NULL)` wrong signature**: BTstack API takes `uint8_t` initial level, not NULL
+
+**Non-blocking notes:**
+- `att_server_client_is_subscribed` API name should be verified against installed BTstack
+- Phase dependency on Classic BT Phase 1 vs. parallel execution is ambiguous
+- Pitfall #7 (TinyUSB/BTstack isolation) duplicates bluetooth-support.md with slight inconsistency
+
+**Missing coverage:**
+- CMakeLists.txt GATT compile step (`compile_gatt.py` custom command) not documented
+- `BLEHIDManager::process()` call site in main loop not shown
+- `btstack_config.h` location, minimum required defines, and file-creation requirement not specified
+
+**Positive findings:**
+- Architecture diagram, pairing flow, security requirements, and BLE vs Classic comparison table are conceptually correct
+- All 10 pitfalls are correctly identified (even if some fixes are API-wrong)
+- Platform support claims (Windows ✅, Switch ❌, iOS complicated) are accurate
+- No Squad agent names in doc — clean attribution
+- USB Config Mode fallback (S2 hold at boot) is described
+- CCCD subscription check is present (in pitfalls section, though should be promoted)
+
+**Pattern reinforced:** Hughes consistently produces well-structured planning docs with accurate high-level concepts but incorrect low-level API details. Edward (firmware dev with BTstack hands-on experience) is the correct correction author for API-level fixes.
+
+**Findings written to:** `.squad/decisions/inbox/riza-ble-doc-review.md`
+
+### Review Cycle: BLE HID Support Doc Round 2 (2026-03-29)
+
+**Reviewed:** `docs/development/ble-hid-support.md` (revision by Edward, commit ff1fa570)
+
+**Verdict:** ✅ APPROVED
+
+**All 6 Round-1 Blockers Resolved:**
+1. SDK version `2.2.0+` → `2.2.0` exactly — confirmed clean, no `+` suffix anywhere in document
+2. `le_device_db_tlv_configure(tlv_impl, &tlv_context)` — two-arg form correct at all three locations (setupBLE, setupSM, pitfall #1)
+3. `btstack_tlv_flash_bank_init_instance(&tlv_context, pico_flash_bank_instance(), NULL)` — correct three-arg form, no file path strings, at both locations
+4. `BLEHIDReport` struct — `report_id` removed, `__attribute__((packed))` applied, layout 4+1+2+2=9 bytes, `static_assert(9)` correct, explanatory comment present
+5. GATT database — `.gatt` DSL file present, `pico_btstack_make_gatt_header` CMake snippet correct (target `GP2040-CE` verified), explicit warning against `#import <hids.gatt>`, pitfalls #4/#5 updated to DSL syntax
+6. Battery service — `battery_service_server_set_battery_value(100)` used throughout, `battery_service_server_init(NULL)` gone
+
+**One new non-blocking issue found:**
+- `setupSM()` contains a duplicate `le_device_db_tlv_configure(tlv_impl, &tlv_context)` call where `tlv_impl` is out of scope (it's a local variable in `setupBLE()`). Would cause a compiler error if `setupSM()` is copied verbatim without `tlv_impl` in scope. **Non-blocking** because the correct single-call pattern is correctly shown in `setupBLE()` and pitfall #1. Recommended: remove duplicate call from `setupSM()` in a polish pass.
+
+**Implementation readiness:** Edward is cleared to begin Phase 1 implementation. All critical APIs, GATT structure, CMake setup, and TLV initialization are correctly documented.
+
+**Hughes remains locked out per Round 1 policy.**
+
+**Pattern reinforced:** When splitting code across multiple illustrative functions, all variables referenced must be in scope or explicitly declared at file scope. Local variables that need cross-function access must be promoted to static file scope.
+
+**Findings written to:** `.squad/decisions/inbox/riza-ble-doc-rereview.md`
 

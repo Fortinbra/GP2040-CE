@@ -378,6 +378,61 @@ le_device_db_tlv_configure(tlv_impl, &tlv_context);  // Context object valid for
 
 **Why:** Transient failures during cold boot were masking the root cause (hard fault). LED debug signals provide visual feedback for field diagnostics.
 
+### 2026-03-29: S2 Boot Web Config Override Must Always Enable USB
+
+**By:** Edward (Firmware Dev)  
+**What:** Added `!configMode` guard to the `wirelessOnly` block in `src/gp2040.cpp` so that USB is always initialized when web config mode is active, even when the saved flash config is `INPUT_MODE_BLE`.
+
+```cpp
+bool wirelessOnly = false;
+#ifdef ENABLE_BLUETOOTH
+    if (!configMode && Storage::getInstance().getGamepadOptions().inputMode == INPUT_MODE_BLE) {
+        wirelessOnly = true;
+    }
+#endif
+```
+
+`configMode` is derived from `DriverManager::getInstance().isConfigMode()` at line 295, which reflects the runtime boot action (S2 held → `INPUT_MODE_CONFIG`), not the saved flash value.
+
+**Why:** S2 web config mode is a recovery/escape mechanism. It must be unconditionally reachable from USB regardless of saved input mode. Fix is minimal and surgical — one boolean condition, no other BLE behavior affected.  
+**Build:** ✅ Pass — `build_ble3/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2` (3,094,528 bytes)
+
+### 2026-03-30: BLE HID Phase 1 Implementation Complete
+
+**By:** Edward (Firmware Dev)  
+**Commit:** c494add2 on feature/ble-hid-v2  
+**What:** Full Phase 1 BLE HID gamepad implementation on a clean branch. Files created: `src/ble_hid.gatt`, `headers/BLEHIDManager.h`, `src/BLEHIDManager.cpp`, `headers/btstack_config.h`, `headers/OutputManager.h`, `src/OutputManager.cpp`. Files modified: `CMakeLists.txt`, `src/gp2040.cpp`, `proto/enums.proto`, `headers/display/ui/screens/MainMenuScreen.h`, web UI locale/mode selectors.
+
+**Critical SDK deviations documented:**
+- `pico_btstack_hid_device` CMake target does not exist in SDK 2.2.0; `hids_device.c` is inside `pico_btstack_ble`
+- `pico_cyw43_arch_poll` requires lwIP; use `pico_cyw43_arch_none` for BT-only
+- `ADV_IND` constant is not in BTstack public API; use `0` directly
+- `HIDS_SUBEVENT_INPUT_REPORT_DISABLE` does not exist; use `HIDS_SUBEVENT_INPUT_REPORT_ENABLE` + enable getter
+- Appearance value `964` in `.gatt` generates narrowing error; must use `C4 03` (hex bytes, little-endian)
+- `att_server_init` callbacks must be NULL; `hids_device` registers its own ATT handler
+
+**Build:** ✅ Success — `build_ble3/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2`  
+**Why:** Phase 1 lays the full BTstack BLE HID foundation for the GP2040-CE wireless input path.
+
+### 2026-03-30: BLE HID Report Descriptor Must Match USB HID Descriptor
+
+**By:** Edward (Firmware Dev)  
+**Commit:** 176109ef on feature/ble-hid-v2  
+**What:** The BLE HID report descriptor body must be byte-for-byte identical to the USB HID descriptor in `HIDDescriptors.h`, with only a Report ID 1 item (`0x85, 0x01`) prepended.
+
+Two bugs in the Phase 1 descriptor caused total input failure on Windows:
+- Axis usages Rx/Ry (0x33/0x34) instead of Z/Rz (0x32/0x35) used by the USB driver
+- Axis logical range signed -128..127 instead of unsigned 0..255 used by the USB driver and `HIDReport` struct
+
+`OutputManager::dispatch()` also encoded axes as signed `int8_t`; corrected to unsigned `uint8_t` matching `HIDDriver::process()`.
+
+**Rules going forward:**
+- BLE HID descriptor = USB `hid_report_descriptor` body + Report ID 1 prefix
+- The 9-byte ATT notification payload is always: 4 bytes buttons + 1 byte hat/pad + 4 bytes axes (no Report ID byte in payload)
+- Any change to the USB descriptor MUST be reflected in the BLE descriptor and OutputManager simultaneously
+
+**Why:** When Windows parses the GATT HID Report Map characteristic, any mismatch with the actual ATT notification data cascades to full input failure. BLE and USB must present identical layouts.
+
 ## Governance
 
 - All meaningful changes require team consensus

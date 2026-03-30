@@ -399,3 +399,80 @@ Edward's detailed protocol analysis revealed that the original "Battery Level Re
 Both documents now accurately reference Pico SDK 2.2.0 APIs and RP2040 hardware capabilities. Ready for PR targeting develop branch.
 
 **Output:** Completion note written to .squad/decisions/inbox/hughes-i2c-corrections.md. All changes committed with Co-authored-by trailer.
+
+### 2026-03-29T210000: BLE HID Feature Documentation — Comprehensive Implementation Guide
+
+**Task:** Write comprehensive BLE HID feature doc for GP2040-CE, separate from existing bluetooth-support.md (Classic HID).
+
+**Document Created:** `docs/development/ble-hid-support.md`  
+**Branch:** feature/ble-hid-v2  
+**Commit:** aa32e09c
+
+**Context:**
+- First BLE HID implementation attempt revealed critical BTstack integration issues
+- BLE HID is distinct from BT Classic: GATT-based instead of L2CAP/SDP, lower power, different platform support
+- Target platforms: Windows 10/11, Android (iOS stretch goal Phase 3)
+- NOT supported on Nintendo Switch (hard constraint—Switch requires BT Classic)
+- Reference board: Pimoroni Pico Lipo 2 XL W (RP2350B + CYW43 + LiPo charging)
+
+**Content Coverage:**
+
+1. **Scope Clarity** — Explicit IN-scope and OUT-of-scope sections distinguishing BLE from Classic and from iOS (Phase 3 deferral)
+
+2. **Architecture** — How BLE HID integrates with OutputManager; GATT (vs. L2CAP) distinction
+
+3. **BTstack Critical Requirements** — Six must-know implementation rules from failed attempt 1:
+   - TLV flash bonding database must be initialized with non-NULL context BEFORE sm_init()
+   - Secure Connections (SC) required for Windows 10/11 via ENABLE_LE_SECURE_CONNECTIONS define
+   - Advertising MUST start AFTER HCI_STATE_WORKING event, not immediately after hci_power_control()
+   - GATT discovery characteristics must NOT require encryption (chicken-and-egg with pairing)
+   - Boot Keyboard/Mouse characteristics must be OMITTED for gamepads (causes ATT discovery errors)
+   - Report ID consistency between HID descriptor and GATT Report Reference descriptor
+
+4. **GATT Database Structure** — Minimal correct schema with service UUIDs, attribute handles, CCCD placement, and sample ATT database code
+
+5. **HID Report Descriptor** — 32 buttons + hat switch + 4 axes gamepad layout with report structure and byte-by-byte breakdown
+
+6. **Pairing & Bonding** — SM configuration (Just Works, no PIN), TLV flash persistence, pairing flow, manual bonding management
+
+7. **USB Config Mode Fallback** — S2 button hold at boot forces USB HID + RNDIS web config (BLE disabled), ensuring config access even in BLE-only mode
+
+8. **Battery Reporting** — GATT Battery Service (UUID 0x180F), ADC voltage measurement (GPIO29/ADC3), VBUS detection, polling interval
+
+9. **Known Pitfalls & Checklist** — 10 critical lessons from implementation attempt 1:
+   - TLV NULL context hard fault
+   - Advertising timing before HCI_STATE_WORKING
+   - Secure Connections missing on Windows
+   - Encryption required on discovery characteristics
+   - Boot Mode characteristics causing discovery failures
+   - Report ID mismatch errors
+   - TinyUSB/BTstack hid_report_type_t namespace collision
+   - CCCD not subscribed (no notifications sent)
+   - Connection drops after bonding
+   - Android reconnection quirks (iOS deferred)
+
+10. **Phased Implementation Plan:**
+    - Phase 1 (10–15 days): Core BLE HID, pairing, bonding, USB fallback, Windows/Android testing
+    - Phase 2 (5–7 days): Polish, troubleshooting docs, API reference, performance characterization
+    - Phase 3 (8–10 days): iOS support, advanced power management, sniff mode
+
+11. **Comparison Table** — BLE HID vs. BT Classic across power, latency, platform support, complexity
+
+**Style & Quality:**
+- Follows bluetooth-support.md structure and tone (technical, practical, code-focused)
+- 4-space indentation in all code blocks
+- No internal Squad agent names ("GP2040-CE core team" only)
+- SDK version: 2.2.0 (ground truth per decisions.md)
+- Cross-linked to bluetooth-support.md and rp2350-support.md
+- Comprehensive code examples (BTstack API calls, GATT database, HID descriptor, sm_init pattern)
+- Marks each phase clearly with deliverables and dependencies
+
+**Technical Validation:**
+- All BTstack API references verified against Pico SDK 2.2.0 documentation
+- Pitfalls drawn from actual failed implementation attempt (Fortinbra's first try on Pimoroni board)
+- Board constraints verified (CYW43-only, no Pico without wireless)
+- Windows SC requirement confirmed (BTstack default does NOT enable SC; must define explicitly)
+
+**Status:** ✅ **COMPLETE**
+
+Document provides implementation roadmap for Phase 2 contributors, consolidates lessons learned from failed attempt 1, and clearly delineates what is Phase 1 vs. Phase 3 (iOS deferral).

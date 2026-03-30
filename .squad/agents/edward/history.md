@@ -223,3 +223,89 @@ Edward's round-1 revision (`688582e4`) passed technical content checks in all su
 - `headers/helper.h:38–40` — `isValidPin()` using `NUM_BANK0_GPIOS`
 - `configs/Pico/BoardConfig.h` — standard Pico pin allocation (GPIO 2–21 for buttons, 0–1 I2C, 28 LEDs)
 - `configs/PicoW/BoardConfig.h` — Pico W same layout; GPIO 23–25 reserved (CYW43)
+
+### 2026-03-29: BLE HID Doc Revision — 6 Riza Blockers Fixed
+
+**Tasked by:** Fortinbra (via Coordinator). Hughes locked out per review policy after Riza rejection.
+
+**Fixed `docs/development/ble-hid-support.md` on branch `feature/ble-hid-v2` (commit ff1fa570).**
+
+**6 blocking API errors corrected:**
+
+1. **SDK version** — Changed 2.2.0+ and 2.2.0 or later to exactly 2.2.0 throughout. Ground truth is CMakeLists.txt line 7.
+
+2. **le_device_db_tlv_configure two-arg form** — Correct signature is le_device_db_tlv_configure(tlv_impl, &tlv_context). The tlv_impl is the btstack_tlv_t* interface pointer returned by btstack_tlv_flash_bank_init_instance(). One-arg form does not exist in BTstack API.
+
+3. **btstack_tlv_flash_bank_init_instance signature** — Correct: btstack_tlv_flash_bank_init_instance(&tlv_context, pico_flash_bank_instance(), NULL). No file path string, no FLASH_SECTOR_SIZE. pico_flash_bank_instance() returns the hal_flash_bank_t*. Third arg is context pointer, always NULL for Pico.
+
+4. **BLEHIDReport struct** — Removed report_id field. BLE HID ATT notifications carry raw payload only; Report ID lives in the GATT Report Reference descriptor (0x2908), NOT in the packet bytes. Added __attribute__((packed)). sizeof(BLEHIDReport) = 4 (buttons) + 1 (hat+pad) + 2 (x,y) + 2 (rx,ry) = 9 bytes. static_assert(9) now correct.
+
+5. **GATT database** — Replaced fabricated gatt_char_t gatt_db[] C struct with correct .gatt DSL file (src/ble_hid.gatt) compiled by pico_btstack_make_gatt_header. gatt_char_t, PRIMARY_SERVICE_UUID16(), CHARACTERISTIC_UUID16(), DESCRIPTOR_UUID16() do not exist in BTstack C API. Added CMakeLists.txt snippet. Explicitly warned against using hids.gatt import (adds ENCRYPTION_KEY_SIZE_16 to all characteristics, blocks pre-pairing discovery).
+
+6. **Battery service API** — Replaced battery_service_server_init(NULL) with battery_service_server_set_battery_value(100). No separate init() call exists or is needed; service is initialized via att_server_init() + GATT database. set_battery_value() takes uint8_t (0-100).
+
+**Also added:** "Critical API Checklist" subsection at the top of Known Pitfalls with all 6 issues as checkboxes. Updated pitfall examples #4 and #5 to use .gatt DSL syntax instead of old C struct macros.
+
+### 2026-03-30: Phase 1 BLE HID Implementation (feature/ble-hid-v2)
+
+**Tasked by:** Fortinbra. Commit: c494add2.
+
+**Files created:**
+- src/ble_hid.gatt — Minimal HID gamepad GATT database using BTstack .gatt DSL; appearance value C4 03 (hex bytes, little-endian for 964 = 0x03C4; NOT decimal 964 which causes narrowing error in generated header).
+- headers/BLEHIDManager.h — Singleton class; no TinyUSB headers (hid_report_type_t collision).
+- src/BLEHIDManager.cpp — BTstack BLE HID implementation; 3s deferred init; LED blink debug; advertising in BTSTACK_EVENT_STATE only.
+- headers/btstack_config.h — BLE-only BTstack config with ENABLE_LE_SECURE_CONNECTIONS.
+- headers/OutputManager.h + src/OutputManager.cpp — BLE dispatch alongside USB, gated on ENABLE_BLUETOOTH.
+
+**Files modified:**
+- CMakeLists.txt — Added if(PICO_CYW43_SUPPORTED) block with pico_cyw43_arch_none, pico_btstack_ble, pico_btstack_cyw43, pico_btstack_flash_bank; pico_btstack_make_gatt_header.
+- src/gp2040.cpp — wirelessOnly flag gates tud_init, rndis_init, tud_task; BLEHIDManager::init() called in setup(); process() in run loop.
+- proto/enums.proto — Added INPUT_MODE_BLE = 18.
+- headers/display/ui/screens/MainMenuScreen.h — Added INPUT_MODE_BLE_NAME "BLE HID" (required by InputMode_VALUELIST macro).
+- Web UI — Added BLE to INPUT_MODES, INPUT_BOOT_MODES, INPUT_MODE_GROUPS; locale key added.
+
+**Critical deviations from doc/spec:**
+1. **pico_btstack_hid_device does not exist** in SDK 2.2.0 — hids_device.c is already included in pico_btstack_ble. Removed the non-existent target.
+2. **pico_cyw43_arch_poll requires lwIP** (pico/lwip_nosys.h) even in poll mode. Used pico_cyw43_arch_none instead (BT-only, no WiFi/lwIP, threadsafe background context).
+3. **ADV_IND constant not defined** in BTstack's public API. Used numeric   directly per hog_keyboard_demo.c pattern.
+4. **HIDS_SUBEVENT_INPUT_REPORT_DISABLE does not exist** — only HIDS_SUBEVENT_INPUT_REPORT_ENABLE exists; uses hids_subevent_input_report_enable_get_enable(packet) to get enable/disable state.
+5. **GATT appearance value must be hex bytes** — 964 decimal in .gatt file becomes  x964 in generated header causing uint8_t narrowing error. Must use C4 03 (little-endian hex).
+6. **tt_server_init callbacks set to NULL** — hids_device registers its own ATT service handler; application-level read/write callbacks are not needed and would interfere.
+7. **INPUT_MODE_BLE_NAME must be added to MainMenuScreen.h** — the InputMode_VALUELIST macro expands enum values with ##_NAME suffix for the on-device menu display. Missing causes compile error.
+8. **tstack_run_loop_init header** — requires pico/btstack_run_loop_async_context.h, NOT pico/btstack_cyw43.h (which doesn't exist as a standalone header in this SDK version).
+
+## Learnings
+
+### S2 Web Config Override Fix (2026-03-29)
+**Task:** Verify and build the !configMode guard in un() that prevents wirelessOnly = true when S2 is held at boot.
+
+**Fix location:** src/gp2040.cpp lines 301–308.
+- The wirelessOnly block now reads: if (!configMode && Storage::getInstance().getGamepadOptions().inputMode == INPUT_MODE_BLE)
+- configMode is derived from DriverManager::getInstance().isConfigMode() at line 295, which is set correctly by setup() when BootAction::ENTER_WEBCONFIG_MODE is detected.
+- This means: if S2 was held and inputMode was forced to INPUT_MODE_CONFIG, configMode == true, the guard short-circuits, wirelessOnly stays alse, and 	ud_init runs — USB is alive, web config works.
+
+**Build result:** Success. UF2 confirmed: uild_ble3/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2 (3,094,528 bytes, 2026-03-29 23:51).
+
+**Key insight:** The critical ordering is setup() → DriverManager::setup(inputMode) → un() → DriverManager::isConfigMode(). Because setup() resolves boot actions before un() queries config mode, the guard is always evaluated with the *runtime-resolved* mode, not the saved flash value. The saved flash inputMode == INPUT_MODE_BLE is irrelevant when S2 override has occurred.
+
+### 2026-03-30: BLE HID Descriptor Fix — Axis Usages and Logical Range
+
+**Tasked by:** Fortinbra. Commit: 176109ef on feature/ble-hid-v2.
+
+**Problem:** Windows showed device as "4 axis 16 button game pad with 32 buttons" and no button presses registered.
+
+**Root cause (three bugs):**
+
+1. **Wrong axis usages** — BLE descriptor used Rx (0x33) and Ry (0x34). USB HID driver uses Z (0x32) and Rz (0x35). Windows maps these usages differently; mismatch causes OS to misparse the report.
+
+2. **Wrong axis logical range** — BLE descriptor declared LOGICAL_MINIMUM (-128) / LOGICAL_MAXIMUM (127). USB sends unsigned 0..255. Windows interprets bytes per descriptor range; mismatch corrupts axis and button parsing.
+
+3. **OutputManager wrong data** — converted axis to signed int8 matching wrong descriptor. Fixed to unsigned uint8 matching USB HIDDriver.
+
+**Fix:** Replaced BLE hid_report_descriptor with body identical to USB HIDDescriptors.h + Report ID 1. Added PHYSICAL_MAXIMUM (255). Grouped 4 axes with REPORT_COUNT 4. Updated OutputManager::dispatch() to unsigned axis encoding.
+
+**Key insight:** For BLE HID the Report ID byte is NOT sent in the ATT notification payload; it is conveyed by the GATT Report Reference descriptor (REPORT_REFERENCE, READ, 1, 1). The 9-byte notification maps 1:1 to HIDReport struct.
+
+**Files changed:** src/BLEHIDManager.cpp, src/OutputManager.cpp
+
+**Build:** Clean. UF2: build_ble3/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2 (3,094,528 bytes)
