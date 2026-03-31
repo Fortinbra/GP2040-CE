@@ -627,3 +627,37 @@ Next Steps:
 - Button presses register when pressed ✓
 - No USB enumeration failures ✓
 - Multi-transport input pipeline validated end-to-end ✓
+
+---
+
+## 2026-03-30: Bonding Persistence — Session Complete
+
+**Files:** headers/BLEHIDManager.h, src/BLEHIDManager.cpp  
+**Status:** ✅ READY FOR COMMIT
+
+### Implementation Summary
+
+Bonding persistence complete. Devices can now reconnect without re-pairing.
+
+#### SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED
+- Sets _notificationsEnabled = true optimistically on reconnect
+- Host won't re-write CCCD after bond restore → prevents notification loss
+- Triggered by BTstack when bonded peer is recognized
+
+#### SM_EVENT_PAIRING_COMPLETE
+- Sets _hasBondedPeers = true immediately after pairing succeeds
+- Tracks bond state for runtime detection
+
+#### _doInit() Startup Detection
+- Calls le_device_db_count() to detect saved bonds at startup
+- Loads bond database state before advertising resumes
+
+#### Code Cleanup
+- Removed nuclear bypass: restored _notificationsEnabled guard in process() and sendReport()
+- Removed diagnostic slow-blink block that masked notification state
+
+#### Public API Additions
+- isNotifying() — query notification enable state
+- hasBondedPeers() — query presence of stored bonds
+
+Bond database persists across power cycles via BTstack's le_device_db.*

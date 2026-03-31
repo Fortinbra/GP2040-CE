@@ -32,8 +32,10 @@ public:
     // Enable or disable BLE pairing (advertising with general discoverability).
     void setPairingMode(bool enabled);
 
-    bool isConnected() const { return _connected; }
-    bool isEnabled() const   { return _initialized; }
+    bool isConnected() const    { return _connected; }
+    bool isEnabled() const      { return _initialized; }
+    bool isNotifying() const    { return _notificationsEnabled; }
+    bool hasBondedPeers() const { return _hasBondedPeers; }
 
 private:
     BLEHIDManager() = default;
@@ -65,8 +67,10 @@ private:
     volatile bool     _connected            = false;
     volatile bool     _notificationsEnabled = false;
     volatile bool     _reportPending        = false;
+    volatile bool     _hasBondedPeers       = false;
     volatile uint16_t _conHandle            = 0xFFFF;
     volatile uint16_t _pendingReportLen     = 0;
+    volatile uint8_t  _pendingBlinkType     = 0;  // 1 = report sent, 3 = disabled, 5 = enabled
     uint8_t  _pendingReport[9]     = {};
 };
 

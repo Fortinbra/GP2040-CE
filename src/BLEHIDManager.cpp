@@ -160,28 +160,13 @@ void BLEHIDManager::process() {
         }
     }
 
-    // NUCLEAR DEBUG: request can send without checking _notificationsEnabled
-    // TODO: restore _notificationsEnabled check after debugging
-    if (_reportPending && _connected) {
+    if (_reportPending && _connected && _notificationsEnabled) {
         hids_device_request_can_send_now_event(_conHandle);
-    }
-    
-    // Diagnostic: slow LED toggle every 2s if connected but notifications still not enabled
-    if (_reportPending && _connected && !_notificationsEnabled) {
-        static absolute_time_t lastDiagBlink = {0};
-        if (absolute_time_diff_us(lastDiagBlink, get_absolute_time()) >= 2000000) {
-            static bool diagLedOn = false;
-            diagLedOn = !diagLedOn;
-            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, diagLedOn ? 1 : 0);
-            lastDiagBlink = get_absolute_time();
-        }
     }
 }
 
 bool BLEHIDManager::sendReport(const uint8_t* report, uint16_t len) {
-    // NUCLEAR DEBUG: bypass notification gate to test if reports flow at all
-    // TODO: restore _notificationsEnabled check after debugging
-    if (!_connected) return false;
+    if (!_connected || !_notificationsEnabled) return false;
     
     if (len > 9) len = 9;
     memcpy(_pendingReport, report, len);
@@ -229,6 +214,9 @@ void BLEHIDManager::_doInit() {
     const btstack_tlv_t* tlv_impl = btstack_tlv_flash_bank_init_instance(
         &tlv_context, pico_flash_bank_instance(), NULL);
     le_device_db_tlv_configure(tlv_impl, &tlv_context);
+
+    // Check for previously bonded peers — used to skip re-pairing on reconnect
+    _hasBondedPeers = (le_device_db_count() > 0);
 
     // Core protocol layers — SM must be initialized before ATT/GATT services
     l2cap_init();
@@ -364,12 +352,24 @@ void BLEHIDManager::_smPacketHandler(uint8_t packetType, uint16_t channel,
 
     if (packetType != HCI_EVENT_PACKET) return;
 
+    BLEHIDManager& mgr = getInstance();
+
     switch (hci_event_packet_get_type(packet)) {
         case SM_EVENT_JUST_WORKS_REQUEST:
             sm_just_works_confirm(sm_event_just_works_request_get_handle(packet));
             break;
+        case SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED:
+            // BTstack recognized a reconnecting bonded peer via IRK resolution.
+            // Windows and macOS cache CCCD state and often do not re-write it on
+            // reconnect, so HIDS_SUBEVENT_INPUT_REPORT_ENABLE may never fire.
+            // Set _notificationsEnabled optimistically — we know this host was
+            // previously subscribed.
+            mgr._notificationsEnabled = true;
+            mgr._hasBondedPeers       = true;
+            break;
         case SM_EVENT_PAIRING_COMPLETE:
-            // Pairing completed — host is now bonded
+            // Fresh pairing finished — record that we now have a bonded peer.
+            mgr._hasBondedPeers = true;
             break;
         default:
             break;
