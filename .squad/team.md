@@ -18,6 +18,7 @@
 | Winry | ⚛️ Frontend Dev | `.squad/agents/winry/charter.md` | active |
 | Riza | 🧪 QA/Reviewer | `.squad/agents/riza/charter.md` | active |
 | Scribe | 📋 Session Logger | `.squad/agents/scribe/charter.md` | active |
+| Ralph | 🔄 Work Monitor | — | active |
 
 ## Project Context
 

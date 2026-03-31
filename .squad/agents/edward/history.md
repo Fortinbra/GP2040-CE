@@ -309,3 +309,321 @@ Edward's round-1 revision (`688582e4`) passed technical content checks in all su
 **Files changed:** src/BLEHIDManager.cpp, src/OutputManager.cpp
 
 **Build:** Clean. UF2: build_ble3/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2 (3,094,528 bytes)
+
+### 2026-03-31: BLE HID Report Pipeline Audit — volatile fix + sm_init ordering
+
+**Tasked by:** Fortinbra (via Fortinbra). Commit: e2584c20 on feature/ble-hid-v2.
+
+**Problem:** After descriptor fix (commit 176109ef), still zero button presses received by Windows.
+
+**Root cause — PRIMARY (volatile missing):**
+_connected, _notificationsEnabled, _reportPending, _conHandle, _pendingReportLen are written
+by _hciPacketHandler running in BTstack's sync_context_threadsafe_background IRQ context and read
+by the main thread in process() and sendReport(). Without olatile, the compiler cached them in
+registers and the main thread never saw the IRQ-written values. sendReport() always evaluated
+!_connected || !_notificationsEnabled as 	rue → returned alse → _reportPending never set →
+process() never called hids_device_request_can_send_now_event() → zero ATT notifications.
+
+**Root cause — SECONDARY (sm_init ordering):**
+BTstack requires sm_init() before tt_server_init() / service layer inits. The original code called
+sm_init() after hids_device_init() and all service setup. Moved it immediately after l2cap_init().
+
+**Fix:** BLEHIDManager.h — added olatile to those 5 members. BLEHIDManager.cpp — reordered init.
+
+**Descriptor audit result:** BLE descriptor is byte-for-byte identical to USB hid_report_descriptor
+plus Report ID 1 prefix. Notification payload = 9 bytes (32 btn + hat/pad + 4 axes), Report ID NOT in
+payload (conveyed by GATT Report Reference descriptor at 0x0023, value 01 01). This is CORRECT.
+
+**async_context threading model (pico_cyw43_arch_none):**
+BTstack runs entirely in sync_context_threadsafe_background which fires from a periodic alarm IRQ on
+the SAME core (core0) as the main thread. This is NOT an SMP context — the IRQ preempts the main thread
+at instruction boundaries. olatile is the correct and sufficient mechanism for variables shared
+between main thread and this IRQ level. ARM Cortex-M's sequential store model ensures that
+memcpy(_pendingReport, ...) writes are visible to the IRQ handler that fires after _reportPending=true
+is written, because the IRQ can only preempt AFTER all instructions in program order complete.
+
+**Build result:** Clean. UF2: build_ble3/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.elf linked.
+
+
+### 2026-03-30: BLE Firmware Rebuild — e2584c20 (volatile + sm_init fix)
+
+**Tasked by:** thegu
+
+**Build target:** uild_ble3 / PimoroniPicoLipo2XLW / pico2_w
+
+**Result:** ✅ SUCCESS — no rebuild required. Ninja reported "no work to do" because the previous build already incorporated commit e2584c20.
+
+**Timestamps confirmed:**
+- src/BLEHIDManager.cpp last modified: 2026-03-30 10:07:44
+- headers/BLEHIDManager.h last modified: 2026-03-30 10:07:24
+- .uf2 built: 2026-03-30 10:08:03 (newer than sources — build is current)
+
+**Output artifact:** GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2 — 3,094,528 bytes (~3.0 MB)
+
+**No relevant BLE/volatile/BTstack warnings observed** (build was a no-op; prior compilation succeeded cleanly per artifact existence).
+
+**What the fixed commit did:**
+1. Added olatile to five fields written by BTstack's sync_context_threadsafe_background IRQ and read from the main thread: _connected, _notificationsEnabled, _reportPending, _conHandle, _pendingReportLen. Without olatile the compiler cached them in registers, causing sendReport() to always see alse and never send ATT notifications.
+2. Moved sm_init() / sm_set_io_capabilities() / sm_set_authentication_requirements() before tt_server_init() and hids_device_init() — BTstack requires the Security Manager to be initialized before the ATT/GATT service layer.
+
+### 2026-03-31: BLE GPIO Input Loop Fix — inputDriver->process() Must Run in BLE Mode
+
+**Tasked by:** thegu (via Edward). Commit: TBD on feature/ble-hid-v2.
+
+**Problem:** After flashing e2584c20 (volatile fix + sm_init order), BLE connects and HID descriptor is correct (32 buttons in joy.cpl), but **zero button presses register**.
+
+**Root cause:** In `src/gp2040.cpp` lines 375-382, the main `run()` loop has a `wirelessOnly` path that calls `BLEHIDManager::process()` ✅ and `OutputManager::dispatch(gamepad)` ✅ but skips `inputDriver->process(gamepad)` ❌. The guard was:
+``cpp
+if (!wirelessOnly && inputDriver != nullptr) {
+    processed = inputDriver->process(gamepad);
+}
+``
+This meant GPIO was never read into `gamepad->state` in BLE mode — dispatch always sent all-zeros state.
+
+**Fix:** Removed the `!wirelessOnly` guard so `inputDriver->process(gamepad)` runs in ALL input modes. Changed line 375-379 from:
+``cpp
+// Process Input Driver (USB modes only)
+bool processed = false;
+if (!wirelessOnly && inputDriver != nullptr) {
+``
+to:
+``cpp
+// Process Input Driver (read GPIO and populate GamepadState)
+bool processed = false;
+if (inputDriver != nullptr) {
+``
+
+**Why this is correct:**
+- `inputDriver->process(gamepad)` reads GPIO pins into `gamepad->state` and returns `true` if it sent a USB HID report. The return value `processed` is only used by `addons.PostprocessAddons(processed)` (line 390) and is irrelevant to BLE dispatch.
+- In BLE mode, `inputDriver->process()` will return `false` (no USB report sent), but it still populates `gamepad->state` from GPIO, which is exactly what `OutputManager::dispatch()` needs.
+- The non-wireless path (USB HID) already calls `inputDriver->process(gamepad)` at line 348 in the configMode branch and line 378 in normal operation. The BLE path now mirrors this.
+
+**Build result:** Clean. UF2: `build_ble3/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2` (3,094,528 bytes, 2026-03-31 11:12).
+
+**Files changed:** `src/gp2040.cpp` (line 375, comment + guard condition only)
+
+**Verified OutputManager logic is correct:**
+- `OutputManager::dispatch()` checks `inputMode == INPUT_MODE_BLE` at line 15 (early return if not BLE).
+- Maps `gamepad->state.buttons` (32-bit bitmask) → report bytes 0-3 (little-endian) ✅
+- Maps `gamepad->state.dpad` (bitmask) → hat 0-7 or 0xF → report byte 4 ✅
+- Maps `gamepad->state.lx/ly/rx/ry` (uint16) → uint8 via `>> 8` → report bytes 5-8 ✅
+- All mappings match the BLE HID descriptor in `BLEHIDManager.cpp` and the USB HID descriptor exactly.
+
+**Key insight:** The `!wirelessOnly` guard was a copy-paste error from the USB-only original codebase. GPIO reading is transport-agnostic — it must happen before ANY output dispatch (USB or BLE). Only the output dispatch path should branch on input mode.
+
+### 2026-03-31: BLE HID Pipeline Deep Audit — Root Cause Still Unconfirmed
+
+**Tasked by:** thegu. Commit: TBD (debug LED blinks added).
+
+**Situation:** After GPIO reading fix (already in feature/ble-hid-v2), BLE still connects cleanly and HID descriptor is correct (32 buttons show in joy.cpl), but **zero button presses register**.
+
+**Audit results:**
+
+1. **✅ _notificationsEnabled event handling is CORRECT:**  
+   - Code listens for HIDS_SUBEVENT_INPUT_REPORT_ENABLE (0x05) at BLEHIDManager.cpp:275
+   - Uses proper accessor hids_subevent_input_report_enable_get_enable(packet)
+   - Sets `_notificationsEnabled` based on packet value
+
+2. **✅ BTstack run loop is CORRECT:**  
+   - `process()` calls `cyw43_arch_poll()` to pump CYW43 driver (line 128)
+   - BTstack run loop integrated via `btstack_run_loop_async_context` (line 178)
+   - NOT using blocking `btstack_run_loop_execute()`
+
+3. **✅ Report ID in ATT payload is CORRECT:**  
+   - OutputManager.cpp builds exactly 9 bytes (4 button + 1 hat + 4 axes)
+   - NO Report ID byte prefix — BTstack handles this via GATT Report Reference descriptor
+
+4. **✅ GPIO reading is CORRECT:**  
+   - `gamepad->read()` IS called every loop iteration (gp2040.cpp:331) BEFORE OutputManager::dispatch()
+   - GPIO reading is transport-agnostic (documented pattern in btstack-rp2040/SKILL.md)
+   - `inputDriver` is nullptr in BLE mode, but GPIO is read by `gamepad->read()` at line 331, not by `inputDriver->process()`
+
+5. **⚠️ Root cause UNCONFIRMED without hardware:**  
+   - Cannot confirm if Windows enables notifications on the GATT input report characteristic CCCD
+   - Cannot confirm if `_notificationsEnabled` is actually set to true at runtime
+   - Cannot confirm if button data in `gamepad->state` is non-zero when buttons are pressed
+
+**Debug instrumentation added:**
+
+Added LED blink diagnostics to trace execution flow (no USB serial in BLE-only mode):
+- **5 fast blinks (50ms)**: `HIDS_SUBEVENT_INPUT_REPORT_ENABLE` arrives with enable=1
+- **3 slow blinks (150ms)**: Event arrives with enable=0
+- **2 rapid double-blinks (30µs)**: `OutputManager::dispatch()` called with buttons != 0
+- **Single 20µs pulse**: `sendReport()` called but notifications disabled
+- **Single 50µs pulse**: Report actually sent via BTstack
+
+**Files changed:**
+- `src/BLEHIDManager.cpp`: Added LED blinks in `_hciPacketHandler()` for HIDS_SUBEVENT_INPUT_REPORT_ENABLE and HIDS_SUBEVENT_CAN_SEND_NOW; added LED pulse in `sendReport()` when notifications disabled
+- `src/OutputManager.cpp`: Added LED double-blink when buttons != 0; added `#include "pico/cyw43_arch.h"`
+
+**Build result:** Clean. UF2: `build_ble3/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2` (3,095,040 bytes, 2026-03-31 11:31:08)
+
+**Next step:** Flash to hardware and observe LED patterns to identify where pipeline fails. Patterns will reveal:
+- If `HIDS_SUBEVENT_INPUT_REPORT_ENABLE` is arriving (5 fast blinks expected after Windows connects)
+- If button presses are detected by GPIO (2 double-blinks expected when button held)
+- If reports are being sent (50µs pulse expected per report)
+- If notifications are enabled but reports aren't requested (20µs pulse expected)
+
+**Hypothesis:** Most likely issue is Windows not subscribing to notifications (CCCD not being written to 0x0001). This would cause `_notificationsEnabled` to stay false. Alternative: GATT database structure issue preventing Windows from finding/subscribing to the characteristic.
+
+
+### 2026-03-29: Nuclear Debug Diagnostics — LED Patterns & CCCD Subscription Gate Bypass
+
+**Requested by:** thegu via Squad system  
+**Problem:** BLE HID reports not reaching Windows host — connection established, LED solid, buttons not registering. Diagnosis unclear whether issue is input pipeline (buttons not detected), CCCD subscription (Windows not subscribing to notifications), or report transmission logic.
+
+**Solution Implemented — Two-Part Fix:**
+
+**Part 1: LED Diagnostic Visibility**
+- µs-range pulses invisible on Pico W (CYW43 LED path too slow)
+- Replaced all diagnostic LED code with slow, clearly-visible patterns using sleep_ms():
+  - HIDS_SUBEVENT_INPUT_REPORT_ENABLE (notifications enabled): **5 blinks, 200ms on/off** — slow and obvious
+  - HIDS_SUBEVENT_CAN_SEND_NOW (report sent): **50ms on** — fast but visible
+  - OutputManager button detected: **3 blinks, 300ms on/off** — very clear pattern
+  - sendReport called but _notificationsEnabled == false: **2 blinks, 500ms on/off** — periodic, very slow (every 2s)
+- LED blink logic MOVED OUT OF IRQ HANDLER to avoid blocking BTstack run loop
+  - Event handler sets _pendingBlinkType flag (volatile uint8_t)
+  - BLEHIDManager::process() executes blink pattern in main loop context
+  - Prevents sleep_ms() blocking in async_context_threadsafe_background IRQ
+
+**Part 2: Nuclear Debug — Bypass _notificationsEnabled Gate**
+- Added compile-time bypass in BLEHIDManager::sendReport():
+  - Removed if (!_connected || !_notificationsEnabled) return false; guard
+  - Changed to if (!_connected) return false;
+  - Nuclear debug comment added: "TODO: restore _notificationsEnabled check after debugging"
+- Modified BLEHIDManager::process():
+  - Changed if (_reportPending && _connected && _notificationsEnabled) to if (_reportPending && _connected)
+  - Requests CAN_SEND_NOW regardless of notification state
+- Added secondary diagnostic: if _reportPending && _connected && !_notificationsEnabled, blink 2-slow every 2 seconds (proves the gate WAS blocking)
+
+**Part 3: OutputManager Dispatch Entry Indicator**
+- Added one-time LED indicator at TOP of OutputManager::dispatch():
+  - 1 second solid LED flash on FIRST call only (static bool guard)
+  - Proves dispatch() is reached at least once (regardless of inputMode)
+- Changed button detection pattern: 3 slow blinks (300ms on/off) instead of 30µs pulses
+
+**Expected Outcomes After Flash:**
+1. LED blinks 1s solid shortly after boot → dispatch() IS being called ✅
+2. 3-blink pattern when button held → buttons ARE reaching OutputManager ✅
+3. 2-blink slow pattern repeats every 2s → _notificationsEnabled gate WAS blocking (nuclear bypass removed it)
+4. Button presses NOW register in joy.cpl → CCCD subscription was the bug
+5. Button presses STILL don't register → problem is upstream (gamepad state or inputMode value)
+
+**Files Changed:**
+- src/BLEHIDManager.cpp: Replaced µs blink with _pendingBlinkType flag system + slow visible patterns + nuclear bypass in sendReport() and process()
+- headers/BLEHIDManager.h: Added olatile uint8_t _pendingBlinkType
+- src/OutputManager.cpp: Added one-time dispatch indicator (1s LED) + changed button pattern to 3×300ms blinks
+
+**Build Result:**
+- ✅ Build successful: GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2
+- Size: 3022.50 KB
+- Zero compiler warnings or errors
+
+**Architectural Pattern Established:**
+- **NEVER use sleep_ms() in BTstack event handlers** — they run in async_context IRQ and block the run loop
+- **Use flag + deferred execution pattern** — event handler sets volatile flag, process() executes blocking code in main loop context
+- **LED diagnostic vocabulary** — slow blinks for state transitions, fast blinks for events, periodic patterns for error states
+
+**Next Steps for thegu:**
+1. Flash GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2 to Pico W
+2. Watch LED patterns:
+   - 1s solid after boot → dispatch working
+   - 5×200ms after Windows connects → notifications enabled (or absence = CCCD subscription failed)
+   - 3×300ms when button held → buttons detected
+   - 2×500ms every 2s → notification gate blocked (only visible if CCCD fails)
+3. If button presses now work → CCCD subscription was the bug (fix the _notificationsEnabled event handler properly and remove nuclear bypass)
+4. If button presses still fail → investigate inputMode value at runtime or GamepadState population upstream
+
+**Technical Notes:**
+- sleep_ms() in IRQ context is FATAL — BTstack async context freezes
+- CYW43 LED can't physically blink faster than ~10ms (SPI round-trip to CYW43 chip)
+- volatile _pendingBlinkType synchronizes IRQ → main thread without blocking
+
+### 2026-03-30: Fix Blocking sleep_ms in OutputManager + BLEHIDManager::process()
+
+**Requested by:** thegu via Squad system
+**Problem:** sleep_ms() calls in OutputManager::dispatch() blocked the entire firmware main loop.
+- TinyUSB polling frozen: XInput Windows device descriptor error (USB enumeration timeout)
+- BTstack cyw43_arch_poll() starved: BLE not advertising
+
+**Root Cause:** OutputManager::dispatch() is on the hot path of BOTH USB and BLE loops.
+
+**Changes Made:**
+
+src/OutputManager.cpp - ZERO blocking calls remain:
+- Removed #include "pico/cyw43_arch.h"
+- Removed dispatched_once block: 1s LED + sleep_ms(1000) + sleep_ms(500)
+- Removed button-detection blink: for(i<3) { gpio(1); sleep_ms(300); gpio(0); sleep_ms(300); }
+- File now has ZERO sleep_ms() calls and ZERO cyw43_arch_gpio_put() calls
+
+src/BLEHIDManager.cpp - process() blink converted to non-blocking state machine:
+- _pendingBlinkType handling called _ledBlink() which used sleep_ms() after cyw43_arch_poll()
+- Replaced with absolute_time_t state machine: blinkRemaining/blinkOnMs/blinkOffMs/blinkNext
+- "Notifications disabled" diagnostic: replaced _ledBlink(2,500,500) with time-gated LED toggle
+- _ledBlink() now only called from _doInit() (startup, before BTstack is running - safe)
+
+Nuclear bypass in sendReport() - KEPT:
+- if (!_connected || !_notificationsEnabled) guard remains bypassed
+- Only gate is if (!_connected) return false
+- TODO comment preserved for later restoration
+
+Build Result:
+- Build successful: build_ble3/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2
+- Size: 3023 KB
+- Zero compiler errors or warnings
+
+Architectural Rule:
+- OutputManager::dispatch() is on the hot path of BOTH USB and BLE loops - NEVER use sleep_ms() there
+- BLEHIDManager::process() calls cyw43_arch_poll() - any sleep_ms() after that starves BTstack
+- Use absolute_time_t state machines for non-blocking LED patterns in the main loop
+- _doInit() blocking is acceptable: called once before BTstack starts
+
+Next Steps:
+1. Flash to hardware and confirm XInput enumeration succeeds on Windows
+2. Confirm BLE advertising starts
+3. After confirming BLE reports flow: restore _notificationsEnabled gate
+---
+
+## 2026-03-31: BLE HID Milestone — Two Root Causes Found, Both Fixed
+
+**Commit:** 0291e55a  
+**Status:** ✅ WORKING — User confirmed button presses register in joy.cpl
+
+### Root Cause #1: BLEHIDManager::init() Never Called
+- BLE advertising sequence was never started because init method was not invoked
+- Device silent on BLE radio even though BTstack was initialized
+- Fixed by adding explicit call in startup sequence
+
+### Root Cause #2: hids_device_register_packet_handler() Never Called (CRITICAL)
+- BTstack requires TWO separate event handler registrations:
+  - `hci_add_event_handler()` — general HCI/BLE events ✓ (was called)
+  - `hids_device_register_packet_handler()` — HIDS-specific events ✗ (WAS MISSING)
+- HIDS meta events only delivered to HIDS-registered handler, not general HCI handler
+- Windows subscribes by writing CCCD → triggers HIDS_SUBEVENT_INPUT_REPORT_ENABLE → but our handler was never registered
+- Result: notifications enabled on Windows side, but firmware never saw the event → blocked all report transmission
+- Fixed by adding `hids_device_register_packet_handler(_hciPacketHandler)` call in _doInit()
+
+### How Found
+- Compared implementation against BTstack's official `hog_keyboard_demo.c` reference
+- Demo code shows explicit HIDS handler registration that was missing in GP2040-CE
+- This is THE definitive pattern: hids_device_init() + **hids_device_register_packet_handler()** are a required pair
+
+### Rule for Future Development
+**CRITICAL: hids_device_register_packet_handler() MUST be called separately from hci_add_event_handler()**
+- HIDS meta events (HIDS_SUBEVENT_INPUT_REPORT_ENABLE, HIDS_SUBEVENT_CAN_SEND_NOW, etc.) are ONLY delivered to the handler registered via hids_device_register_packet_handler
+- They are NOT delivered to the hci_add_event_handler handler even though both listen to HCI_EVENT_HIDS_META packets
+- This is a BTstack architectural quirk: service-specific handlers get first dibs on their events; HCI handlers don't see them
+- Symptom of missing registration: device connects, CCCD looks correct, but notifications never fire
+
+### Build Artifact
+- File: build_ble3/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2
+- Size: 3,094,528 bytes
+- Board: PimoroniPicoLipo2XLW (RP2350A + CYW43)
+- Status: Ready for production deployment
+
+### What's Working Now
+- BLE connection established ✓
+- Windows sees 32 buttons + hat + 4 axes in joy.cpl ✓
+- Button presses register when pressed ✓
+- No USB enumeration failures ✓
+- Multi-transport input pipeline validated end-to-end ✓

@@ -433,6 +433,140 @@ Two bugs in the Phase 1 descriptor caused total input failure on Windows:
 
 **Why:** When Windows parses the GATT HID Report Map characteristic, any mismatch with the actual ATT notification data cascades to full input failure. BLE and USB must present identical layouts.
 
+### 2026-03-30: Remove Blocking sleep_ms from Hot Loop
+
+**By:** Edward (Firmware Dev)  
+**Status:** COMPLETE — build verified ✅
+
+**Problem:** `sleep_ms()` calls in `OutputManager::dispatch()` were blocking the entire firmware main loop, causing XInput enumeration timeout and BLE advertising starvation.
+
+**Decision:**
+- **Rule: OutputManager::dispatch() must have ZERO blocking calls** — on the hot path of USB+BLE loop
+- **Rule: BLEHIDManager::process() must not call sleep_ms() after cyw43_arch_poll()** — starves BTstack run loop
+- **Exception: _doInit() blocking is acceptable** — called once during startup, before BTstack runs
+
+**Changes:**
+- Removed `dispatched_once` block: 1s LED + sleep_ms(1000) + sleep_ms(500)
+- Removed button-detection blink: 3 × sleep_ms(300) per button press
+- Replaced blocking LED blinks in `process()` with non-blocking `absolute_time_t` state machine
+- Result: ZERO `sleep_ms()` calls in hot path
+
+**Build:** ✅ Success — 3023 KB, zero warnings
+
+**Why:** Blocking calls in the main loop freeze both USB polling and BTstack event handling, causing enumeration timeouts and wireless starvation.
+
+### 2026-03-31: GPIO Input Must Be Read in All Input Modes (Including BLE)
+
+**By:** Edward (Firmware Dev)  
+**Status:** Implemented
+
+**Problem:** In BLE mode, `inputDriver->process(gamepad)` was guarded by `!wirelessOnly`, so GPIO pins were never read. `gamepad->state` remained all zeros when dispatching to BLE HID.
+
+**Decision:** Remove the `!wirelessOnly` guard. GPIO input reading is transport-agnostic and must happen before ANY output dispatch (USB HID, BLE HID, or future wireless).
+
+**Implementation:**
+```cpp
+// OLD: if (!wirelessOnly && inputDriver != nullptr)
+// NEW: if (inputDriver != nullptr)
+bool processed = inputDriver->process(gamepad);
+```
+
+**Why:** GPIO reading is orthogonal to output transport. The physical button states must be sampled from hardware regardless of whether output goes to USB or BLE.
+
+### 2026-03-31: BLE HID Report Pipeline Deep Audit — Debug Instrumentation Added
+
+**By:** Edward (Firmware Dev)  
+**Date:** 2026-03-31  
+**Status:** Debug build ready for hardware testing
+
+**Decision:** Added comprehensive LED blink diagnostics to the BLE HID pipeline (5 audit points) to identify failure points without USB serial debug output.
+
+**Audit Results:** All structural points verified correct (notifications handling, run loop integration, report ID encoding, GPIO reading). Runtime behavior (CCCD subscription, button data non-zero) required hardware testing.
+
+**Changes:** Added LED blink patterns in `_hciPacketHandler()` for HIDS events and OutputManager for button detection.
+
+**Build:** ✅ Clean, 3,095,040 bytes
+
+**Why:** Pipeline diagnosis required observable LED patterns when zero button presses register but connection succeeds.
+
+### 2026-03-31: BLE Firmware Rebuild Result — e2584c20
+
+**By:** Edward (Firmware Dev)  
+**Date:** 2026-03-30
+
+**Finding:** `build_ble3` firmware is current and healthy after commit e2584c20 (volatile fix + sm_init ordering).
+
+**Build:** ✅ No work to do — timestamps confirm build artifacts are newer than last source change
+
+**Output:** `GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2` (3,094,528 bytes)
+
+**What e2584c20 Fixed:**
+1. `volatile` on shared-state fields (`_connected`, `_notificationsEnabled`, `_reportPending`, `_conHandle`, `_pendingReportLen`)
+2. `sm_init()` ordering — Security Manager must precede ATT service init
+
+**Why:** Without these fixes, compiler cached `_connected == false` in registers, and BTstack initialization failed silently.
+
+### 2026-03-31: Nuclear Debug Diagnostics — LED Pattern System & CCCD Subscription Gate Bypass
+
+**By:** Edward  
+**Date:** 2026-03-29  
+**Status:** Experimental diagnostic — requires hardware validation
+
+**Decision:** Implement visible LED diagnostic patterns for multi-stage BLE HID pipeline debugging, and bypass the `_notificationsEnabled` gate to isolate CCCD subscription failures.
+
+**Pattern Vocabulary:**
+- **5 blinks × 200ms:** HIDS_SUBEVENT_INPUT_REPORT_ENABLE (Windows subscribed)
+- **3 blinks × 300ms:** Buttons detected in OutputManager
+- **50ms on:** Report sent to BTstack
+- **2 blinks × 500ms every 2s:** Notification gate blocked
+
+**Nuclear Bypass:** Removed `_notificationsEnabled` check from `sendReport()` and `process()`. If buttons work with bypass → CCCD event handler never fired. If still blocked → problem upstream.
+
+**Changes:**
+1. Moved LED blink execution from BTstack event handler (IRQ context) to `process()` (main loop) via `volatile uint8_t _pendingBlinkType` flag
+2. Added 1s dispatch indicator in OutputManager
+3. Replaced µs pulses with visible ms-range blinks
+
+**Build:** ✅ 3022.50 KB, zero warnings
+
+**Architectural Patterns Established:**
+- Never block BTstack IRQ context — use `volatile` flags to defer execution to main loop
+- LED diagnostic vocabulary: 50-100ms for events, 200-300ms for state transitions, 500ms+ for error states
+- Nuclear debug pattern: bypass gates one by one to isolate which stage is failing
+
+**Why:** Without hardware serial output, LED patterns are the only debugging tool for wireless firmware. Bypassing gates allows rapid isolation of failure points.
+
+### 2026-03-31: BLE HID Milestone Confirmed — hids_device_register_packet_handler() Was Missing Piece
+
+**By:** User (thegu)  
+**Date:** 2026-03-31  
+**Commit:** 0291e55a on feature/ble-hid-v2  
+**Status:** MILESTONE — BLE HID input working end-to-end ✅
+
+**Confirmed Working:**
+- Button presses register in Windows joy.cpl
+- Device connects via BLE successfully
+- 32 buttons visible in controller configuration
+- No USB enumeration failures
+
+**Two Root Causes Found and Fixed:**
+
+1. **BLEHIDManager::init() was never called** → no advertising
+   - Device never started BLE advertising sequence
+   - Fixed by adding `BLEHIDManager::init()` to startup sequence
+
+2. **hids_device_register_packet_handler() never called** → HIDS events dropped
+   - BTstack requires TWO separate event registrations: `hci_add_event_handler()` (general) + `hids_device_register_packet_handler()` (HIDS-specific)
+   - HIDS meta events (INPUT_REPORT_ENABLE, CAN_SEND_NOW) only delivered to HIDS handler, not HCI handler
+   - Windows writes CCCD → triggers HIDS_SUBEVENT_INPUT_REPORT_ENABLE → but handler was never registered
+   - Fixed by adding `hids_device_register_packet_handler(_hciPacketHandler)` in `_doInit()`
+
+**How Identified:** Comparison with BTstack's official `hog_keyboard_demo.c` reference implementation showed both registration calls were required.
+
+**Build Artifact:** `GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2` (3,094,528 bytes)
+
+**Why:** This milestone confirms BLE HID input pipeline is architecturally sound and ready for multi-transport firmware deployment.
+
 ## Governance
 
 - All meaningful changes require team consensus

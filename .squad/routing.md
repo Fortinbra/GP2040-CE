@@ -16,6 +16,7 @@ How to decide who handles what.
 | Scope & priorities | Roy Mustang | What to document next, trade-offs, decisions |
 | Async issue work (bugs, tests, small features) | @copilot 🤖 | Well-defined tasks matching capability profile |
 | Session logging | Scribe | Automatic — never needs routing |
+| Work queue monitoring, backlog, issue tracking, CI status | Ralph | Activated with "Ralph, go" — runs continuously until "Ralph, idle" |
 
 ## Issue Routing
 
