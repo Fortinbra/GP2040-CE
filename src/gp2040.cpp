@@ -298,10 +298,11 @@ void GP2040::run() {
 	Gamepad * processedGamepad = Storage::getInstance().GetProcessedGamepad();
 	GamepadState prevState;
 
-	// Determine if this is a wireless-only mode (no TinyUSB)
+	// Determine if this is a wireless-only mode (no TinyUSB).
+	// Never skip USB when configMode is active — S2 web config override must always work.
 	bool wirelessOnly = false;
 #ifdef ENABLE_BLUETOOTH
-	if (Storage::getInstance().getGamepadOptions().inputMode == INPUT_MODE_BLE) {
+	if (!configMode && Storage::getInstance().getGamepadOptions().inputMode == INPUT_MODE_BLE) {
 		wirelessOnly = true;
 	}
 #endif
@@ -318,6 +319,12 @@ void GP2040::run() {
 	if (!wirelessOnly && configMode == true) {
 		rndis_init();
 	}
+
+#ifdef ENABLE_BLUETOOTH
+	if (wirelessOnly) {
+		BLEHIDManager::getInstance().init();
+	}
+#endif
 
 	while (1) { // LOOP
 		this->getReinitGamepad(gamepad);
@@ -371,9 +378,9 @@ void GP2040::run() {
 		// Copy Processed Gamepad for Core1 (race condition otherwise)
 		memcpy(&processedGamepad->state, &gamepad->state, sizeof(GamepadState));
 
-		// Process Input Driver (USB modes only)
+		// Process Input Driver (read GPIO and populate GamepadState)
 		bool processed = false;
-		if (!wirelessOnly && inputDriver != nullptr) {
+		if (inputDriver != nullptr) {
 			processed = inputDriver->process(gamepad);
 		}
 

@@ -127,14 +127,62 @@ void BLEHIDManager::process() {
 
     cyw43_arch_poll();
 
-    // Send any pending report via BTstack CAN_SEND_NOW mechanism
-    if (_reportPending && _connected && _notificationsEnabled) {
+    // Non-blocking LED blink state machine — replaces blocking _ledBlink() calls.
+    // _pendingBlinkType is set by the IRQ handler; we execute the blink here without sleep_ms().
+    {
+        static uint8_t         blinkRemaining = 0;
+        static bool            blinkLedOn     = false;
+        static uint32_t        blinkOnMs      = 200;
+        static uint32_t        blinkOffMs     = 200;
+        static absolute_time_t blinkNext      = {0};
+
+        if (_pendingBlinkType != 0) {
+            uint8_t blinkType = _pendingBlinkType;
+            _pendingBlinkType = 0;
+            if (blinkType == 5) {
+                blinkOnMs = 200; blinkOffMs = 200; blinkRemaining = 10;
+            } else if (blinkType == 3) {
+                blinkOnMs = 300; blinkOffMs = 300; blinkRemaining = 6;
+            } else if (blinkType == 1) {
+                blinkOnMs = 50;  blinkOffMs = 50;  blinkRemaining = 2;
+            }
+            blinkLedOn = true;
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
+            blinkNext  = make_timeout_time_ms(blinkOnMs);
+        }
+
+        if (blinkRemaining > 0 &&
+                absolute_time_diff_us(blinkNext, get_absolute_time()) >= 0) {
+            blinkRemaining--;
+            blinkLedOn = !blinkLedOn;
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, blinkLedOn ? 1 : 0);
+            blinkNext  = make_timeout_time_ms(blinkLedOn ? blinkOnMs : blinkOffMs);
+        }
+    }
+
+    // NUCLEAR DEBUG: request can send without checking _notificationsEnabled
+    // TODO: restore _notificationsEnabled check after debugging
+    if (_reportPending && _connected) {
         hids_device_request_can_send_now_event(_conHandle);
+    }
+    
+    // Diagnostic: slow LED toggle every 2s if connected but notifications still not enabled
+    if (_reportPending && _connected && !_notificationsEnabled) {
+        static absolute_time_t lastDiagBlink = {0};
+        if (absolute_time_diff_us(lastDiagBlink, get_absolute_time()) >= 2000000) {
+            static bool diagLedOn = false;
+            diagLedOn = !diagLedOn;
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, diagLedOn ? 1 : 0);
+            lastDiagBlink = get_absolute_time();
+        }
     }
 }
 
 bool BLEHIDManager::sendReport(const uint8_t* report, uint16_t len) {
-    if (!_connected || !_notificationsEnabled) return false;
+    // NUCLEAR DEBUG: bypass notification gate to test if reports flow at all
+    // TODO: restore _notificationsEnabled check after debugging
+    if (!_connected) return false;
+    
     if (len > 9) len = 9;
     memcpy(_pendingReport, report, len);
     _pendingReportLen = len;
@@ -210,6 +258,11 @@ void BLEHIDManager::_doInit() {
     sm_event_callback_registration.callback = &_smPacketHandler;
     sm_add_event_handler(&sm_event_callback_registration);
 
+    // HIDS meta events (HIDS_SUBEVENT_INPUT_REPORT_ENABLE, HIDS_SUBEVENT_CAN_SEND_NOW, etc.)
+    // are delivered ONLY through hids_device_register_packet_handler — NOT via hci_add_event_handler.
+    // Without this, the handler never fires and reports can never be sent.
+    hids_device_register_packet_handler(&_hciPacketHandler);
+
     // Set up advertising parameters and data (adv_type = 0 = ADV_IND, undirected connectable)
     gap_advertisements_set_params(0x0030, 0x0060, 0, 0, NULL, 0x07, 0x00);
     gap_advertisements_set_data(sizeof(adv_data), (uint8_t*)adv_data);
@@ -273,8 +326,12 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
         case HCI_EVENT_HIDS_META:
             switch (hci_event_hids_meta_get_subevent_code(packet)) {
                 case HIDS_SUBEVENT_INPUT_REPORT_ENABLE:
-                    mgr._notificationsEnabled =
-                        (hids_subevent_input_report_enable_get_enable(packet) != 0);
+                    {
+                        uint8_t enable = hids_subevent_input_report_enable_get_enable(packet);
+                        mgr._notificationsEnabled = (enable != 0);
+                        // Set flag to blink LED in process() — don't block IRQ handler with sleep_ms
+                        mgr._pendingBlinkType = (enable != 0) ? 5 : 3;
+                    }
                     break;
                 case HIDS_SUBEVENT_CAN_SEND_NOW:
                     if (mgr._reportPending) {
@@ -282,6 +339,8 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
                                                       mgr._pendingReport,
                                                       mgr._pendingReportLen);
                         mgr._reportPending = false;
+                        // Set flag to blink LED in process() — don't block IRQ handler
+                        mgr._pendingBlinkType = 1;
                     }
                     break;
                 default:
