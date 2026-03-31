@@ -2,6 +2,52 @@
 
 This document captures reusable patterns for BTstack BLE development on RP2040/RP2350 with the Pico SDK.
 
+## Pattern: NEVER Set _notificationsEnabled on SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED
+
+**Confidence:** CRITICAL — Proven root cause of bonded reconnect disconnect/loop (2025-01-31)
+
+**Context:** On bonded device reconnect (power cycle or disconnect/reconnect), BTstack fires `SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED` when the Security Manager resolves the peer's IRK against the bonded device database. This event fires **before** the LTK encryption handshake completes.
+
+**Anti-pattern (causes disconnect loop):**
+```cpp
+case SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED:
+    mgr._notificationsEnabled = true;  // ❌ NEVER — link is not yet encrypted
+    mgr._hasBondedPeers = true;
+    break;
+```
+
+**Result:** ATT notifications sent on unencrypted link → ATT security error → disconnect → Windows/macOS retries immediately → infinite loop.
+
+**Correct pattern (gate on encryption complete):**
+```cpp
+// In _hciPacketHandler, handle HCI_EVENT_ENCRYPTION_CHANGE instead:
+case HCI_EVENT_ENCRYPTION_CHANGE: {
+    uint8_t encStatus = hci_event_encryption_change_get_status(packet);
+    if (encStatus == ERROR_CODE_SUCCESS && mgr._connected) {
+        mgr._notificationsEnabled = true;  // ✅ Link is now encrypted
+    }
+    break;
+}
+
+// In _smPacketHandler, SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED only sets:
+case SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED:
+    mgr._hasBondedPeers = true;  // ✅ Identity confirmed (informational)
+    break;
+```
+
+**Why:** The correct event ordering for a bonded BLE reconnect is:
+1. `HCI_SUBEVENT_LE_CONNECTION_COMPLETE` — link exists, unencrypted
+2. `SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED` — identity confirmed, still unencrypted
+3. `HCI_EVENT_ENCRYPTION_CHANGE` (status=SUCCESS) — link is now encrypted ← **safe to send ATT notifications**
+4. `SM_EVENT_PAIRING_COMPLETE` — (on fresh pair only)
+5. `HIDS_SUBEVENT_INPUT_REPORT_ENABLE` — (on fresh pair only; host may skip on reconnect)
+
+`SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED` is purely an identity confirmation event. It MUST NEVER be used to gate ATT/GATT operations that require link encryption.
+
+**Key Rule:** Gate all ATT/GATT notification sends on `HCI_EVENT_ENCRYPTION_CHANGE` (status==ERROR_CODE_SUCCESS && connected), never on SM identity events.
+
+---
+
 ## Pattern: volatile for IRQ-Shared State
 
 **Context:** BTstack runs in `sync_context_threadsafe_background`, which fires from a periodic alarm IRQ on the same core as the main thread (not SMP). The IRQ preempts the main thread at instruction boundaries.

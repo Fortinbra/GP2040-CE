@@ -292,6 +292,20 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
             }
             break;
 
+        case HCI_EVENT_ENCRYPTION_CHANGE: {
+            // Link is now encrypted using the stored LTK — safe to send ATT notifications.
+            // On reconnect, Windows won't re-write the CCCD (it cached that state),
+            // so we set _notificationsEnabled optimistically here instead of waiting
+            // for HIDS_SUBEVENT_INPUT_REPORT_ENABLE, which may never fire on reconnect.
+            // On fresh pair, HIDS_SUBEVENT_INPUT_REPORT_ENABLE fires after this and
+            // sets _notificationsEnabled = true again (harmless double-set).
+            uint8_t encStatus = hci_event_encryption_change_get_status(packet);
+            if (encStatus == ERROR_CODE_SUCCESS && mgr._connected) {
+                mgr._notificationsEnabled = true;
+            }
+            break;
+        }
+
         case HCI_EVENT_DISCONNECTION_COMPLETE:
             mgr._connected            = false;
             mgr._notificationsEnabled = false;
@@ -360,12 +374,11 @@ void BLEHIDManager::_smPacketHandler(uint8_t packetType, uint16_t channel,
             break;
         case SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED:
             // BTstack recognized a reconnecting bonded peer via IRK resolution.
-            // Windows and macOS cache CCCD state and often do not re-write it on
-            // reconnect, so HIDS_SUBEVENT_INPUT_REPORT_ENABLE may never fire.
-            // Set _notificationsEnabled optimistically — we know this host was
-            // previously subscribed.
-            mgr._notificationsEnabled = true;
-            mgr._hasBondedPeers       = true;
+            // Do NOT set _notificationsEnabled here — the LTK encryption handshake
+            // has not completed yet. Arming notifications before the link is encrypted
+            // causes an ATT security mode error, which disconnects the peer and creates
+            // a reconnect loop. _notificationsEnabled is set in HCI_EVENT_ENCRYPTION_CHANGE.
+            mgr._hasBondedPeers = true;
             break;
         case SM_EVENT_PAIRING_COMPLETE:
             // Fresh pairing finished — record that we now have a bonded peer.

@@ -661,3 +661,23 @@ Bonding persistence complete. Devices can now reconnect without re-pairing.
 - hasBondedPeers() — query presence of stored bonds
 
 Bond database persists across power cycles via BTstack's le_device_db.*
+
+### 2025-01-31: BLE Reconnect Loop Fix — SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED Event Sequence Clarification
+
+**Task:** Fix BLE disconnect/reconnect loop on bonded power-cycle reconnect (feature/ble-hid-v2 branch).
+
+**Root Cause:** `SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED` fires when BTstack resolves the peer's IRK (Identity Resolving Key) against the bonded device database. This event **confirms identity** but the **LTK encryption handshake has not yet completed**. Setting `_notificationsEnabled = true` at this point allowed ATT notifications to be sent on an unencrypted link → ATT security error → disconnect → Windows/macOS retry immediately → infinite loop.
+
+**Fix:** Moved notification gate from `SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED` to `HCI_EVENT_ENCRYPTION_CHANGE` (status==ERROR_CODE_SUCCESS && connected). This event fires **only after** the LTK handshake succeeds and the link is encrypted.
+
+**Updated Handler:**
+- `SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED` now sets `_hasBondedPeers = true` only (for informational use, identifies as bonded peer).
+- `HCI_EVENT_ENCRYPTION_CHANGE` with status==ERROR_CODE_SUCCESS gates `_notificationsEnabled = true` (authoritative encryption-complete event).
+
+**Correct Event Sequence (Bonded Reconnect):**
+1. `HCI_SUBEVENT_LE_CONNECTION_COMPLETE` — link exists, unencrypted
+2. `SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED` — identity confirmed, still unencrypted
+3. `HCI_EVENT_ENCRYPTION_CHANGE` (status=SUCCESS) — link is now encrypted ← **safe to send ATT notifications**
+4. (Fresh pair only: `SM_EVENT_PAIRING_COMPLETE`, `HIDS_SUBEVENT_INPUT_REPORT_ENABLE`)
+
+**Key Learning:** Never gate ATT/GATT operations on SM identity events. Encryption-complete is the authoritative gate. SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED is purely identity confirmation, has no ATT/GATT authorization properties.

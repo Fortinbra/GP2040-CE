@@ -198,6 +198,40 @@ Documented gaps:
 
 **Why:** Quality assurance review to ensure both docs meet project documentation standards before merge.
 
+### 2025-01-27: BLE Bonding Persistence — Optimistic Reconnect Gate
+
+**By:** Edward (BLE/BTstack firmware engineer)  
+**What:** Implemented bonded device reconnection optimizations in `src/BLEHIDManager.cpp`:
+1. `SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED` (BTstack confirms peer IRK match) → set `_notificationsEnabled = true` optimistically. Bonded hosts cache CCCD subscription server-side; this gate ensures reports flow immediately on reconnect without waiting for host CCCD rewrite.
+2. `SM_EVENT_PAIRING_COMPLETE` → set `_hasBondedPeers = true` for public API immediately.
+3. At startup, check `le_device_db_count() > 0` after `le_device_db_tlv_configure()` to populate `_hasBondedPeers`.
+4. Restored proper `_notificationsEnabled` guard in `process()` and `sendReport()` (removed nuclear debugging bypass).
+5. Added public APIs: `isNotifying()` and `hasBondedPeers()`.
+6. Declared `_hasBondedPeers` volatile (written from both IRQ and main context).
+
+**Safety:** IRK resolution only succeeds with real long-term key material from bonded database — not a security regression.
+
+**Why:** Power-cycle reconnect to Windows/macOS: bonded peers cache CCCD, no re-subscription on reconnect. Without optimistic gate, reports blocked indefinitely. Proper SM event handling restores connectivity.
+
+**Commit:** feature/ble-hid-v2 (clean build ✅)
+
+### 2025-01-31: Gate BLE Notification Enable on HCI_EVENT_ENCRYPTION_CHANGE (Disconnect Loop Fix)
+
+**By:** Edward (BLE/BTstack firmware engineer)  
+**What:** Root cause identified and fixed for BLE disconnect/reconnect loop on bonded power-cycle:
+- **Root cause:** `SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED` fires before LTK encryption handshake completes. Setting `_notificationsEnabled = true` there allowed ATT notifications on unencrypted link → ATT security error → disconnect → Windows retry loop.
+- **Fix:** Moved notification gate from `SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED` to `HCI_EVENT_ENCRYPTION_CHANGE` (status==ERROR_CODE_SUCCESS && connected). This event fires only after LTK handshake succeeds.
+- **SM Handler Update:** Now only sets `_hasBondedPeers = true` for informational use (identity confirmed).
+- **Coverage:** Two correct paths now: fresh pair (HCI_EVENT_ENCRYPTION_CHANGE sets flag, then HIDS_SUBEVENT_INPUT_REPORT_ENABLE harmlessly re-sets it) and bonded reconnect (HCI_EVENT_ENCRYPTION_CHANGE arms notifications immediately, no CCCD write expected).
+
+**Technical:** Correct event sequence for bonded BLE reconnect is: (1) HCI_SUBEVENT_LE_CONNECTION_COMPLETE (link exists, unencrypted), (2) SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED (identity confirmed, still unencrypted), (3) HCI_EVENT_ENCRYPTION_CHANGE status=SUCCESS (link now encrypted ← safe for ATT), (4) SM_EVENT_PAIRING_COMPLETE (fresh pair only), (5) HIDS_SUBEVENT_INPUT_REPORT_ENABLE (fresh pair only).
+
+**Learning:** Never gate ATT/GATT operations on SM identity events. Use encryption-complete as the authoritative gate.
+
+**Why:** Fix resolves the disconnect loop that occurred when bonded hosts reconnected after power cycle. SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED is purely identity confirmation, not an encryption event.
+
+**Commit:** feature/ble-hid-v2 (clean build ✅)
+
 ### 2026-03-29T201441: Dead Code Pattern Documented — BTStack Key Management
 
 **By:** Edward (Firmware Dev)  
