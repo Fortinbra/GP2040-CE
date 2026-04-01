@@ -664,3 +664,57 @@ uint16_t raw = adc_read();
 ```
 
 in your `.gatt` file. This provides the standard Battery Service (UUID 0x180F) characteristics.
+
+---
+
+## Pattern: BLE Power State Machine (ADVERTISING / ACTIVE / IDLE)
+
+**Confidence:** Verified — clean build on RP2350B + CYW43439 (Pimoroni Pico Lipo 2 XL W).
+
+**Context:** Battery-powered BLE HID devices should not send full-rate reports when no inputs change.
+
+### State transitions
+
+`
+ADVERTISING → ACTIVE  : HIDS_SUBEVENT_INPUT_REPORT_ENABLE (enable != 0)
+ACTIVE      → IDLE    : (now - _lastInputChangeMs) >= 30000ms in process()
+IDLE        → ACTIVE  : memcmp(_lastSentReport, _pendingReport) != 0 in CAN_SEND_NOW
+ACTIVE/IDLE → ADVERTISING : HCI_EVENT_DISCONNECTION_COMPLETE
+`
+
+### IDLE report throttle (in sendReport)
+
+`cpp
+if (_powerState == BLEPowerState::IDLE) {
+    uint32_t now = to_ms_since_boot(get_absolute_time());
+    if ((now - _lastReportMs) < 50) return false;
+}
+`
+
+### Input change detection (in CAN_SEND_NOW)
+
+_lastSentReport is only accessed from CAN_SEND_NOW (IRQ context) — **no volatile needed**.
+_lastInputChangeMs is written by IRQ and read by main thread — **must be volatile**.
+
+`cpp
+if (memcmp(mgr._lastSentReport, mgr._pendingReport, mgr._pendingReportLen) != 0) {
+    memcpy(mgr._lastSentReport, mgr._pendingReport, mgr._pendingReportLen);
+    mgr._lastInputChangeMs = to_ms_since_boot(get_absolute_time());
+    if (mgr._powerState == BLEPowerState::IDLE) {
+        mgr._powerState = BLEPowerState::ACTIVE;
+    }
+}
+`
+
+### Connection interval tuning (optional, host-advisory)
+
+`cpp
+// Short interval for gaming (7.5ms = 6 * 1.25ms)
+gap_request_connection_parameter_update(_conHandle, 6, 6, 0, 200);
+
+// Long interval for idle power saving (100ms = 80 * 1.25ms)
+gap_request_connection_parameter_update(_conHandle, 80, 80, 0, 200);
+`
+
+Host may ignore these. Call after transitioning state — do NOT call from inside
+HCI_EVENT_DISCONNECTION_COMPLETE or before HCI_STATE_WORKING.

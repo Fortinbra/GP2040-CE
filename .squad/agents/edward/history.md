@@ -889,3 +889,55 @@ Recommended **Option B** (custom `le_device_db` backed by protobuf). See `ble-pr
 **Summary:** Battery service successfully integrated. ADC reads battery voltage on GPIO29/ADC3 (3:1 divider). Pre-existing bug fixed: `battery_service_server_init()` was missing before `set_battery_value()`. Battery level reported every 30s when connected. Build verified clean at 2.96 MB.
 
 **Status:** ✅ Ready for integration
+
+---
+
+## CMakeLists.txt BLE Audit (2025-08-01)
+
+**Task:** Audit and clean the PICO_CYW43_SUPPORTED block in CMakeLists.txt.
+
+**Findings:**
+- All BLE sources correct: BLEHIDManager.cpp, OutputManager.cpp, le_device_db_proto.cpp
+- le_device_db_tlv.c properly excluded via HEADER_FILE_ONLY TRUE
+- le_device_db_tlv_configure() noop stub lives in le_device_db_proto.cpp
+- hids_device.c, attery_service_server.c, device_information_service_server.c all already in pico_btstack_ble — NOT duplicated in explicit sources (correct)
+- pico_btstack_make_gatt_header for src/ble_hid.gatt present
+- **Issue found:** pico_btstack_flash_bank was linked but zero references to it remain anywhere (TLV flash replaced by proto impl)
+
+**Fix:** Removed pico_btstack_flash_bank from 	arget_link_libraries in the BLE block.
+
+**Build:** Clean — exit code 0.
+
+### 2026-04-01: BLE Power Management State Machine
+
+**Tasked by:** thegu
+
+**Task:** Implement 3-state power management (ADVERTISING / ACTIVE / IDLE) for BLE HID firmware on Pimoroni Pico Lipo 2 XL W.
+
+**States Implemented:**
+- ADVERTISING: default after boot/disconnect, no reports sent, cyw43_arch_poll normal
+- ACTIVE: connected + notifications enabled, full-rate reports (~1ms), transitioned from ADVERTISING on HIDS_SUBEVENT_INPUT_REPORT_ENABLE
+- IDLE: connected but no input change for 30s, reports throttled to ~50ms, transitioned from ACTIVE on 30s timeout
+
+**State Transitions Implemented:**
+- ADVERTISING → ACTIVE: HIDS_SUBEVENT_INPUT_REPORT_ENABLE (enable != 0)
+- ACTIVE → IDLE: process() detects (now - _lastInputChangeMs) >= 30000ms
+- IDLE → ACTIVE: CAN_SEND_NOW detects memcmp diff vs _lastSentReport
+- ACTIVE/IDLE → ADVERTISING: HCI_EVENT_DISCONNECTION_COMPLETE
+
+**Connection Interval Tuning:** Commented out (safe opt-in) — gap_request_connection_parameter_update() stubs present in IDLE and ACTIVE transitions.
+
+**New Members Added:**
+- BLEPowerState enum (ADVERTISING=0, ACTIVE=1, IDLE=2) in header
+- volatile BLEPowerState _powerState = ADVERTISING
+- volatile uint32_t _lastInputChangeMs = 0
+- volatile uint32_t _lastReportMs = 0 (throttle timestamp)
+- uint8_t _lastSentReport[9] (previous payload, IRQ-only access, no volatile needed)
+
+**Key implementation note:** _lastSentReport is only read/written from CAN_SEND_NOW IRQ context — no volatile needed. _lastInputChangeMs is written by IRQ and read by main thread — must be volatile (per BTstack RP2040 pattern).
+
+**Build result:** ✅ Clean — 4/4 objects recompiled, GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.elf linked.
+
+**Files Changed:**
+- headers/BLEHIDManager.h: BLEPowerState enum, getPowerState() accessor, 4 new members
+- src/BLEHIDManager.cpp: sendReport() IDLE throttle, process() ACTIVE→IDLE, disconnect reset, HIDS_INPUT_REPORT_ENABLE ACTIVE transition, CAN_SEND_NOW change detection + IDLE→ACTIVE

@@ -1004,3 +1004,123 @@ Task required adding BLE Battery Service reporting for the Pimoroni Pico Lipo 2 
 - Battery percentage reported accurately over BLE Battery Service (UUID 0x180F) to connected hosts.
 - Host OS typically displays battery % in system tray for BLE HID devices.
 - Implementation is portable: non-battery boards compile and function normally (fixed 100% reported).
+
+---
+
+# Decision: BLE Power Management State Machine
+
+**By:** Edward Elric  
+**Date:** 2026-04-01  
+**Status:** Implemented, build verified
+
+## Decision
+
+Implement a 3-state BLE power management machine (ADVERTISING / ACTIVE / IDLE) to reduce power consumption when the gamepad is idle while connected.
+
+## Context
+
+The Pimoroni Pico Lipo 2 XL W is battery-powered. Sending HID reports at full rate (~1ms) when no buttons are pressed wastes power. The BLE connection interval also defaults to a host-negotiated value; requesting a longer interval when idle reduces radio duty cycle.
+
+## States
+
+| State | Trigger In | What changes |
+|---|---|---|
+| ADVERTISING | disconnect / boot | No reports; cyw43_arch_poll normal |
+| ACTIVE | HIDS notifications enabled | Full rate reports (~1ms); short connection interval optional |
+| IDLE | 30s no input change | Reports throttled to 50ms; long connection interval optional |
+
+## Implementation
+
+- BLEPowerState enum + 4 new volatile/non-volatile members in BLEHIDManager.h
+- sendReport() skips if IDLE and < 50ms since last report
+- process() transitions ACTIVE→IDLE after 30s of _lastInputChangeMs
+- CAN_SEND_NOW compares payload vs _lastSentReport; transitions IDLE→ACTIVE on change
+- Disconnect handler resets to ADVERTISING and clears _lastInputChangeMs
+
+## Connection Interval Tuning
+
+gap_request_connection_parameter_update() calls are present but commented out.  
+They are host-advisory only and safe to enable if latency vs power trade-off is desired:
+- ACTIVE: 7.5ms interval (6 * 1.25ms)  
+- IDLE: 100ms interval (80 * 1.25ms)
+
+## Trade-offs
+
+- ✅ Measurable idle power reduction (50ms report rate vs 1ms)
+- ✅ Zero sleep_ms() calls — non-blocking as required
+- ✅ No impact on ADVERTISING path or USB mode
+- ✅ Minimal diff — no main loop restructuring
+- ✗ 30s hardcoded — not user-configurable (acceptable for v1)
+- ✗ Connection interval tuning opt-in only (host may ignore anyway)
+
+## Build
+
+Clean: exit code 0, GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.elf linked.
+
+---
+
+# CMakeLists.txt BLE Section Audit — Edward Elric
+
+**Date:** 2026-04-01  
+**Status:** Complete  
+**Requested by:** thegu  
+
+---
+
+## What was audited
+
+The `PICO_CYW43_SUPPORTED` block in `CMakeLists.txt` after all BLE work landed.
+
+---
+
+## Findings
+
+| Item | Status | Notes |
+|------|--------|-------|
+| `src/BLEHIDManager.cpp` in sources | ✅ Correct | Present |
+| `src/OutputManager.cpp` in sources (BLE branch) | ✅ Correct | Present |
+| `src/le_device_db_proto.cpp` in sources | ✅ Correct | Present |
+| `le_device_db_tlv.c` excluded via `HEADER_FILE_ONLY TRUE` | ✅ Correct | Prevents duplicate symbols with our proto impl |
+| `le_device_db_tlv_configure()` noop stub | ✅ Correct | Implemented inside `le_device_db_proto.cpp` line 209 |
+| `hids_device.c` explicit source | ✅ Correct | Already in `pico_btstack_ble` — NOT re-listed (no duplicate) |
+| `battery_service_server.c` explicit source | ✅ Correct | Already in `pico_btstack_ble` — NOT re-listed (no duplicate) |
+| `device_information_service_server.c` explicit source | ✅ Correct | Already in `pico_btstack_ble` — NOT re-listed (no duplicate) |
+| `pico_btstack_ble` linked | ✅ Correct | |
+| `pico_btstack_cyw43` linked | ✅ Correct | |
+| `pico_btstack_flash_bank` linked | ❌ **Unnecessary** | Zero references to `btstack_flash_bank.h` or `btstack_tlv_flash_bank.h` anywhere in the codebase — TLV flash storage replaced by protobuf impl |
+| `pico_btstack_make_gatt_header` for `src/ble_hid.gatt` | ✅ Correct | Present |
+| `ENABLE_BLUETOOTH=1` compile definition | ✅ Correct | Present |
+
+---
+
+## Fix Applied
+
+Removed `pico_btstack_flash_bank` from `target_link_libraries` in the `PICO_CYW43_SUPPORTED` block.
+
+```cmake
+# Before
+target_link_libraries(${PROJECT_NAME}
+    pico_cyw43_arch_none
+    pico_btstack_ble
+    pico_btstack_cyw43
+    pico_btstack_flash_bank   # ← removed
+)
+
+# After
+target_link_libraries(${PROJECT_NAME}
+    pico_cyw43_arch_none
+    pico_btstack_ble
+    pico_btstack_cyw43
+)
+```
+
+---
+
+## Build Result
+
+```
+[471/472] Linking CXX executable GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.elf
+exit code 0 — clean build, no errors
+```
+
+Only pre-existing warnings (unused variables in SDK / other files, unrelated to BLE section).
