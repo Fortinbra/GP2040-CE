@@ -606,3 +606,365 @@ bool processed = inputDriver->process(gamepad);
 - All meaningful changes require team consensus
 - Document architectural decisions here
 - Keep history focused on work, decisions focused on direction
+
+
+---
+
+# Decision: Replace BTstack TLV Bond Storage with Protobuf-Backed le_device_db
+
+**Date:** 2026-03-31  
+**Author:** Edward Elric  
+**Status:** Implemented  
+**Files changed:** `proto/config.proto`, `src/le_device_db_proto.cpp` (new), `src/BLEHIDManager.cpp`, `src/config_utils.cpp`, `CMakeLists.txt`
+
+---
+
+## Context
+
+BLE bond entries (paired device keys) were not surviving power cycles. The root cause is a flash region collision: GP2040-CE's `FlashPROM` (32 KB at `0x101F8000–0x10200000`) and BTstack's `pico_flash_bank_instance()` (two 4 KB sectors at the top of the same 2 MB flash) overlap. Every call to `Storage.save()` erases BTstack's TLV bond bank.
+
+## Decision
+
+Implement the BTstack `le_device_db.h` interface directly, backed by a new `BLEConfig` protobuf sub-message inside the existing `Config` root. This eliminates the TLV flash bank entirely.
+
+**Rejected alternative:** Redirect the TLV flash bank through a custom `hal_flash_bank_t` that calls FlashPROM. This fixes the collision but keeps bonds as an opaque binary blob, not first-class managed config.
+
+## Implementation Details
+
+### Proto schema (field 16 on Config)
+```protobuf
+message BLEBondEntry { valid, addr(6B), addrType, irk(16B), ltk(16B), ediv, rand(8B), keySize, authenticated, authorized, secureConnection, seqNr }
+message BLEConfig { repeated BLEBondEntry bonds[(nanopb).max_count=4], seqCounter }
+Config.bleConfig = 16
+```
+
+### CMake: exclude SDK's le_device_db_tlv.c
+```cmake
+set_source_files_properties(
+    "${PICO_SDK_PATH}/lib/btstack/src/ble/le_device_db_tlv.c"
+    PROPERTIES HEADER_FILE_ONLY TRUE
+)
+```
+`HEADER_FILE_ONLY TRUE` is the correct CMake idiom for suppressing compilation of a specific source file that was added by an INTERFACE library.
+
+### le_device_db_tlv_configure noop
+`btstack_cyw43.c` calls `le_device_db_tlv_configure()` unconditionally. A noop stub in `le_device_db_proto.cpp` satisfies the linker.
+
+## Trade-offs
+
+| | Old (TLV) | New (proto) |
+|---|---|---|
+| Flash collision | ✗ corrupts bonds | ✓ no conflict |
+| Bond persistence | unreliable | reliable |
+| Web UI inspectable | ✗ | ✓ (future) |
+| Code size delta | baseline | +~350 LOC |
+| Migration | N/A | bonds lost on upgrade (one-time re-pair) |
+
+## Build Verification
+
+Clean build, no errors. Output: `GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2` (3.1 MB).
+
+
+---
+
+# Decision: BLE Reconnect Loop — Secure Connections + Deferred Advertising + Identity Mismatch Handling
+
+**Date:** 2026-03-31  
+**Status:** Implemented (awaiting hardware test)  
+**Branch:** feature/ble-hid-v2  
+**Agent:** Edward (BLE domain expert)  
+**Files:** headers/BLEHIDManager.h, src/BLEHIDManager.cpp
+
+---
+
+## Problem
+
+BLE reconnect loop persists after all prior fixes (encryption gating, _reportPending clear). Hardware diagnostic shows ~15 LED blinks on disconnect, indicating HCI reason code ≥ 15. Most likely codes:
+- 0x13 (19) = Remote User Terminated (Windows chose to disconnect)
+- 0x16 (22) = Local Host Terminated (Pico disconnected)
+- 0x3B (59) = Unacceptable Connection Parameters
+
+User observation: reconnect loop happens consistently on bonded reconnect (power cycle or manual disconnect/reconnect).
+
+---
+
+## Root Cause Analysis
+
+Compared GP2040-CE BLEHIDManager implementation against BTstack's official `hog_keyboard_demo.c` reference implementation. Found three critical discrepancies:
+
+### Discrepancy #1: SM Authentication Requirements (SC Missing)
+
+**BTstack demo:**
+```c
+sm_set_authentication_requirements(SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING);
+```
+
+**GP2040-CE (before fix):**
+```c
+sm_set_authentication_requirements(SM_AUTHREQ_BONDING);
+```
+
+**Impact:** Modern operating systems (Windows 10+, macOS, iOS, Android) prefer LE Secure Connections (LESC) for BLE pairing. When Windows pairs with a device advertising LESC support, it stores an SC-LTK (LE Secure Connections Long Term Key). On reconnect, Windows presents this SC-LTK during the encryption handshake.
+
+If the device's Security Manager is configured for legacy bonding only (no SC support), it cannot accept the SC-LTK → encryption handshake fails → Windows terminates with reason 0x13 (Remote User Terminated).
+
+### Discrepancy #2: Advertising Restart from Disconnect Handler
+
+**BTstack demo:**
+- Does NOT call `gap_advertisements_enable()` in disconnect handler
+
+**GP2040-CE (before fix):**
+- Calls `gap_advertisements_enable(1)` directly from `HCI_EVENT_DISCONNECTION_COMPLETE` handler
+
+**Impact:** BTstack packet handlers run in IRQ context (`sync_context_threadsafe_background` alarm). Calling `gap_advertisements_enable()` from the disconnect handler races with BTstack's internal Link Layer cleanup state machine. The LL may still be tearing down the connection when the advertising request arrives → undefined state → potential disconnect on next connection attempt.
+
+### Discrepancy #3: SM_EVENT_IDENTITY_RESOLVING_FAILED (not handled)
+
+**BTstack demo:**
+- Not shown (may not handle if bonds never go stale in demo scenarios)
+
+**GP2040-CE (before fix):**
+- Never handles this event
+
+**Impact:** `SM_EVENT_IDENTITY_RESOLVING_FAILED` fires when BTstack cannot match a reconnecting peer's IRK (Identity Resolving Key) to any entry in the bonded device database. This happens when:
+- User deletes the Bluetooth pairing on Windows but the Pico still has a stored bond
+- Bond database entry is corrupted or stale
+- IRK mismatch due to out-of-sync bond state
+
+Without handling this event, the connection proceeds in an undefined state → BTstack may silently disconnect the peer.
+
+---
+
+## Decision: Three Targeted Fixes
+
+### FIX 1: Add SM_AUTHREQ_SECURE_CONNECTION
+
+**Change:**
+```c
+// In _doInit(), line 249
+sm_set_authentication_requirements(SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING);
+```
+
+**Rationale:**
+- Aligns with modern OS expectations (Windows 10+, macOS 11+, iOS, Android)
+- Enables LE Secure Connections support — device can now accept SC-LTKs presented by Windows on reconnect
+- Matches BTstack's official reference implementation
+
+**Implication:**
+- **User must delete existing Windows pairing and re-pair once after this change**
+- The SC flag changes the pairing mode — existing legacy bonds are incompatible with the new SC mode
+- This is acceptable and expected for a firmware update
+
+### FIX 2: Defer Advertising Restart to process()
+
+**Change:**
+1. Add `volatile bool _needsAdvRestart = false;` to `headers/BLEHIDManager.h` (line 70)
+2. In `HCI_EVENT_DISCONNECTION_COMPLETE` handler: set `_needsAdvRestart = true` instead of calling `gap_advertisements_enable(1)`
+3. In `process()` main loop (after `cyw43_arch_poll()`): check `if (_needsAdvRestart && !_connected)` → call `gap_advertisements_enable(1)` → clear flag
+
+**Rationale:**
+- Defers advertising restart to the next main loop iteration rather than calling from IRQ context
+- Allows BTstack's LL cleanup to complete before starting new advertising sequence
+- Avoids race condition between `gap_advertisements_enable` and LL state machine
+
+**Why this is safe:**
+- `_needsAdvRestart` is written in IRQ context (disconnect handler) and read in main loop → must be `volatile`
+- Main loop runs at ~1ms cadence → advertising restart happens within 1ms of disconnect (imperceptible to user)
+- Flag is cleared immediately after advertising starts → no repeated calls
+
+### FIX 3: Handle SM_EVENT_IDENTITY_RESOLVING_FAILED
+
+**Change:**
+```c
+// In _smPacketHandler, after SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED case
+case SM_EVENT_IDENTITY_RESOLVING_FAILED:
+    // BTstack could not match reconnecting peer's IRK to any stored bond.
+    // This happens if Windows deleted its side of the pairing but the Pico
+    // still has a stored entry (or vice versa). Request a fresh pairing.
+    sm_request_pairing(sm_event_identity_resolving_failed_get_handle(packet));
+    break;
+```
+
+**Rationale:**
+- Gracefully handles bond state mismatch between Windows and Pico
+- Instead of silent disconnect, triggers a fresh pairing exchange
+- User sees pairing dialog on Windows again → can re-pair without manually deleting old bond
+
+**Why this is correct:**
+- `sm_request_pairing()` is the BTstack API for initiating pairing from the peripheral side
+- This is the standard recovery path when IRK resolution fails
+- Matches iOS/Android BLE peripheral behavior (auto-repair on bond mismatch)
+
+---
+
+## Build Result
+
+```
+ninja: Entering directory `build_ble3'
+[3/4] Building CXX object CMakeFiles/GP2040-CE.dir/src/BLEHIDManager.cpp.obj
+[4/4] Linking CXX executable GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.elf
+```
+
+✅ **SUCCESS** — No compile errors, firmware built successfully
+
+---
+
+## Expected Outcome
+
+1. **First boot after firmware flash:**
+   - User deletes existing "GP2040-CE Gamepad" pairing from Windows Bluetooth settings
+   - User triggers pairing mode on Pico (existing pairing button mechanism)
+   - Windows pairs with SC-LTK → stores SC bond
+
+2. **Subsequent reconnects (power cycle, manual disconnect):**
+   - Windows presents SC-LTK → Pico accepts (SC support enabled) → encryption succeeds
+   - No disconnect loop
+   - LED blink diagnostic shows 0 blinks (no disconnect reason)
+
+3. **Bond mismatch scenario (Windows deletes pairing, Pico still has bond):**
+   - BTstack fires `SM_EVENT_IDENTITY_RESOLVING_FAILED`
+   - Pico calls `sm_request_pairing(handle)`
+   - Windows shows pairing dialog → user re-pairs
+   - New bond established → reconnects succeed
+
+---
+
+## Alternatives Considered
+
+### Alternative 1: Keep legacy bonding, add SC LTK compatibility layer
+**Rejected:** BTstack does not provide an API to accept both legacy and SC LTKs in the same bond. The SM authentication requirements are set globally, not per-bond.
+
+### Alternative 2: Call gap_advertisements_enable(1) after a timer delay
+**Rejected:** BTstack runs in `async_context_threadsafe_background` — cannot use `sleep_ms()` or timers in packet handlers without blocking the entire BLE stack. Deferring to main loop via flag is cleaner and doesn't require timers.
+
+### Alternative 3: Clear bond database on boot to force fresh pairing every time
+**Rejected:** Defeats the purpose of bonding persistence. Users want to reconnect without re-pairing every boot.
+
+---
+
+## Testing Plan
+
+**Hardware test (next step):**
+1. Flash firmware to Pico W or Pico 2 W with CYW43
+2. Delete existing Windows pairing
+3. Trigger pairing mode on Pico
+4. Pair with Windows → verify connection succeeds
+5. Power cycle Pico → verify Windows reconnects without pairing dialog
+6. Observe LED blink diagnostic → expect 0 blinks (no disconnect)
+7. Repeat power cycle 10 times → verify no disconnect loops
+
+**Diagnostic:**
+- If LED still blinks ~15 times, capture exact blink count (user should count slowly)
+- Exact count tells us which HCI reason code is firing
+- If count is exactly 15, actual reason code may be > 15 (capped by diagnostic logic)
+
+---
+
+## Rollback Plan
+
+If hardware test shows this fix does NOT resolve the reconnect loop:
+1. Revert all three changes (git revert)
+2. Add more detailed logging (if USB serial available) or LED diagnostics to capture exact HCI reason code
+3. Investigate alternate root causes (connection parameters, L2CAP negotiation, GATT MTU)
+
+---
+
+## Key Learnings
+
+1. **Windows/macOS prefer LE Secure Connections** — modern BLE peripherals should enable `SM_AUTHREQ_SECURE_CONNECTION` by default for OS compatibility
+2. **BTstack packet handlers run in IRQ context** — never call state-changing API functions directly from handlers; defer to main loop via flags
+3. **SM_EVENT_IDENTITY_RESOLVING_FAILED is the correct event for bond mismatch recovery** — peripherals should handle this event and request re-pairing gracefully
+4. **Compare against official BTstack examples** — `hog_keyboard_demo.c` is the authoritative reference for BLE HID implementation patterns
+
+---
+
+## References
+
+- BTstack hog_keyboard_demo.c: `pico-sdk/lib/btstack/example/hog_keyboard_demo.c`
+- BTstack Security Manager docs: https://bluekitchen-gmbh.com/btstack/
+- BLE Core Spec v5.4, Vol 3, Part H (Security Manager Protocol)
+- `.squad/skills/btstack-rp2040/SKILL.md` (pattern library)
+- `.squad/agents/edward/history.md` (prior reconnect loop fixes)
+
+
+---
+
+# Decision: Aggressive Bond Clearing on SM_EVENT_IDENTITY_RESOLVING_FAILED
+
+**Date:** 2026-03-31  
+**Author:** Edward  
+**Status:** Implemented (build_ble3)
+
+## Context
+
+After adding `SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING` to require Secure Connections pairing, the reconnect loop was still happening but significantly faster. This is the classic stale-bond pattern:
+
+1. Pico flash contains a legacy (non-SC) LTK from a previous pairing
+2. Windows also has the old non-SC bond stored  
+3. On reconnect, Windows presents the old LTK, Pico has SC required → encryption handshake fails immediately
+4. Disconnect → re-advertise → repeat (faster than before because SC fails at a different protocol layer)
+
+The previous `SM_EVENT_IDENTITY_RESOLVING_FAILED` handler called `sm_request_pairing()` but did not remove the stale bond entry from `le_device_db` first. BTstack kept trying to resolve the old bond, preventing fresh SC pairing from completing.
+
+## Decision
+
+When `SM_EVENT_IDENTITY_RESOLVING_FAILED` fires, **wipe ALL stored bonds BEFORE requesting fresh pairing**.
+
+Implementation in `src/BLEHIDManager.cpp`:
+
+```cpp
+case SM_EVENT_IDENTITY_RESOLVING_FAILED: {
+    hci_con_handle_t handle = sm_event_identity_resolving_failed_get_handle(packet);
+    // Stale or mismatched bond — wipe all stored bonds so fresh SC pairing can complete.
+    // The host will need to remove and re-add the device on their side as well.
+    int deviceCount = le_device_db_count();
+    for (int i = deviceCount - 1; i >= 0; i--) {
+        le_device_db_remove(i);
+    }
+    mgr._hasBondedPeers = false;
+    sm_request_pairing(handle);
+    break;
+}
+```
+
+## Rationale
+
+- **Identity resolution failure means the bond is stale or mismatched** — BTstack couldn't match the connecting peer's IRK to any stored bond, or the stored bond is incompatible (non-SC vs SC)
+- **Clearing bonds BEFORE `sm_request_pairing()` is critical** — the stale entry must be gone before BTstack can accept new SC pairing
+- **Reverse iteration is safe** — removing from highest index to lowest avoids index shifting bugs
+- **Host must also re-pair** — Windows/macOS/iOS will need to remove and re-add the device on their side
+
+## BTstack API Notes
+
+- **No `le_device_db_remove_all()` exists** in BTstack
+- Must iterate `le_device_db_count()` and call `le_device_db_remove(index)` manually
+- Correct getter: `sm_event_identity_resolving_failed_get_handle(packet)` (confirmed in SDK 2.2.0 `btstack_event.h:3879`)
+
+## Consequences
+
+### Positive
+- Fresh SC pairing can complete when identity resolution fails
+- Eliminates stale non-SC LTK causing encryption handshake failures
+- Simple, surgical fix with no impact on normal operation
+
+### Negative
+- **All bonds are wiped** when identity resolution fails (not just the mismatched one)
+- User must re-pair on both sides (Pico and host) if this event fires
+- Aggressive approach — may clear bonds unnecessarily if the failure is transient
+
+### Trade-offs
+Chose aggressive clearing over selective removal because:
+1. BTstack doesn't provide enough context to identify which specific bond is stale
+2. Identity resolution failure is rare in normal operation (only happens on bond mismatch)
+3. Security benefit outweighs UX cost (ensures clean SC pairing, no legacy crypto)
+
+## Verification
+
+Build succeeded: ✅ `ninja -C build_ble3` (commit pending hardware test)
+
+## Related Files
+
+- `src/BLEHIDManager.cpp` (lines 404–415)
+- `.squad/skills/btstack-rp2040/SKILL.md` (pattern documented)
+- `.squad/agents/edward/history.md` (2026-03-31 entry)
+

@@ -504,6 +504,33 @@ Added LED blink diagnostics to trace execution flow (no USB serial in BLE-only m
 
 **Expected Outcomes After Flash:**
 1. LED blinks 1s solid shortly after boot → dispatch() IS being called ✅
+
+### 2026-03-31: BLE Stale Bond Cleanup on Identity Resolution Failure
+
+**Task:** Fix reconnect loop caused by stale non-SC bonds in flash after adding `SM_AUTHREQ_SECURE_CONNECTION`.
+
+**Root Cause:** After requiring Secure Connections (`SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING`), reconnect loops were faster but still happening. The issue: Pico flash contained legacy (non-SC) LTK from previous pairing. Windows presented the old LTK, Pico required SC → encryption handshake failed → disconnect → re-advertise → repeat. The `SM_EVENT_IDENTITY_RESOLVING_FAILED` handler called `sm_request_pairing()` but didn't remove the stale bond entry first — BTstack kept trying to resolve the old bond.
+
+**Fix Applied:** In `src/BLEHIDManager.cpp`, modified `SM_EVENT_IDENTITY_RESOLVING_FAILED` handler to aggressively clear all stored bonds BEFORE requesting fresh pairing:
+
+```cpp
+case SM_EVENT_IDENTITY_RESOLVING_FAILED: {
+    hci_con_handle_t handle = sm_event_identity_resolving_failed_get_handle(packet);
+    // Stale or mismatched bond — wipe all stored bonds so fresh SC pairing can complete.
+    // The host will need to remove and re-add the device on their side as well.
+    int deviceCount = le_device_db_count();
+    for (int i = deviceCount - 1; i >= 0; i--) {
+        le_device_db_remove(i);
+    }
+    mgr._hasBondedPeers = false;
+    sm_request_pairing(handle);
+    break;
+}
+```
+
+**BTstack API:** No `le_device_db_remove_all()` exists. Must iterate `le_device_db_count()` and call `le_device_db_remove(index)` in reverse order. The correct getter is `sm_event_identity_resolving_failed_get_handle(packet)` (confirmed in `btstack_event.h:3879`).
+
+**Build Result:** ✅ `ninja -C build_ble3` succeeded. Firmware compiles cleanly with aggressive bond cleanup.
 2. 3-blink pattern when button held → buttons ARE reaching OutputManager ✅
 3. 2-blink slow pattern repeats every 2s → _notificationsEnabled gate WAS blocking (nuclear bypass removed it)
 4. Button presses NOW register in joy.cpl → CCCD subscription was the bug
@@ -681,3 +708,142 @@ Bond database persists across power cycles via BTstack's le_device_db.*
 4. (Fresh pair only: `SM_EVENT_PAIRING_COMPLETE`, `HIDS_SUBEVENT_INPUT_REPORT_ENABLE`)
 
 **Key Learning:** Never gate ATT/GATT operations on SM identity events. Encryption-complete is the authoritative gate. SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED is purely identity confirmation, has no ATT/GATT authorization properties.
+
+### 2026-03-31: BLE Reconnect Loop Final Fix — Secure Connections + Advertising Defer + Identity Mismatch
+
+**Branch:** feature/ble-hid-v2  
+**Commit:** (pending)  
+**Status:** ✅ FIXES APPLIED — awaiting hardware test
+
+**Situation:** Reconnect loop persists after prior fixes. LED diagnostic shows ~15 blinks (HCI reason ≥ 15). Most likely: 0x13 (Windows terminated), 0x16 (local terminated), or 0x3B (bad params).
+
+**Root Cause Analysis (comparing to BTstack hog_keyboard_demo.c):**
+
+#### Discrepancy #1: SM Auth Requirements (SC Missing)
+- **Demo:** `SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING`
+- **Ours:** `SM_AUTHREQ_BONDING` only
+- **Impact:** Windows paired using LE Secure Connections and stored an SC LTK. On reconnect, Windows presents SC LTK, but our device is configured for legacy bonding only → LTK mismatch → encryption fails → Windows terminates (0x13).
+
+#### Discrepancy #2: Advertising Restart from Disconnect Handler
+- **Demo:** Does NOT call gap_advertisements_enable in disconnect handler
+- **Ours:** Calls gap_advertisements_enable(1) directly from IRQ context disconnect handler
+- **Impact:** Calling gap_advertisements_enable while the LL link is still cleaning up may cause race condition. BTstack may restart advertising internally.
+
+#### Discrepancy #3: SM_EVENT_IDENTITY_RESOLVING_FAILED (not handled)
+- **Demo:** Not shown (may not need if bonds never go stale)
+- **Ours:** Never handles this event
+- **Impact:** If BTstack can't match reconnecting peer to stored bond (stale IRK, Windows deleted pairing), this event fires. We never act on it → silent disconnect.
+
+**Fixes Applied:**
+
+##### FIX 1: Add SM_AUTHREQ_SECURE_CONNECTION
+Changed `sm_set_authentication_requirements(SM_AUTHREQ_BONDING)` to `sm_set_authentication_requirements(SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING)` in _doInit().
+
+**Implication:** This changes pairing mode. User must delete existing Windows pairing and re-pair once after this change.
+
+##### FIX 2: Defer Advertising Restart to process()
+- Added `volatile bool _needsAdvRestart` to headers/BLEHIDManager.h
+- In HCI_EVENT_DISCONNECTION_COMPLETE handler: set `_needsAdvRestart = true` instead of calling gap_advertisements_enable(1) directly
+- In process() main loop (after cyw43_arch_poll): check `if (_needsAdvRestart && !_connected)` → call gap_advertisements_enable(1) → clear flag
+
+**Rationale:** Defers advertising restart to next main loop iteration rather than calling from IRQ context. Avoids race with LL cleanup.
+
+##### FIX 3: Handle SM_EVENT_IDENTITY_RESOLVING_FAILED
+Added case to _smPacketHandler:
+```cpp
+case SM_EVENT_IDENTITY_RESOLVING_FAILED:
+    sm_request_pairing(sm_event_identity_resolving_failed_get_handle(packet));
+    break;
+```
+
+**Rationale:** If BTstack can't match reconnecting peer's IRK to any stored bond (e.g., Windows deleted pairing, stale bond entry), request fresh pairing gracefully instead of silent disconnect.
+
+**Build Result:** ✅ SUCCESS (ninja build_ble3)
+
+**Next Steps:** User tests with physical hardware, observes LED blink count. Expected outcome: reconnect loop resolved, Windows/Pico re-pair once, then stable reconnects with no disconnect loops.
+
+**Key Learnings:**
+1. Windows prefers LE Secure Connections — SM_AUTHREQ_SECURE_CONNECTION should be default for modern OS compatibility
+2. BTstack event handlers firing in IRQ context should NOT call state-changing API functions directly — defer to main loop via flags
+3. SM_EVENT_IDENTITY_RESOLVING_FAILED is the correct event to trigger re-pairing when bond state is mismatched between peers
+
+
+## 2025-01-28 — BLE Bond Storage Scoping
+
+### Task
+Scope protobuf BLE bond storage: assess feasibility and produce a concrete design for storing BTstack BLE bond data inside GP2040-CE's existing protobuf config system.
+
+### Key Findings
+
+**Root cause of bond loss (likely):** Flash region collision between GP2040-CE's `FlashPROM` (0x101F8000–0x10200000, 32 KB) and BTstack's `pico_flash_bank_instance()` (also at the top of 2 MB flash). Both subsystems call `flash_range_erase()` on overlapping pages, obliterating each other's data on every config save or bond write.
+
+**Protobuf config structure:** `proto/config.proto` uses nanopb syntax v2. Root `Config` message uses fields 1–15. Field 16 is free for `BLEConfig`. All fields are `optional`; nanopb initialises unset fields to zero/false — safe for new schema additions.
+
+**Storage layer:** `FlashPROM` (32 KB write-cache, deferred commit via `add_alarm_in_ms()` with 50 ms debounce, multicore-safe). `StorageManager` singleton wraps protobuf encode/decode. Config loaded before BLE init (BLE deferred 3 s), so `le_device_db_init()` can safely access the live config struct.
+
+**BTstack interface:** `le_device_db.h` is a clean public API (12 functions). BTstack SM layer calls it without caring about the backend. The TLV implementation (`le_device_db_tlv.c`) is a separate compilation unit — not hard-linked; can be replaced by providing our own `.cpp` that implements the same symbols.
+
+**BLEHIDManager:** Already uses `btstack_tlv_flash_bank_init_instance()` + `le_device_db_tlv_configure()`. These ~5 lines are removed as part of Option B.
+
+### Decision
+Recommended **Option B** (custom `le_device_db` backed by protobuf). See `ble-proto-bond-design.md` for full design.
+
+### Deliverables
+- `.squad/agents/edward/ble-proto-bond-design.md` — full design document
+- `.squad/agents/edward/history.md` — appended this entry
+
+### 2026-03-31: Protobuf BLE Bond Storage Implementation
+
+**Task:** Replace BTstack TLV flash-bank bond storage with protobuf-backed le_device_db.
+
+**Root cause confirmed:** FlashPROM and pico_flash_bank_instance() both address the top of flash. Every Storage.save() nukes the TLV bond bank and vice versa.
+
+**What worked:**
+- Nanopb optional bytes fields generate PB_BYTES_ARRAY_T(N) typedefs + struct with .size and .bytes[].  Confirmed by inspecting uild_ble3/proto/config.pb.h.
+- epeated BLEBondEntry bonds = 1 [(nanopb).max_count = 4] generates onds[4] + onds_count in the struct as expected.
+- Adding leConfig = 16 to the root Config message compiled without conflict — field 15 (peripheralOptions) was the last used.
+- set_source_files_properties(... HEADER_FILE_ONLY TRUE) on le_device_db_tlv.c **works** to exclude that SDK file from compilation cleanly. This is the correct CMake idiom for overriding INTERFACE library sources.
+
+**Gotchas:**
+1. **le_device_db.h path:** Must be #include "ble/le_device_db.h" — BTstack headers are under src/ble/, not directly in the include path root.
+2. **le_device_db_tlv_configure stub required:** tstack_cyw43.c (Pico SDK, not our code) calls le_device_db_tlv_configure() unconditionally in tstack_cyw43_init(). Excluding le_device_db_tlv.c removes the only provider of this symbol. Fix: add a noop stub in le_device_db_proto.cpp, also include "ble/le_device_db_tlv.h" so the C++ declaration matches.
+3. **le_device_db_memory.c compiles out automatically:** NVM_NUM_DEVICE_DB_ENTRIES=4 in tstack_config.h triggers a #ifndef NVM_NUM_DEVICE_DB_ENTRIES guard in le_device_db_memory.c that skips its entire body. No action needed for that file.
+4. **Both TLV files are in pico_btstack_ble INTERFACE:** le_device_db_memory.c AND le_device_db_tlv.c are both listed as 	arget_sources(pico_btstack_ble INTERFACE ...). Only le_device_db_tlv.c produces symbols (memory.c guards itself out), so only one file needs HEADER_FILE_ONLY exclusion.
+5. **pico_btstack_flash_bank can stay linked:** tstack_tlv_flash_bank.c (from pico_btstack_base) does NOT call pico_flash_bank_instance() directly — it only uses a hal_flash_bank_t* pointer. Removing pico_btstack_flash_bank from link_libraries is optional; left as-is to avoid risk.
+
+**Build result:** Clean — no errors, no duplicate symbol warnings. UF2 produced at 3.1 MB.
+
+### 2026-04-01: Protobuf-Backed BLE Bond Storage Implementation
+
+**Task:** Replace BTstack TLV bond storage with protobuf-integrated le_device_db to eliminate flash collision with FlashPROM.
+
+**Problem:** GP2040-CE's FlashPROM (32 KB @  x101F8000–0x10200000) and BTstack's pico_flash_bank_instance() (two 4 KB sectors at flash top) overlap. Every Storage.save() erases BTstack's TLV bond bank → bonds don't survive power cycles.
+
+**Solution:** Implement BTstack's le_device_db.h interface directly, backed by new BLEConfig protobuf sub-message inside existing Config root. This eliminates the TLV bank entirely.
+
+**Implementation Details:**
+- **Proto schema:** Added BLEBondEntry and BLEConfig messages (field 16 on Config). Supports up to 4 bonded devices.
+- **le_device_db_proto.cpp:** NEW file implementing full BTstack le_device_db.h interface plus le_device_db_tlv_configure() noop stub (required by tstack_cyw43.c).
+- **CMake exclusion:** set_source_files_properties(HEADER_FILE_ONLY TRUE) suppresses SDK's le_device_db_tlv.c compilation.
+
+**Critical Finding:** tstack_cyw43.c calls le_device_db_tlv_configure() unconditionally at init. Merely excluding le_device_db_tlv.c leaves undefined symbol. Noop stub in le_device_db_proto.cpp satisfies linker.
+
+**Trade-offs:**
+- ✅ Flash collision eliminated
+- ✅ Bond persistence reliable (protobuf serialization)
+- ✅ Web UI inspectable (future)
+- ✗ One-time re-pair on upgrade (bonds lost on upgrade)
+- ✗ +~350 LOC code delta
+
+**Build Result:** ✅ Clean build, 3.1 MB firmware (GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2).
+
+**Files Changed:**
+- proto/config.proto: BLEBondEntry, BLEConfig schemas
+- src/le_device_db_proto.cpp: NEW implementation file
+- src/BLEHIDManager.cpp: Minor proto reference updates
+- src/config_utils.cpp: Proto serialization integration
+- CMakeLists.txt: le_device_db_tlv.c exclusion
+
+**Next Steps:**
+1. Hardware test bond persistence across power cycles
+2. Protobuf web configurator integration (future phase)

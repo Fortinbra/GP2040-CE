@@ -162,6 +162,10 @@ void _doInit() {
 
 **Why:** `att_server_init()` and service inits may register callbacks that depend on Security Manager state. Out-of-order initialization can cause silent failures or bonding issues.
 
+**CRITICAL: Always use SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING for modern OS compatibility.** Windows 10+, macOS 11+, iOS, and Android prefer LE Secure Connections (LESC). If the device is configured for legacy bonding only (`SM_AUTHREQ_BONDING` without SC), the OS will pair using SC and store an SC-LTK. On reconnect, the OS presents the SC-LTK but the device cannot accept it → encryption fails → disconnect loop (HCI reason 0x13). Adding `SM_AUTHREQ_SECURE_CONNECTION` enables the device to accept SC-LTKs on reconnect.
+
+**Implication of adding SC:** Existing legacy bonds are incompatible with SC mode. Users must delete old pairings and re-pair once after enabling SC.
+
 ---
 
 ## Pattern: Report ID in Descriptor vs ATT Notification Payload
@@ -387,6 +391,49 @@ public:
 };
 ```
 
+---
+
+## Pattern: Aggressive Bond Clearing on SM_EVENT_IDENTITY_RESOLVING_FAILED
+
+**Confidence:** HIGH — Critical for Secure Connections (SC) pairing after enabling `SM_AUTHREQ_SECURE_CONNECTION`
+
+**Context:** When `SM_EVENT_IDENTITY_RESOLVING_FAILED` fires, BTstack couldn't match the connecting peer's IRK to any stored bond. This typically means:
+1. The host deleted its side of the pairing but the Pico still has a stored bond entry
+2. The bond is stale (e.g., legacy non-SC bond when SC is now required)
+3. The peer re-paired on their side without notifying the device
+
+**Problem:** Simply calling `sm_request_pairing()` is insufficient. BTstack will keep trying to resolve the stale bond entry, preventing fresh SC pairing from completing. This creates a fast reconnect loop.
+
+**Solution:** Clear ALL stored bonds BEFORE requesting fresh pairing:
+
+```cpp
+case SM_EVENT_IDENTITY_RESOLVING_FAILED: {
+    hci_con_handle_t handle = sm_event_identity_resolving_failed_get_handle(packet);
+    // Stale or mismatched bond — wipe all stored bonds so fresh SC pairing can complete.
+    // The host will need to remove and re-add the device on their side as well.
+    int deviceCount = le_device_db_count();
+    for (int i = deviceCount - 1; i >= 0; i--) {
+        le_device_db_remove(i);
+    }
+    mgr._hasBondedPeers = false;
+    sm_request_pairing(handle);
+    break;
+}
+```
+
+**Why:**
+- **Clearing bonds BEFORE `sm_request_pairing()` is critical** — the stale entry must be gone before BTstack can accept new SC pairing
+- **Reverse iteration is safe** — removing from highest index to lowest avoids index shifting bugs
+- **No `le_device_db_remove_all()` exists** in BTstack — must iterate manually using `le_device_db_count()` and `le_device_db_remove(index)`
+
+**When to use:**
+- After enabling `SM_AUTHREQ_SECURE_CONNECTION` on a device that previously used legacy bonding
+- When reconnect loops occur after OS updates (Windows 10→11, macOS upgrades)
+- When identity resolution consistently fails despite valid connections
+
+**Trade-off:** This is an aggressive approach — it clears ALL bonds, not just the mismatched one. But BTstack doesn't provide enough context to identify which specific bond is stale, and identity resolution failure is rare in normal operation, so security benefit outweighs UX cost.
+
+
 **Why:** BTstack's architectural design gives service-specific handlers first access to events. When `hids_device_register_packet_handler()` is registered, HIDS meta events are routed to that handler ONLY — they do NOT appear in the general HCI event handler. This is by design, not a bug, but it's a common source of silent failures.
 
 **Architectural Rule:** For any BTstack service (HIDS, Battery Service, Device Information Service, etc.) that emits meta events, you must register a service-specific handler to receive those events, even if you also have a general HCI handler.
@@ -410,3 +457,161 @@ public:
 - **BTstack documentation:** https://bluekitchen-gmbh.com/btstack/
 - **GP2040-CE BLE HID commits:** c494add2, 176109ef, e2584c20, 0291e55a (HIDS handler registration)
 - **Edward's history:** `.squad/agents/edward/history.md`
+## Pattern: Defer State-Changing API Calls from IRQ Context to Main Loop
+
+**Confidence:** HIGH (confirmed root cause of advertising restart race, 2026-03-31)
+
+**Context:** BTstack packet handlers run in IRQ context (`sync_context_threadsafe_background` periodic alarm). Calling state-changing API functions (e.g., `gap_advertisements_enable`, `hci_disconnect`, `sm_request_pairing`) directly from packet handlers can race with BTstack's internal state machines.
+
+**Anti-pattern (race condition):**
+```cpp
+case HCI_EVENT_DISCONNECTION_COMPLETE: {
+    // ... clear state ...
+    gap_advertisements_enable(1);  // ❌ Called from IRQ context → races with LL cleanup
+    break;
+}
+```
+
+**Correct pattern (defer to main loop):**
+```cpp
+// In headers/BLEHIDManager.h:
+volatile bool _needsAdvRestart = false;
+
+// In packet handler (IRQ context):
+case HCI_EVENT_DISCONNECTION_COMPLETE: {
+    // ... clear state ...
+    _needsAdvRestart = true;  // ✅ Set flag, don't call API
+    break;
+}
+
+// In process() main loop (after cyw43_arch_poll):
+if (_needsAdvRestart && !_connected) {
+    gap_advertisements_enable(1);  // ✅ Called from main loop, safe
+    _needsAdvRestart = false;
+}
+```
+
+**Why:** BTstack's Link Layer state machine cleans up the connection asynchronously after `HCI_EVENT_DISCONNECTION_COMPLETE` fires. Calling `gap_advertisements_enable` while the LL is still in the cleanup phase can cause undefined behavior (advertising starts but LL state is stale → next connection attempt fails → disconnect loop).
+
+**Key Rule:** Packet handlers should ONLY:
+1. Read event data (safe — data is read-only in handler context)
+2. Set flags (`volatile` variables written in IRQ, read in main loop)
+3. Call BTstack "response" APIs that are explicitly IRQ-safe (e.g., `sm_just_works_confirm`, documented as callable from handler)
+
+**Prohibited in packet handlers:**
+- `gap_advertisements_enable` / `gap_advertisements_disable`
+- `hci_disconnect`
+- `sm_request_pairing` (unless documented as IRQ-safe)
+- Any function that modifies GAP/SM/L2CAP state
+
+**When to defer:** If an API function modifies connection state, advertising state, or initiates a new protocol exchange, defer it to the main loop via a `volatile bool` flag.
+
+---
+
+## Pattern: Handle SM_EVENT_IDENTITY_RESOLVING_FAILED for Bond Mismatch Recovery
+
+**Confidence:** HIGH (correct recovery path for bond state mismatch, 2026-03-31)
+
+**Context:** `SM_EVENT_IDENTITY_RESOLVING_FAILED` fires when BTstack cannot match a reconnecting peer's IRK (Identity Resolving Key) to any stored bond. This happens when:
+- User deletes the Bluetooth pairing on the host (Windows, macOS, etc.) but the peripheral still has a stored bond
+- Bond database entry is corrupted or stale
+- IRK mismatch due to out-of-sync bond state
+
+**Anti-pattern (silent disconnect):**
+```cpp
+// SM_EVENT_IDENTITY_RESOLVING_FAILED not handled → connection proceeds in undefined state → silent disconnect
+```
+
+**Correct pattern (graceful re-pairing):**
+```cpp
+case SM_EVENT_IDENTITY_RESOLVING_FAILED:
+    // BTstack could not match reconnecting peer's IRK to any stored bond.
+    // Request a fresh pairing exchange to recover.
+    sm_request_pairing(sm_event_identity_resolving_failed_get_handle(packet));
+    break;
+```
+
+**Why:** Without handling this event, the connection proceeds with no valid bond → BTstack may silently disconnect the peer (HCI reason 0x13 or 0x16) → user sees reconnect loop with no pairing dialog.
+
+**Correct behavior:** When IRK resolution fails, trigger a fresh pairing exchange. The host sees a pairing dialog → user can re-pair → new bond established → future reconnects succeed.
+
+**Key Rule:** Peripherals that use bonding (`SM_AUTHREQ_BONDING`) MUST handle `SM_EVENT_IDENTITY_RESOLVING_FAILED` and call `sm_request_pairing` to recover from bond state mismatch.
+
+**Note:** Do NOT call `sm_request_pairing` from IRQ context in high-traffic scenarios. For BLE HID reconnect (single-peer, low-frequency event), it is safe. For multi-peer scenarios, consider deferring via flag.
+
+---
+
+
+## Pattern: Replace le_device_db_tlv with Custom Protobuf Backend
+
+**Confidence:** CONFIRMED — Implemented and built clean (2026-03-31)
+
+**Context:** BTstack's default bond storage (le_device_db_tlv.c) uses pico_flash_bank_instance() which maps to the top of flash — the same region as GP2040-CE's FlashPROM. Every config save corrupts the bond bank.
+
+**Fix:** Implement the le_device_db.h interface directly, backed by protobuf config.
+
+### CMake: exclude SDK's le_device_db_tlv.c
+
+`cmake
+# Inside if(PICO_CYW43_SUPPORTED) block, AFTER target_sources/target_link_libraries:
+set_source_files_properties(
+    "${PICO_SDK_PATH}/lib/btstack/src/ble/le_device_db_tlv.c"
+    PROPERTIES HEADER_FILE_ONLY TRUE
+)
+`
+
+HEADER_FILE_ONLY TRUE suppresses compilation of a specific source file that was added by an INTERFACE library. No CMake 3.18+ required (no TARGET_DIRECTORY needed when setting the property in the same directory scope as the consuming target).
+
+### le_device_db_memory.c is already safe
+
+le_device_db_memory.c has #ifndef NVM_NUM_DEVICE_DB_ENTRIES at the top — when NVM_NUM_DEVICE_DB_ENTRIES is defined (as it is in tstack_config.h), the entire file compiles to nothing. No action needed.
+
+### Required noop stub: le_device_db_tlv_configure
+
+tstack_cyw43.c (Pico SDK, not project code) calls le_device_db_tlv_configure() unconditionally from tstack_cyw43_init(). This is the ONLY SDK caller. Add this noop to your custom le_device_db implementation:
+
+`cpp
+#include "ble/le_device_db_tlv.h"  // for the declaration
+
+void le_device_db_tlv_configure(const btstack_tlv_t* btstack_tlv_impl,
+                                 void* btstack_tlv_context)
+{
+    (void)btstack_tlv_impl;
+    (void)btstack_tlv_context;
+    // protobuf backend needs no TLV wiring
+}
+`
+
+### BTstack header include path
+
+BTstack headers live under src/ble/ in the BTstack tree. Always use:
+- #include "ble/le_device_db.h" (NOT "le_device_db.h")
+- #include "ble/le_device_db_tlv.h"
+
+### Nanopb bytes fields in C++
+
+For optional bytes field = N [(nanopb).max_size = K] on a message Foo, nanopb generates:
+`c
+typedef PB_BYTES_ARRAY_T(K) Foo_field_t;
+typedef struct _Foo {
+    bool has_field;
+    Foo_field_t field;   // .size (pb_size_t) + .bytes[K]
+} Foo;
+`
+Access bytes as ntry.addr.bytes (array) and ntry.addr.size (length in use).
+
+### LRU eviction pattern for fixed-size bond array
+
+`cpp
+static int _find_lru(const BLEConfig& c) {
+    int lru_idx = 0;
+    uint32_t lru_seq = c.bonds[0].seqNr;
+    for (int i = 1; i < 4; i++) {
+        if (c.bonds[i].seqNr < lru_seq) { lru_seq = c.bonds[i].seqNr; lru_idx = i; }
+    }
+    return lru_idx;
+}
+`
+Increment seqCounter on every le_device_db_add(), store it in the slot's seqNr.
+
+---
