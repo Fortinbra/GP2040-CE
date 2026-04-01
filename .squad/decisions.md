@@ -1207,3 +1207,140 @@ Users must delete and re-pair after this change. The GATT Database Hash changes 
 | iOS            | Partial — not a primary target |
 | Nintendo Switch| Not supported (Switch requires BT Classic HID only) |
 
+
+
+---
+
+## Merged from Inbox — 2026-04-01
+
+# BT Architecture Diagram — Delivery Note
+
+**From:** Edward Elric (BLE/BTstack Engineer)  
+**Date:** 2026-06-11  
+**Requested by:** thegu
+
+---
+
+## Deliverable
+
+`docs/development/bt-architecture.md` — Mermaid architecture diagrams for the GP2040-CE Bluetooth stack.
+
+---
+
+## Contents of the Document
+
+### 1. Block Diagram (`graph TD`)
+Five subgraphs mapping WHERE each component lives:
+
+| Subgraph | Contents |
+|---|---|
+| **Hardware** | RP2350B (Core 0/1), CYW43439 (BT+WiFi), GPIO29/ADC3 (battery), gSPI bus |
+| **Pico SDK** | `pico_cyw43_arch_none`, `async_context_threadsafe_background`, `btstack_run_loop_async_context` |
+| **BTstack** | HCI → L2CAP → SM → ATT → GATT → `hids_device`, `battery_service_server`, `device_information_service_server` |
+| **GP2040-CE BLE Layer** | `BLEHIDManager` singleton, `BLEPowerState` state machine, `_hciPacketHandler`, `_smPacketHandler`, `le_device_db_proto` bond storage |
+| **GP2040-CE Core** | `GP2040::run()` (`wirelessOnly` path), `Gamepad`, `OutputManager::dispatch()`, `StorageManager`, `FlashPROM` |
+
+### 2. Report Send Sequence Diagram
+Shows WHEN a gamepad report travels from button press to BT RF:
+- `GP2040::run()` → `gamepad.read()/process()` → `OutputManager::dispatch()` → `BLEHIDManager::sendReport()` (caches 9-byte report, sets `_reportPending`)
+- `process()` → `cyw43_arch_poll()` → `hids_device_request_can_send_now_event()`
+- `HIDS_SUBEVENT_CAN_SEND_NOW` IRQ → `hids_device_send_input_report()` → ATT → L2CAP → HCI → CYW43439 → RF
+
+### 3. Connection Lifecycle Sequence Diagram
+Two side-by-side flows (fresh pair / bonded reconnect):
+- **Fresh pair:** ADV → CONNECT → SM pairing (Just Works / SC) → PAIRING_COMPLETE → ENCRYPTION_CHANGE → HIDS notify enable → ACTIVE
+- **Bonded reconnect:** ADV → CONNECT → IRK resolution → `SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED` (_hasBondedPeers only — NOT notifications) → `HCI_EVENT_ENCRYPTION_CHANGE` → _notificationsEnabled=true → HIDS notify enable → ACTIVE
+
+> ⚠️ The reconnect sequence diagram explicitly calls out the critical SKILL.md pattern: **do NOT gate `_notificationsEnabled` on `SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED`**. The diagram gates it on `HCI_EVENT_ENCRYPTION_CHANGE` as the correct pattern.
+
+### 4. Supporting Tables
+- **GATT profile summary** — 5 services (GAP, Battery, DIS, HID, GATT), their UUIDs and key characteristics
+- **Power state reference** — ADVERTISING / ACTIVE / IDLE transitions and behavior
+
+---
+
+## No Firmware Changes
+
+This is a documentation-only deliverable. All firmware code was read but not modified.
+
+---
+
+## Architectural Insights Confirmed
+
+1. `ENABLE_BLUETOOTH=1` compile-time guard is the correct check across all call sites — set only when `PICO_CYW43_SUPPORTED` (SDK-provided, not custom).
+2. `OutputManager.cpp` is compiled for ALL boards (both branches of the CMake `if(PICO_CYW43_SUPPORTED)`) — the non-BLE path is a no-op `(void)gamepad`.
+3. `le_device_db_proto.cpp` provides a `le_device_db_tlv_configure()` noop stub required by `btstack_cyw43.c` (Pico SDK internal) which calls this function unconditionally during init.
+4. `_lastDisconnectReason` blinking in `process()` is a novel diagnostic pattern: N slow blinks = HCI disconnect reason code (capped at 15). Clears on next connection. Useful field diagnostic for reconnect loops.
+# Decision Inbox: BLE HID Report ID in Descriptor
+
+**From:** Edward
+**Date:** 2026-XX-XX
+**Context:** BLE HID button regression fix (post XInput-style 13-byte descriptor)
+
+## Finding
+
+For single-report BLE HID devices, **do NOT include  x85, 0x01 (Report ID) in the HID Report Map descriptor**.
+
+### Why
+
+Some Windows BLE HID driver versions treat BLE HID like USB HID when the Report Map declares a Report ID. They expect the Report ID byte as the first byte of every ATT notification payload, which shifts all data fields by one byte and breaks button/axis parsing. BTstack's hids_device_send_input_report() does NOT prepend a Report ID byte (confirmed from source), but the host-side misinterpretation is enough to silently break input.
+
+For a single-report device the GATT Report Reference descriptor (REPORT_REFERENCE, READ, 1, 1 in le_hid.gatt) already communicates the Report ID to the BLE host for GATT-level disambiguation. The Report Map's  x85 item is redundant and harmful.
+
+### Rule
+
+- **Single-report BLE HID**: no  x85 in descriptor. Let GATT Report Reference carry the ID.
+- **Multi-report BLE HID**:  x85 items required in descriptor to distinguish reports, AND GATT Report Reference must match each report's ID.
+
+### Also note
+
+tstack_hid_get_report_size_for_id(id, type, ...) returns 0 if the descriptor has no Report ID items and id != HID_REPORT_ID_UNDEFINED. This sets 
+eport_storage->size = 0 internally. This does NOT affect hids_device_send_input_report() (which calls tt_server_notify with the caller-supplied length, ignoring 
+eport_storage->size), but would affect the ATT read path for Report characteristics. Since we do not register hids_device_register_get_report_callback(), the ATT read already returns 0 — no regression.
+
+### Re-pair always required after descriptor change
+
+Any change to the HID Report Map requires the host to forget and re-pair the device. This is OS-level behaviour and cannot be avoided in firmware.
+# Decision: XInput-Style BLE HID Report Implementation
+
+**Date:** 2026-05-25  
+**By:** Edward (BLE/BTstack Engineer)  
+**Requested by:** thegu
+
+## What
+
+Replaced the 9-byte generic 32-button BLE HID report descriptor and report builder with a
+13-byte XInput-style layout in BLEHIDManager.cpp, BLEHIDManager.h, and OutputManager.cpp.
+
+## Layout
+
+`
+Byte 0:   A, B, X, Y, LB, RB, Back, Start
+Byte 1:   Guide, LS, RS + 5 reserved bits
+Byte 2:   Hat switch (0–7, null=8) + 4-bit padding
+Bytes 3–4: LT, RT (uint8, 0..255)
+Bytes 5–12: LX, LY, RX, RY (int16 LE, Y axes inverted)
+`
+
+Report ID 1 declared in descriptor but NOT in ATT payload — carried by GATT Report Reference.
+
+## Why
+
+- Old descriptor exposed 32 anonymous buttons; hosts showed "Button 1"–"Button 32"
+- Old axes were unsigned 8-bit (0..255); XInput convention uses signed 16-bit
+- New layout gives semantic button labels and proper signed axes on Windows/Android/macOS
+
+## Key Choices
+
+- Hat null state = 8 (any value > 7 is null per HID spec, descriptor uses Null State flag 0x42)
+- Axis formula mirrors XInputDriver.cpp exactly: static_cast<int16_t>(state.lx) + INT16_MIN
+- Y axes inverted: ~state.ly to convert GP2040-CE "0=up" to XInput "positive=up"
+- hasAnalogTriggers guard kept: digital boards get 0x00/0xFF; analog boards use state.lt/rt directly
+- Buffer sizes updated to 13 in header; clamp in sendReport updated to 13
+
+## Impact
+
+- **Re-pairing required** after firmware update (GATT Database Hash changes)
+- USB XInput driver unchanged
+- GATT file (src/ble_hid.gatt) unchanged
+- Build clean on uild_ble3 (PimoroniPicoLipo2XLW target)
