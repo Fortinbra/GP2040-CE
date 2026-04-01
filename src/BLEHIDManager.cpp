@@ -19,17 +19,21 @@
 // Generated GATT database header (from src/ble_hid.gatt via pico_btstack_make_gatt_header)
 #include "ble_hid.h"
 
-// HID Report Descriptor: Report ID 1 + 11 named buttons (2 bytes) + hat+padding (1 byte)
-//   + LT/RT triggers (2 bytes) + 4 signed 16-bit axes (8 bytes) = 13 bytes.
+// HID Report Descriptor: NO Report ID — 11 named buttons (2 bytes) + hat+padding (1 byte)
+//   + LT/RT triggers (2 bytes) + 4 signed 16-bit axes (8 bytes) = 13 bytes total.
 // XInput-style layout: named face/shoulder/menu buttons, hat switch, uint8 triggers, int16 sticks.
-// For BLE HID the Report ID byte is NOT sent in the ATT notification payload; it is communicated
-// via the GATT Report Reference descriptor (0x2908) in ble_hid.gatt (REPORT_REFERENCE, READ, 1, 1).
+//
+// Report ID is intentionally omitted from this descriptor. For a single-report BLE HID device,
+// the GATT Report Reference descriptor (0x2908) in ble_hid.gatt (REPORT_REFERENCE, READ, 1, 1)
+// already communicates the Report ID to the host. Including 0x85/0x01 here causes some Windows
+// BLE HID driver versions to expect the Report ID as the first byte of every ATT notification
+// payload (USB HID behaviour), which shifts all data by one byte and breaks button parsing.
+// BTstack's hids_device_send_input_report() does NOT prepend a Report ID byte regardless;
+// but removing it from the map eliminates the host-side misinterpretation.
 static const uint8_t hid_report_descriptor[] = {
     0x05, 0x01,              // USAGE_PAGE (Generic Desktop)
     0x09, 0x05,              // USAGE (Game Pad)
     0xA1, 0x01,              // COLLECTION (Application)
-
-    0x85, 0x01,              // Report ID (1)
 
     // ── 11 digital buttons (2 bytes total) ─────────────────────────────────
     // Buttons 1–8: A, B, X, Y, LB, RB, Back, Start

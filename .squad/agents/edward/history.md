@@ -1009,3 +1009,27 @@ Recommended **Option B** (custom `le_device_db` backed by protobuf). See `ble-pr
 
 Replaced 9-byte generic BLE HID report with 13-byte XInput-style layout. Files: BLEHIDManager.cpp (new descriptor, clamp 9->13), BLEHIDManager.h (buffers [9]->[13]), OutputManager.cpp (new 13-byte builder). Axis formula and hasAnalogTriggers guard copied from XInputDriver.cpp. Build: clean 7/7.
 
+
+### 2026-XX-XX: BLE HID Report ID regression fix
+
+**Tasked by:** Fortinbra
+
+**Problem:** After the XInput-style 13-byte descriptor landed (commit 91366f88), button presses were not seen by the host over BLE. LEDs and connection state responded normally.
+
+**Investigation:**
+- Checked hids_device_send_input_report in BTstack 2.2.0 source — confirmed it calls tt_server_notify directly with the payload as-is. Does NOT prepend a Report ID byte regardless of descriptor content.
+- Confirmed the OLD 9-byte descriptor (commit ea363070) also contained  x85, 0x01 (Report ID 1). So the Report ID was not newly introduced by the 13-byte change.
+- Verified descriptor byte counts: 11 buttons (2 bytes) + hat+padding (1 byte) + triggers (2 bytes) + int16 axes (8 bytes) = 13 bytes. Correct.
+- sendReport() passes sizeof(report) = 13 correctly. _pendingReportLen is set to 13. hids_device_send_input_report sends 13 bytes via tt_server_notify. No buffer size issues.
+- No hardcoded 9s left in the code.
+
+**Root cause:** When  x85, 0x01 (Report ID 1) is present in the HID Report Map, some Windows BLE HID driver versions expect the Report ID byte as the FIRST byte of every ATT notification payload (USB HID behaviour). This shifts all data by one byte, putting button data out of alignment. For a single-report BLE HID device, the Report ID in the descriptor is unnecessary — the GATT Report Reference descriptor (0x2908) already communicates the Report ID to the host.
+
+**Fix applied (Option A):** Removed  x85, 0x01 from hid_report_descriptor[] in src/BLEHIDManager.cpp. Updated the comment block to explain the rationale. No changes to OutputManager.cpp, buffer sizes, or GATT file.
+
+**Re-pair required:** Yes. Any descriptor change (including this one) requires removing and re-adding the device on the host.
+
+**Build:** Clean — 2/2 objects recompiled, ELF linked, exit code 0.
+
+**Files changed:**
+- src/BLEHIDManager.cpp: removed Report ID item from descriptor, updated comment.

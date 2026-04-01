@@ -168,52 +168,46 @@ void _doInit() {
 
 ---
 
-## Pattern: Report ID in Descriptor vs ATT Notification Payload
+## Pattern: Report ID in HID Descriptor — OMIT for single-report BLE HID
 
-**Context:** BLE HID Report Descriptors include a Report ID item (`0x85, 0x01`), but the ATT notification payload does NOT include the Report ID byte.
+**Confidence:** CRITICAL — Proven root cause of button presses not registering on host
 
-**Report Descriptor:**
+**Context:** For single-report BLE HID devices, the `0x85` (Report ID) item MUST be omitted from the HID Report Map descriptor. The GATT Report Reference descriptor (UUID 0x2908) already communicates the Report ID to the GATT/BLE host.
+
+**Anti-pattern (causes buttons not to register on Windows):**
 ```cpp
 static const uint8_t hid_report_descriptor[] = {
-    0x05, 0x01,        // USAGE_PAGE (Generic Desktop)
-    0x09, 0x05,        // USAGE (Game Pad)
-    0xA1, 0x01,        // COLLECTION (Application)
-    0x85, 0x01,        // Report ID (1)  ← Descriptor declares this
-    // ... 32 buttons, hat, 4 axes ...
-    0xC0,              // END_COLLECTION
+    // ...
+    0x85, 0x01,   // Report ID (1)  <- DO NOT ADD for single-report device
+    // ...
 };
 ```
+**Result:** Some Windows BLE HID driver versions see `0x85, 0x01` in the Report Map and expect the Report ID byte as the FIRST byte of every ATT notification payload (USB HID behaviour). This shifts all data by one byte: byte[0] (button data) is consumed as the Report ID, and actual button data never registers.
 
-**ATT Notification Payload (9 bytes, NO Report ID):**
+**Correct pattern:**
 ```cpp
-uint8_t report[9] = {};
-report[0] = (uint8_t)(state.buttons & 0xFF);         // Buttons byte 0
-report[1] = (uint8_t)((state.buttons >> 8) & 0xFF);  // Buttons byte 1
-report[2] = (uint8_t)((state.buttons >> 16) & 0xFF); // Buttons byte 2
-report[3] = (uint8_t)((state.buttons >> 24) & 0xFF); // Buttons byte 3
-report[4] = hat & 0x0F;                              // Hat + padding
-report[5] = (uint8_t)(state.lx >> 8);                // Axis X
-report[6] = (uint8_t)(state.ly >> 8);                // Axis Y
-report[7] = (uint8_t)(state.rx >> 8);                // Axis Z
-report[8] = (uint8_t)(state.ry >> 8);                // Axis Rz
-hids_device_send_input_report(_conHandle, report, 9);
+static const uint8_t hid_report_descriptor[] = {
+    0x05, 0x01,   // USAGE_PAGE (Generic Desktop)
+    0x09, 0x05,   // USAGE (Game Pad)
+    0xA1, 0x01,   // COLLECTION (Application)
+    // NO 0x85/0x01 — Report ID carried by GATT Report Reference descriptor
+    // ... buttons, hat, axes ...
+    0xC0,
+};
+// In ble_hid.gatt:
+// REPORT_REFERENCE, READ, 1, 1   <- Report ID 1, Type Input
 ```
+**Why BTstack does NOT prepend Report ID:**
+`hids_device_send_input_report()` calls `att_server_notify()` directly — no Report ID byte is prepended regardless of descriptor content. The misinterpretation is entirely HOST-side.
 
-**GATT Attribute (Report Reference Descriptor):**
-```
-// In ble_hid.gatt (GATT database source):
-CHARACTERISTIC, 2A4D, READ | NOTIFY,
-    // Report body characteristic
-REPORT_REFERENCE, READ, 01 01
-    // ^^^^^^^^^^  ^^^^^^^^  ^^^^^
-    // 0x2908       readable  [Report ID = 1, Report Type = 1 (Input)]
-```
+**BTstack side effect when Report ID omitted:**
+`btstack_hid_get_report_size_for_id(1, INPUT, ...)` returns 0 (internal `current_report_id` stays `HID_REPORT_ID_UNDEFINED=0xffff`, never matches `1`). Sets `report_storage->size=0` internally. Does NOT affect notifications (caller-supplied length is used). ATT read path already returns 0 since no get_report callback is registered.
 
-**Why:** The Report Reference descriptor (UUID 0x2908) conveys the Report ID to the GATT client. The ATT notification payload contains only the report body (buttons, hat, axes) — the GATT client infers the Report ID from the characteristic's Report Reference descriptor.
+**Rule for multi-report devices:**
+If the device has multiple Report characteristics, `0x85` items ARE required in the descriptor AND each GATT Report Reference must match. ATT notification payloads still do NOT include the Report ID byte (BLE HID never includes it).
 
-**Key Rule:** BLE HID descriptor body = USB HID descriptor body + Report ID item. ATT notification payload = USB HID report struct (no Report ID byte).
-
----
+**Re-pair always required after descriptor change:**
+Any change to the HID Report Map (size, fields, or Report ID presence) requires the host to forget and re-pair. The host caches the descriptor on first pair.
 
 ## Pattern: Avoid TinyUSB Headers in BTstack Translation Units
 
