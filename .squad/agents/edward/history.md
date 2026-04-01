@@ -1,3 +1,19 @@
+## Core Context
+
+**Edward's Role:** BLE/BTstack Engineer & Technical Analyst — firmware deep-dive investigations, multi-output architecture surveys, protobuf/protocol analysis, platform compatibility verification.
+
+**Major Contributions:**
+1. **Multi-Output Architecture Survey** (2026-03-28) — 8 architectural constraints identified for Bluetooth/GPIO output support: GPDriver USB-only, no runtime switching, no existing BT code, transport abstraction needed, protobuf cascade required.
+2. **GPIO Output Constraints** (2026-03-28T024429Z) — 12-point analysis of retro console GPIO output: N64/Dreamcast require PIO, SNES/Genesis viable, level shifting mandatory for 5V, Pico W pin loss (GPIO 23–25), existing SNES protocol timing verified.
+3. **BLE HID Report Design** (2026-05-25) — Proposed 13-byte XInput-style report (11 named buttons, hat, triggers, signed int16 axes) replacing 9-byte generic format. Rationale: proper button naming, improved dead-zone performance, platform compatibility verified.
+4. **RM2/CYW43 GPIO Analysis** (2026-03-28) — Exact pin mappings confirmed (GPIO 23/24/25/29), PICO_CYW43_SUPPORTED flag function, custom board path identified (same pins → Pico W config reuse).
+5. **BT Classic Battery Protocol** (2026-03-28) — Corrected misconception: Classic HID battery = HID descriptor Feature report + `hid_device_register_report_request_callback()`, NOT GATT. BLE future path documented.
+6. **Power Management Analysis** (2026-03-28) — VBUS detection, runtime power mode switching, NVIC priority for CYW43 IRQ (priority 2), SoC state machine design (USB active, battery dormant, sleep).
+7. **I2C Slave & Peripheral Expansion** (2026-03-29) — 6 critical SDK corrections (no `i2c_slave_init()`, manual IRQ, open-drain emulation, atomic primitives, timing), docs updated, implementation-ready.
+8. **RP2350 + BTStack Verification** (2026-03-28T04:14) — Confirmed RP2350 CYW43 BT working (Fortinbra hardware evidence); TinyUSB/BTStack namespace conflict noted; Pimoroni Pico Lipo 2 XL W as reference board.
+
+**Session Status:** Actively developing BLE HID features; most docs approved and merged to develop; XInput report design awaiting implementation green-light.
+
 ## Project Context (Day 1)
 
 **Project:** GP2040-CE — RP2040 firmware for gamepads and game controllers  

@@ -1,3 +1,18 @@
+## Core Context
+
+**Riza's Role:** QA/Review Agent — documentation quality assurance, technical accuracy verification, consistency enforcement, approval authority for feature docs.
+
+**Major Contributions:**
+1. **Review Cycle 1: SDK Version Gauntlet** (2026-03-28T210547Z) — Initial REJECTION of RP2350 and dependency docs; identified SDK version conflict (docs claimed 2.2.0, copilot-instructions claimed 2.1.1). Root cause analysis revealed: actual CMakeLists.txt enforces 2.2.0 as project-wide minimum (not RP2350-specific). Escalated to Edward for revision authority.
+2. **Review Cycle 2-6: Full Resolution** (2026-03-28T024429Z through final approval) — Comprehensive multi-round review (6 cycles) covering: SDK version reconciliation, BTStack namespace conflict (TinyUSB), GPIO constraint documentation, dependency version accuracy, metadata and formatting standards.
+3. **Final RP2350 Doc Approval** (Commit bf3d2f4d) — ✅ APPROVED after all corrections applied. Confirmed: hardware specs accurate, build commands match codebase, testing checklists actionable.
+4. **Bluetooth & Multi-Output Architecture Vetting** — Technical accuracy reviews of Edward's findings; verified 8 architectural constraints and 12 GPIO constraints against codebase and SDK source.
+5. **I2C Documentation Quality Review** (2026-03-29T201441) — 10-point consistency check across i2c-peripheral-expansion.md and hid-over-i2c.md. Verdict: ✅ APPROVE WITH NOTES. All SDK corrections verified and applied.
+6. **Dependency Docs Verification** (2026-03-28T234414) — Automated audit of all version pairs verified against codebase: TinyUSB (0.17.0 + 18 commits), pico-pio-usb (0.5.3 + 10 commits), nanopb (0.4.8-dev vendored), npm package versions (React 18→19, Vite 4→8, etc.).
+7. **Standards Enforcement** — Enforced removal of internal Squad agent names from public docs, verified SDK 2.2.0 as ground truth, ensured "GP2040-CE core team" attribution only.
+
+**Session Status:** Primary quality gate for all feature documentation; works in sequential review cycles with Hughes (author) and Edward (technical authority). High bar for technical accuracy and consistency maintained.
+
 ## Project Context (Day 1)
 
 **Project:** GP2040-CE — RP2040 firmware for gamepads and game controllers  
