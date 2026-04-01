@@ -542,6 +542,83 @@ case SM_EVENT_IDENTITY_RESOLVING_FAILED:
 ---
 
 
+## Pattern: HID Descriptor Design for XInput-Style BLE Gamepad
+
+**Confidence:** CONFIRMED — Researched from live codebase (2026-05-25)
+
+**Context:** GP2040-CE's BLE HID descriptor declares 32 anonymous buttons and 8-bit unsigned axes.
+To present as a proper named-button gamepad (A/B/X/Y/LB/RB etc.) with XInput-style axes, the
+descriptor and report builder must both change.
+
+**Critical encoding details for signed 16-bit axes:**
+```cpp
+// HID descriptor items for signed int16 axis range
+0x16, 0x00, 0x80,   // LOGICAL_MINIMUM(-32768)  — 2-byte item, LE: 0x8000 = -32768
+0x26, 0xFF, 0x7F,   // LOGICAL_MAXIMUM(32767)   — 2-byte item, LE: 0x7FFF = 32767
+0x75, 0x10,         // REPORT_SIZE (16)
+0x95, 0x04,         // REPORT_COUNT (4)          — for 4 axes
+0x81, 0x02,         // INPUT (Data,Var,Abs)
+```
+
+**Hat switch with null state:**
+```cpp
+0x09, 0x39,         // USAGE (Hat switch)
+0x15, 0x00,         // LOGICAL_MINIMUM (0)
+0x25, 0x07,         // LOGICAL_MAXIMUM (7)       — 0=N, 1=NE ... 7=NW
+0x75, 0x04,         // REPORT_SIZE (4)
+0x95, 0x01,         // REPORT_COUNT (1)
+0x81, 0x42,         // INPUT (Data,Var,Abs,Null)  — 0x42 enables null state
+// 4-bit padding to complete byte:
+0x75, 0x04,
+0x95, 0x01,
+0x81, 0x03,         // INPUT (Cnst,Var,Abs)
+```
+Hat null value: any value > LOGICAL_MAXIMUM (i.e., 0x8–0xF in 4 bits) signals "no direction".
+Use `hat = 8` for neutral; the 4-bit field encoding handles it.
+
+**Analog trigger usage (Simulation Controls, not Generic Desktop):**
+```cpp
+0x05, 0x02,         // USAGE_PAGE (Simulation Controls)
+0x09, 0xC5,         // USAGE (Brake)        — LT
+0x09, 0xC4,         // USAGE (Accelerator)  — RT
+0x15, 0x00,         // LOGICAL_MINIMUM (0)
+0x26, 0xFF, 0x00,   // LOGICAL_MAXIMUM (255)
+0x75, 0x08,         // REPORT_SIZE (8)
+0x95, 0x02,         // REPORT_COUNT (2)
+0x81, 0x02,         // INPUT (Data,Var,Abs)
+```
+
+**Stick usage assignments (matches existing USB HID driver):**
+- X (0x30) / Y (0x31) = left stick
+- Z (0x32) / Rz (0x35) = right stick
+
+**XInput-style axis conversion (matches XInputDriver.cpp):**
+```cpp
+int16_t lx = static_cast<int16_t>(state.lx) + INT16_MIN;
+int16_t ly = static_cast<int16_t>(~state.ly) + INT16_MIN;  // Y inverted: positive = up
+int16_t rx = static_cast<int16_t>(state.rx) + INT16_MIN;
+int16_t ry = static_cast<int16_t>(~state.ry) + INT16_MIN;
+// Little-endian store:
+report[n]   = (uint8_t)(lx & 0xFF);
+report[n+1] = (uint8_t)((uint16_t)lx >> 8);
+```
+Casting through `uint16_t` before shifting avoids right-shifting a signed negative value (UB).
+
+**`ble_hid.gatt` does NOT carry HID descriptor bytes.** The GATT file declares service/characteristic
+structure only. The actual HID descriptor is passed to `hids_device_init()` as a C array in
+`BLEHIDManager.cpp`. BTstack's HIDS service returns it for the REPORT_MAP (0x2A4B) characteristic.
+
+**Re-pairing is required after any descriptor change.** The GATT Database Hash (0x2B2A) is
+recomputed when REPORT_MAP content changes. Hosts that have cached the old descriptor will
+misparse reports until they delete the pairing and re-pair.
+
+**Key Rule:** Changing `hid_report_descriptor[]` in `BLEHIDManager.cpp` requires three
+coordinated changes: (1) the descriptor array itself, (2) the `_pendingReport`/`_lastSentReport`
+buffer sizes in `BLEHIDManager.h`, (3) the `sendReport()` length guard and the report builder in
+`OutputManager.cpp`.
+
+---
+
 ## Pattern: Replace le_device_db_tlv with Custom Protobuf Backend
 
 **Confidence:** CONFIRMED — Implemented and built clean (2026-03-31)

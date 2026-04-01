@@ -1124,3 +1124,86 @@ exit code 0 — clean build, no errors
 ```
 
 Only pre-existing warnings (unused variables in SDK / other files, unrelated to BLE section).
+# Decision: XInput-Style BLE HID Report Design
+
+**By:** Edward (BLE/BTstack Engineer)  
+**Date:** 2026-05-25  
+**Status:** Proposed — awaiting implementation approval  
+**Full doc:** `docs/development/ble-xinput-report.md`
+
+---
+
+## Decision
+
+Replace the current 9-byte generic BLE HID report (32 anonymous buttons + unsigned 8-bit axes)
+with a **13-byte XInput-style BLE HID report** (11 named buttons + hat + trigger bytes +
+signed 16-bit stick axes).
+
+---
+
+## Problem
+
+The current BLE HID report descriptor presents the controller as a "32-button generic gamepad".
+Hosts label buttons "Button 1"–"Button 32" with no semantic names, and the unsigned 8-bit axis
+range causes poor dead-zone detection compared to XInput's signed 16-bit convention.
+
+---
+
+## What Changes
+
+| File | Change summary |
+|------|---------------|
+| `src/BLEHIDManager.cpp` | Replace `hid_report_descriptor[]` — 9-byte → 13-byte XInput-style |
+| `src/BLEHIDManager.cpp` | `sendReport()` size guard: `> 9` → `> 13` |
+| `headers/BLEHIDManager.h` | `_pendingReport[9]` and `_lastSentReport[9]` → `[13]` |
+| `src/OutputManager.cpp` | Replace report builder: raw 32-bit bitmask → named button mapping + triggers + int16 axes |
+
+**`src/ble_hid.gatt` does NOT change** — it defines GATT structure only, not HID descriptor bytes.
+
+---
+
+## What Does NOT Change
+
+- GATT service structure (`ble_hid.gatt`)
+- BTstack initialization sequence (`BLEHIDManager::_doInit()`)
+- Battery service, device information service, bonding, encryption flow
+- The `sendReport()` / `CAN_SEND_NOW` / `_reportPending` pipeline
+
+---
+
+## Key Design Choices
+
+1. **11 named buttons, not 32.** Only buttons with XInput-equivalent names are exposed.
+   L2/R2 become dedicated trigger bytes; A2/A3/A4/E1–E12 are omitted.
+
+2. **Hat switch retained.** D-pad stays as a 4-bit hat (not split into 4 button bits), which
+   is more idiomatic HID and already correct in the current descriptor.
+
+3. **Signed 16-bit axes.** Matches `XInputDriver.cpp` conversion: `(int16_t)(state.lx) + INT16_MIN`.
+   Y axes inverted (`~state.ly`) to match XInput's positive-up convention.
+
+4. **Separate trigger bytes (LT/RT).** Follows `XInputDriver.cpp` `hasAnalogTriggers` pattern.
+
+5. **Windows shows as generic HID, not XInput.** True XInput (XUSB.sys) is USB-only and
+   proprietary. Over BLE this is a standard HID gamepad — but with proper button names and
+   correct axis ranges it works well with SDL2 / DirectInput games.
+
+---
+
+## Re-pairing Required
+
+Users must delete and re-pair after this change. The GATT Database Hash changes when the
+`REPORT_MAP` content changes, invalidating the host's cached HID descriptor.
+
+---
+
+## Compatibility Summary
+
+| Platform       | Result |
+|----------------|--------|
+| Windows 10/11  | Generic HID gamepad — named buttons, proper axes, no XInput badge |
+| Android        | Standard gamepad — works correctly |
+| macOS 12+      | Generic HID gamepad — works correctly |
+| iOS            | Partial — not a primary target |
+| Nintendo Switch| Not supported (Switch requires BT Classic HID only) |
+

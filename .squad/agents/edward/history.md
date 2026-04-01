@@ -644,6 +644,45 @@ Next Steps:
 
 ### Build Artifact
 - File: build_ble3/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2
+
+### 2026-05-25: XInput-Style BLE HID Report — Feature Investigation
+
+**Tasked by:** thegu (via Coordinator). Full feature doc at `docs/development/ble-xinput-report.md`.
+
+**Current BLE HID descriptor (9 bytes) confirmed from `BLEHIDManager.cpp`:**
+- 32 anonymous buttons (4 bytes, raw `state.buttons` bitmask)
+- 1 hat switch (4 bits) + 4-bit padding = 1 byte
+- 4 unsigned 8-bit axes (X, Y, Z, Rz) = 4 bytes
+Report builder in `src/OutputManager.cpp` writes all 32 button bits directly; axes shift uint16→uint8 by `>> 8`.
+
+**Problems confirmed:**
+1. Hosts see "Button 1" through "Button 32" with no semantic labels — the 32-bit raw bitmask includes E1–E12 extra buttons that have no named purpose on any host.
+2. Axes are unsigned 8-bit (0–255), not signed 16-bit as XInput conventions expect.
+3. Triggers (L2/R2) are buried in the button bitmask — no dedicated trigger axes.
+
+**Proposed 13-byte XInput-style report layout:**
+- Byte 0: 8 face/shoulder/menu buttons (A, B, X, Y, LB, RB, Back, Start → B1/B2/B3/B4/L1/R1/S1/S2)
+- Byte 1: Guide + LS + RS (A1, L3, R3) + 5 padding bits
+- Byte 2: Hat switch (4-bit, 0–7 + null=8) + 4-bit padding
+- Bytes 3–4: LT, RT (uint8 triggers)
+- Bytes 5–12: LX, LY, RX, RY (int16 LE, signed, Y axes inverted to match XInput convention)
+
+**Key implementation findings:**
+- `ble_hid.gatt` does NOT need to change — it declares GATT service structure only, not HID descriptor bytes. The HID descriptor is passed via `hids_device_init()`.
+- `hid_report_descriptor[]` array in `BLEHIDManager.cpp` is what gets served as the REPORT_MAP characteristic via BTstack's HIDS service.
+- `_pendingReport[9]` and `_lastSentReport[9]` in `BLEHIDManager.h` must be resized to `[13]`.
+- `sendReport()` guard `if (len > 9) len = 9` must become `if (len > 13) len = 13`.
+- `OutputManager.cpp` is where the GamepadState→report mapping lives — entirely self-contained, easy to replace.
+- Axis conversion: matches `XInputDriver.cpp` exactly — `(int16_t)(state.lx) + INT16_MIN` for X axes; `(int16_t)(~state.ly) + INT16_MIN` for Y axes (inverts direction).
+- Re-pairing required after descriptor change (GATT Database Hash change invalidates host cache).
+- Windows will NOT recognise this as an XInput controller (XInput requires proprietary USB vendor class + `XUSB.sys`). It appears as a generic HID gamepad with proper named buttons.
+
+**HID descriptor design notes (stored in SKILL.md):**
+- `LOGICAL_MINIMUM(-32768)` = `0x16, 0x00, 0x80` (2-byte item, little-endian two's complement)
+- `LOGICAL_MAXIMUM(32767)` = `0x26, 0xFF, 0x7F`
+- Hat switch with null state = `0x81, 0x42` (INPUT Data,Var,Abs,Null)
+- Trigger usage page: Simulation Controls (0x02), Brake=0xC5 (LT), Accelerator=0xC4 (RT)
+- Stick usages: X(0x30)/Y(0x31) = left stick, Z(0x32)/Rz(0x35) = right stick (matches existing USB HID driver)
 - Size: 3,094,528 bytes
 - Board: PimoroniPicoLipo2XLW (RP2350A + CYW43)
 - Status: Ready for production deployment
