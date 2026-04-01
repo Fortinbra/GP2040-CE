@@ -380,13 +380,21 @@ if(PICO_CYW43_SUPPORTED)
     target_sources(${PROJECT_NAME} PRIVATE
         src/BLEHIDManager.cpp
         src/OutputManager.cpp
+        src/le_device_db_proto.cpp
+    )
+
+    # Exclude BTstack's TLV-backed le_device_db — our protobuf implementation
+    # provides all the same symbols.  le_device_db_memory.c is already disabled
+    # by NVM_NUM_DEVICE_DB_ENTRIES being defined; only tlv needs explicit exclusion.
+    set_source_files_properties(
+        "${PICO_SDK_PATH}/lib/btstack/src/ble/le_device_db_tlv.c"
+        PROPERTIES HEADER_FILE_ONLY TRUE
     )
 
     target_link_libraries(${PROJECT_NAME}
         pico_cyw43_arch_none
         pico_btstack_ble
         pico_btstack_cyw43
-        pico_btstack_flash_bank
     )
 
     target_compile_definitions(${PROJECT_NAME} PUBLIC

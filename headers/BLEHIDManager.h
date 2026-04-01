@@ -8,6 +8,18 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// Power management states for BLE HID operation.
+// Transitions:
+//   ADVERTISING → ACTIVE  : HIDS_SUBEVENT_INPUT_REPORT_ENABLE (notifications enabled)
+//   ACTIVE      → IDLE    : no input change for 30 seconds
+//   IDLE        → ACTIVE  : any input change detected in CAN_SEND_NOW
+//   ACTIVE/IDLE → ADVERTISING : HCI_EVENT_DISCONNECTION_COMPLETE
+enum class BLEPowerState : uint8_t {
+    ADVERTISING = 0,
+    ACTIVE      = 1,
+    IDLE        = 2,
+};
+
 class BLEHIDManager {
 public:
     static BLEHIDManager& getInstance() {
@@ -36,12 +48,14 @@ public:
     bool isEnabled() const      { return _initialized; }
     bool isNotifying() const    { return _notificationsEnabled; }
     bool hasBondedPeers() const { return _hasBondedPeers; }
+    BLEPowerState getPowerState() const { return _powerState; }
 
 private:
     BLEHIDManager() = default;
 
     void _doInit();
     void _ledBlink(uint32_t count, uint32_t onMs, uint32_t offMs);
+    static uint8_t _readBatteryPercent();
 
     static void _hciPacketHandler(uint8_t packetType, uint16_t channel,
                                   uint8_t* packet, uint16_t size);
@@ -68,10 +82,18 @@ private:
     volatile bool     _notificationsEnabled = false;
     volatile bool     _reportPending        = false;
     volatile bool     _hasBondedPeers       = false;
+    volatile bool     _needsAdvRestart      = false;
     volatile uint16_t _conHandle            = 0xFFFF;
     volatile uint16_t _pendingReportLen     = 0;
     volatile uint8_t  _pendingBlinkType     = 0;  // 1 = report sent, 3 = disabled, 5 = enabled
+    volatile uint8_t  _lastDisconnectReason = 0;  // HCI disconnect reason code; cleared on new connection
+    volatile uint32_t _lastBatteryUpdateMs  = 0;
+    volatile uint8_t  _lastBatteryLevel     = 255;  // 255 = uninitialized → forces first update
+    volatile BLEPowerState _powerState      = BLEPowerState::ADVERTISING;
+    volatile uint32_t _lastInputChangeMs    = 0;    // updated when report payload changes
+    volatile uint32_t _lastReportMs         = 0;    // updated each time a report is queued
     uint8_t  _pendingReport[9]     = {};
+    uint8_t  _lastSentReport[9]    = {};  // previous payload; compared in CAN_SEND_NOW to detect changes
 };
 
 #endif // BLE_HID_MANAGER_H

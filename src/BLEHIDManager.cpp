@@ -11,9 +11,7 @@
 #include "pico/time.h"
 #include "pico/cyw43_arch.h"
 #include "pico/btstack_run_loop_async_context.h"
-#include "pico/btstack_flash_bank.h"
-#include "platform/embedded/btstack_tlv_flash_bank.h"
-#include "ble/le_device_db_tlv.h"
+#include "hardware/adc.h"
 
 // BTstack core
 #include "btstack.h"
@@ -90,8 +88,7 @@ static const uint8_t scan_resp_data[] = {
     'G','P','2','0','4','0','-','C','E',' ','G','a','m','e','p','a','d',
 };
 
-// Static TLV context for bonding key storage in flash
-static btstack_tlv_flash_bank_t    tlv_context;
+// Static TLV context removed — bonding database is now backed by protobuf config.
 
 // BTstack event handler registrations
 static btstack_packet_callback_registration_t hci_event_callback_registration;
@@ -127,6 +124,38 @@ void BLEHIDManager::process() {
 
     cyw43_arch_poll();
 
+    // Periodic battery level reporting — throttled to once per 30 seconds.
+    // Uses direct ADC read on GPIO29 (ADC3) via 3:1 voltage divider.
+    // Only fires when connected and notifications are enabled.
+    {
+        uint32_t now = to_ms_since_boot(get_absolute_time());
+        if (_connected && _notificationsEnabled &&
+                (now - _lastBatteryUpdateMs >= 30000 || _lastBatteryLevel == 255)) {
+            uint8_t level = _readBatteryPercent();
+            if (level != _lastBatteryLevel) {
+                battery_service_server_set_battery_value(level);
+                _lastBatteryLevel = level;
+            }
+            _lastBatteryUpdateMs = now;
+        }
+    }
+
+    // Power state management — transition ACTIVE → IDLE after 30s of no input change.
+    if (_powerState == BLEPowerState::ACTIVE) {
+        if ((now - _lastInputChangeMs) >= 30000) {
+            _powerState = BLEPowerState::IDLE;
+            // Optional connection parameter request for longer interval in idle:
+            // gap_request_connection_parameter_update(_conHandle, 80, 80, 0, 200);
+        }
+    }
+
+    // Deferred advertising restart — set by disconnect handler, executed here in main loop
+    if (_needsAdvRestart && !_connected) {
+        gap_advertisements_enable(1);
+        _advStarted = true;
+        _needsAdvRestart = false;
+    }
+
     // Non-blocking LED blink state machine — replaces blocking _ledBlink() calls.
     // _pendingBlinkType is set by the IRQ handler; we execute the blink here without sleep_ms().
     {
@@ -155,8 +184,38 @@ void BLEHIDManager::process() {
                 absolute_time_diff_us(blinkNext, get_absolute_time()) >= 0) {
             blinkRemaining--;
             blinkLedOn = !blinkLedOn;
+            if (blinkRemaining == 0) {
+                // Sequence complete — always end with LED off
+                blinkLedOn = false;
+            }
             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, blinkLedOn ? 1 : 0);
-            blinkNext  = make_timeout_time_ms(blinkLedOn ? blinkOnMs : blinkOffMs);
+            if (blinkRemaining > 0) {
+                blinkNext = make_timeout_time_ms(blinkLedOn ? blinkOnMs : blinkOffMs);
+            }
+        }
+    }
+
+    // Blink out the HCI disconnect reason code (N slow blinks = reason code value, capped at 15)
+    // Common codes: 8=timeout, 0x13=remote terminated, 0x16=local terminated, 0x3B=bad params
+    if (_lastDisconnectReason != 0 && _advStarted && !_connected) {
+        static uint8_t diagBlinkCount = 0;
+        static absolute_time_t diagBlinkNext = {0};
+        static bool diagBlinkInit = false;
+        if (!diagBlinkInit) {
+            diagBlinkCount = (_lastDisconnectReason > 15) ? 15 : _lastDisconnectReason;
+            diagBlinkNext = make_timeout_time_ms(1000); // 1s initial pause
+            diagBlinkInit = true;
+        }
+        if (diagBlinkCount > 0 && absolute_time_diff_us(diagBlinkNext, get_absolute_time()) >= 0) {
+            static bool diagLedOn = false;
+            diagLedOn = !diagLedOn;
+            cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, diagLedOn ? 1 : 0);
+            diagBlinkNext = make_timeout_time_ms(diagLedOn ? 300 : 300);
+            if (!diagLedOn) diagBlinkCount--;
+            if (diagBlinkCount == 0) {
+                _lastDisconnectReason = 0;
+                diagBlinkInit = false;
+            }
         }
     }
 
@@ -167,11 +226,18 @@ void BLEHIDManager::process() {
 
 bool BLEHIDManager::sendReport(const uint8_t* report, uint16_t len) {
     if (!_connected || !_notificationsEnabled) return false;
-    
+
+    // In IDLE state, throttle report submission to ~50ms to reduce power consumption.
+    if (_powerState == BLEPowerState::IDLE) {
+        uint32_t now = to_ms_since_boot(get_absolute_time());
+        if ((now - _lastReportMs) < 50) return false;
+    }
+
     if (len > 9) len = 9;
     memcpy(_pendingReport, report, len);
     _pendingReportLen = len;
     _reportPending    = true;
+    _lastReportMs     = to_ms_since_boot(get_absolute_time());
     return true;
 }
 
@@ -195,6 +261,24 @@ void BLEHIDManager::_ledBlink(uint32_t count, uint32_t onMs, uint32_t offMs) {
     }
 }
 
+// Read battery percentage from the onboard voltage divider on GPIO29/ADC3.
+// Divider ratio is 3:1 → Vbat = Vadc * 3. LiPo range: 3.0 V (0%) to 4.2 V (100%).
+// Raw ADC thresholds for a 3.3 V reference on a 12-bit (0–4095) converter:
+//   3.0 V → Vadc = 1.0 V → raw ≈ 1241
+//   4.2 V → Vadc = 1.4 V → raw ≈ 1737 (span = 496 counts)
+// Falls back to 100 % on boards that do not define BATTERY_ADC_GPIO.
+uint8_t BLEHIDManager::_readBatteryPercent() {
+#ifdef BATTERY_ADC_GPIO
+    adc_select_input(BATTERY_ADC_CHANNEL);
+    uint16_t raw = adc_read();
+    if (raw <= 1241) return 0;
+    if (raw >= 1737) return 100;
+    return (uint8_t)((raw - 1241) * 100 / 496);
+#else
+    return 100;
+#endif
+}
+
 void BLEHIDManager::_doInit() {
     // Initialize CYW43 wireless chip
     int err = cyw43_arch_init();
@@ -210,19 +294,26 @@ void BLEHIDManager::_doInit() {
     // Initialize BTstack run loop integrated with the CYW43 async context
     btstack_run_loop_init(btstack_run_loop_async_context_get_instance(cyw43_arch_async_context()));
 
-    // TLV flash-backed bonding database — MUST be initialized before sm_init / le_device_db
-    const btstack_tlv_t* tlv_impl = btstack_tlv_flash_bank_init_instance(
-        &tlv_context, pico_flash_bank_instance(), NULL);
-    le_device_db_tlv_configure(tlv_impl, &tlv_context);
-
     // Check for previously bonded peers — used to skip re-pairing on reconnect
     _hasBondedPeers = (le_device_db_count() > 0);
+
+    // Bond-count diagnostic: blink count = number of stored bonds.
+    // 0 bonds → 5 slow blinks (obvious "no stored bonds" indicator).
+    // N bonds → N medium blinks (confirmed persistence).
+    // Watch carefully at boot — this runs before the 3-blink HCI power-on sequence.
+    {
+        int bondCount = le_device_db_count();
+        int blinkCount = (bondCount > 0) ? bondCount : 5;
+        uint32_t onMs  = (bondCount > 0) ? 200 : 400;
+        uint32_t offMs = (bondCount > 0) ? 200 : 400;
+        _ledBlink(blinkCount, onMs, offMs);
+    }
 
     // Core protocol layers — SM must be initialized before ATT/GATT services
     l2cap_init();
     sm_init();
     sm_set_io_capabilities(IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
-    sm_set_authentication_requirements(SM_AUTHREQ_BONDING);
+    sm_set_authentication_requirements(SM_AUTHREQ_SECURE_CONNECTION | SM_AUTHREQ_BONDING);
 
     // ATT server — profile_data is generated from ble_hid.gatt by pico_btstack_make_gatt_header.
     // NULL callbacks: hids_device registers its own service handler for all HIDS characteristics.
@@ -231,8 +322,15 @@ void BLEHIDManager::_doInit() {
     // HID over GATT device — boot mode 0 (no boot keyboard/mouse)
     hids_device_init(0, hid_report_descriptor, sizeof(hid_report_descriptor));
 
-    // Battery service — set initial level; no separate init() call needed
-    battery_service_server_set_battery_value(100);
+    // Battery ADC init — GPIO29/ADC3 is the onboard voltage divider on boards that define it.
+    // Safe to call after cyw43_arch_init(); the CYW43 SPI and ADC reads coexist on GPIO29.
+#ifdef BATTERY_ADC_GPIO
+    adc_init();
+    adc_gpio_init(BATTERY_ADC_GPIO);
+#endif
+
+    // Battery service — init() registers with ATT server; must be called before hci_power_control.
+    battery_service_server_init(_readBatteryPercent());
 
     // Device Information Service
     device_information_service_server_set_manufacturer_name("OpenStickCommunity");
@@ -292,33 +390,25 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
             }
             break;
 
-        case HCI_EVENT_ENCRYPTION_CHANGE: {
-            // Link is now encrypted using the stored LTK — safe to send ATT notifications.
-            // On reconnect, Windows won't re-write the CCCD (it cached that state),
-            // so we set _notificationsEnabled optimistically here instead of waiting
-            // for HIDS_SUBEVENT_INPUT_REPORT_ENABLE, which may never fire on reconnect.
-            // On fresh pair, HIDS_SUBEVENT_INPUT_REPORT_ENABLE fires after this and
-            // sets _notificationsEnabled = true again (harmless double-set).
-            uint8_t encStatus = hci_event_encryption_change_get_status(packet);
-            if (encStatus == ERROR_CODE_SUCCESS && mgr._connected) {
-                mgr._notificationsEnabled = true;
-            }
-            break;
-        }
-
-        case HCI_EVENT_DISCONNECTION_COMPLETE:
+        case HCI_EVENT_DISCONNECTION_COMPLETE: {
+            uint8_t reason = hci_event_disconnection_complete_get_reason(packet);
+            mgr._lastDisconnectReason = reason;
+            mgr._reportPending        = false;
             mgr._connected            = false;
             mgr._notificationsEnabled = false;
             mgr._conHandle            = HCI_CON_HANDLE_INVALID;
             mgr._advStarted           = false;
-            // Restart advertising so the host can reconnect
-            gap_advertisements_enable(1);
-            mgr._advStarted = true;
+            mgr._powerState           = BLEPowerState::ADVERTISING;
+            mgr._lastInputChangeMs    = 0;
+            // Defer advertising restart to process() to avoid race with LL cleanup
+            mgr._needsAdvRestart = true;
             break;
+        }
 
         case HCI_EVENT_LE_META:
             if (hci_event_le_meta_get_subevent_code(packet) ==
                     HCI_SUBEVENT_LE_CONNECTION_COMPLETE) {
+                mgr._lastDisconnectReason = 0; // clear on new connection
                 mgr._conHandle  = hci_subevent_le_connection_complete_get_connection_handle(packet);
                 mgr._connected  = true;
                 mgr._advStarted = false;
@@ -333,6 +423,10 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
                         mgr._notificationsEnabled = (enable != 0);
                         // Set flag to blink LED in process() — don't block IRQ handler with sleep_ms
                         mgr._pendingBlinkType = (enable != 0) ? 5 : 3;
+                        if (enable != 0) {
+                            mgr._powerState        = BLEPowerState::ACTIVE;
+                            mgr._lastInputChangeMs = to_ms_since_boot(get_absolute_time());
+                        }
                     }
                     break;
                 case HIDS_SUBEVENT_CAN_SEND_NOW:
@@ -341,8 +435,19 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
                                                       mgr._pendingReport,
                                                       mgr._pendingReportLen);
                         mgr._reportPending = false;
-                        // Set flag to blink LED in process() — don't block IRQ handler
-                        mgr._pendingBlinkType = 1;
+                        // Detect input change for IDLE → ACTIVE transition.
+                        // _lastSentReport is only accessed here (IRQ context) so no volatile needed.
+                        if (memcmp(mgr._lastSentReport, mgr._pendingReport, mgr._pendingReportLen) != 0) {
+                            memcpy(mgr._lastSentReport, mgr._pendingReport, mgr._pendingReportLen);
+                            mgr._lastInputChangeMs = to_ms_since_boot(get_absolute_time());
+                            if (mgr._powerState == BLEPowerState::IDLE) {
+                                mgr._powerState = BLEPowerState::ACTIVE;
+                                // Optional: request shorter connection interval for gaming latency:
+                                // gap_request_connection_parameter_update(mgr._conHandle, 6, 6, 0, 200);
+                            }
+                        }
+                        // Don't blink per-report — reports fire at HID frame rate,
+                        // continuously restarting the blink sequence keeps the LED solid.
                     }
                     break;
                 default:
@@ -380,10 +485,32 @@ void BLEHIDManager::_smPacketHandler(uint8_t packetType, uint16_t channel,
             // a reconnect loop. _notificationsEnabled is set in HCI_EVENT_ENCRYPTION_CHANGE.
             mgr._hasBondedPeers = true;
             break;
-        case SM_EVENT_PAIRING_COMPLETE:
-            // Fresh pairing finished — record that we now have a bonded peer.
-            mgr._hasBondedPeers = true;
+        case SM_EVENT_IDENTITY_RESOLVING_FAILED: {
+            // Cannot resolve the peer's address using stored IRKs — likely a stale bond
+            // on the host side. Clear all stored bonds so fresh pairing can succeed.
+            // CRITICAL: Do NOT call sm_request_pairing() here — sending an unsolicited
+            // pairing request to a host that believes it already has a valid bond will
+            // cause the host to DELETE its stored bond (Android behavior observed).
+            // Let the host either initiate re-pairing or allow the connection to proceed
+            // (some hosts use non-resolvable addresses that still work without IRK match).
+            int deviceCount = le_device_db_count();
+            for (int i = deviceCount - 1; i >= 0; i--) {
+                le_device_db_remove(i);
+            }
+            mgr._hasBondedPeers = false;
             break;
+        }
+        case SM_EVENT_PAIRING_COMPLETE: {
+            uint8_t status = sm_event_pairing_complete_get_status(packet);
+            if (status == ERROR_CODE_SUCCESS) {
+                mgr._hasBondedPeers = true;
+                // Re-verify bond was stored — 2 fast blinks = pairing+bond confirmed
+                mgr._pendingBlinkType = 1;  // use the report-sent blink as "success" indicator
+            }
+            // On failure: do nothing. Bond was not stored. Advertising will restart
+            // on disconnect and the host can try again.
+            break;
+        }
         default:
             break;
     }
