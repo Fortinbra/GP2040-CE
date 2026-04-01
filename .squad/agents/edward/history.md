@@ -847,3 +847,45 @@ Recommended **Option B** (custom `le_device_db` backed by protobuf). See `ble-pr
 **Next Steps:**
 1. Hardware test bond persistence across power cycles
 2. Protobuf web configurator integration (future phase)
+
+### 2026-04-01: BLE Battery Service Reporting
+
+**Task:** Implement BLE Battery Service reporting using BTstack's `battery_service_server` and the Pimoroni Pico Lipo 2 XL W's onboard battery voltage divider on GPIO29 (ADC channel 3).
+
+**Battery API Investigation:**
+- `cyw43_get_battery_voltage()` does NOT exist in Pico SDK 2.2.0 (confirmed by grepping cyw43_arch.h and cyw43.h — no battery function found).
+- `BoardConfig.h` for PimoroniPicoLipo2XLW explicitly documents: "GPIO29 is shared with WL_CLK but ADC reads coexist safely — no GPIO conflict." — direct ADC reads on GPIO29/ADC3 are safe after `cyw43_arch_init()`.
+- Board defines `BATTERY_ADC_GPIO=29`, `BATTERY_ADC_CHANNEL=3`, `BATTERY_VOLTAGE_DIVIDER=3.0f`, `BATTERY_MIN_VOLTAGE=3.0f`, `BATTERY_MAX_VOLTAGE=4.2f`.
+- Implementation uses `#ifdef BATTERY_ADC_GPIO` guards so it degrades gracefully on boards without battery monitoring.
+
+**Key Fix:** The pre-existing code called `battery_service_server_set_battery_value(100)` WITHOUT calling `battery_service_server_init()` first. The BTstack API requires `_init()` before `_set_battery_value()` — `_init()` registers the service with the ATT server. Fixed by replacing with `battery_service_server_init(_readBatteryPercent())`.
+
+**What was already in place (no changes needed):**
+- `pico_btstack_ble` (Pico SDK CMake target) already includes `battery_service_server.c` at line 87 — no explicit source add required.
+- `ble_hid.gatt` already has `#import <battery_service.gatt>`.
+- `adv_data[]` already advertises Battery Service UUID (0x180F).
+- `hardware_adc` already in `target_link_libraries`.
+- `btstack.h` already includes `battery_service_server.h`.
+
+**Implementation:**
+- `_readBatteryPercent()` static helper: `adc_select_input(BATTERY_ADC_CHANNEL)` + `adc_read()` + 3:1 divider math. ADC thresholds: raw ≤ 1241 = 0%, raw ≥ 1737 = 100% (496-count span).
+- `adc_init()` + `adc_gpio_init(BATTERY_ADC_GPIO)` added in `_doInit()` after `cyw43_arch_init()`.
+- Periodic update in `process()`: throttled to 30-second intervals, fires immediately on first connection (`_lastBatteryLevel == 255`), only calls `battery_service_server_set_battery_value()` when level actually changes.
+- `_lastBatteryUpdateMs` and `_lastBatteryLevel` (init 255) added as `volatile` members.
+
+**Build result:** ✅ Clean — `GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2` (2.96 MB).
+
+**Files Changed:**
+- `headers/BLEHIDManager.h`: Added `_readBatteryPercent()` static declaration; `_lastBatteryUpdateMs`, `_lastBatteryLevel` volatile members.
+- `src/BLEHIDManager.cpp`: Added `hardware/adc.h` include; fixed `_doInit()` (battery init + ADC init); added `_readBatteryPercent()` helper; added periodic battery update in `process()`.
+- `CMakeLists.txt`: No changes required.
+
+### 2026-04-01: BLE Battery Service — Implementation Complete
+
+**Tasked by:** User → Coordinator → edward-battery spawn.
+
+**Decision Logged:** `.squad/decisions.md` — "BLE Battery Service — Direct ADC via GPIO29"
+
+**Summary:** Battery service successfully integrated. ADC reads battery voltage on GPIO29/ADC3 (3:1 divider). Pre-existing bug fixed: `battery_service_server_init()` was missing before `set_battery_value()`. Battery level reported every 30s when connected. Build verified clean at 2.96 MB.
+
+**Status:** ✅ Ready for integration

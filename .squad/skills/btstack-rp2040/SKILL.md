@@ -615,3 +615,52 @@ static int _find_lru(const BLEConfig& c) {
 Increment seqCounter on every le_device_db_add(), store it in the slot's seqNr.
 
 ---
+
+---
+## Battery Voltage Reading on CYW43 Boards (RP2350B / Pico W / Pico 2W)
+
+**Confidence:** CONFIRMED — Implemented and built clean (2026-04-01)
+
+### `cyw43_get_battery_voltage()` does NOT exist
+
+Searched `cyw43_arch.h` and `cyw43-driver/src/cyw43.h` in Pico SDK 2.2.0 — no battery voltage function found anywhere in the CYW43 driver or pico_cyw43_arch. Do NOT assume this API exists.
+
+### Safe approach: Direct ADC read on GPIO29
+
+GPIO29 is shared with WL_CLK (CYW43 SPI clock), but ADC reads coexist safely. The key rule from BoardConfig.h for PimoroniPicoLipo2XLW:
+
+> "GPIO29 is shared with WL_CLK but ADC reads coexist safely — no GPIO conflict."
+
+You can call `adc_gpio_init(29)` and `adc_read()` **after** `cyw43_arch_init()` without issues on RP2350B.
+
+### Correct call sequence
+
+```cpp
+// In _doInit(), AFTER cyw43_arch_init():
+adc_init();
+adc_gpio_init(BATTERY_ADC_GPIO);   // 29 on PimoroniPicoLipo2XLW
+
+// Helper function:
+adc_select_input(BATTERY_ADC_CHANNEL);  // 3 on PimoroniPicoLipo2XLW
+uint16_t raw = adc_read();
+// LiPo 3:1 divider, 3.3V ref, 12-bit:
+//   raw ≤ 1241 → 0%,  raw ≥ 1737 → 100%,  span = 496 counts
+```
+
+### BTstack `battery_service_server` API
+
+`battery_service_server_init(uint8_t level)` MUST be called before `hci_power_control()`. It registers the service with the ATT server. `battery_service_server_set_battery_value(level)` updates the value and triggers GATT notifications to subscribed clients.
+
+**Do NOT call only `_set_battery_value()` without first calling `_init()`** — the service will not be registered in the ATT database.
+
+### CMake: no explicit source needed
+
+`pico_btstack_ble` (Pico SDK INTERFACE library) already includes `battery_service_server.c` (line 87 in `pico_btstack`'s CMakeLists). No need to add it manually.
+
+### GATT: already included via
+
+```
+#import <battery_service.gatt>
+```
+
+in your `.gatt` file. This provides the standard Battery Service (UUID 0x180F) characteristics.

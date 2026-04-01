@@ -968,3 +968,39 @@ Build succeeded: ✅ `ninja -C build_ble3` (commit pending hardware test)
 - `.squad/skills/btstack-rp2040/SKILL.md` (pattern documented)
 - `.squad/agents/edward/history.md` (2026-03-31 entry)
 
+
+---
+
+# Decision: BLE Battery Service — Direct ADC via GPIO29
+
+**Date:** 2026-04-01  
+**Author:** Edward Elric (BLE/BTstack Engineer)  
+**Status:** Implemented ✅
+
+## Context
+
+Task required adding BLE Battery Service reporting for the Pimoroni Pico Lipo 2 XL W (RP2350B + CYW43439). The board has a 3:1 voltage divider on GPIO29 feeding ADC channel 3.
+
+## Decision
+
+**Use direct ADC reads on GPIO29/ADC3** for battery voltage measurement — NOT a CYW43 driver API.
+
+## Rationale
+
+1. `cyw43_get_battery_voltage()` does not exist in Pico SDK 2.2.0. No battery voltage API is exposed via the CYW43 driver headers.
+2. `BoardConfig.h` for PimoroniPicoLipo2XLW explicitly documents that GPIO29 ADC reads are safe after `cyw43_arch_init()`: *"GPIO29 is shared with WL_CLK but ADC reads coexist safely — no GPIO conflict."*
+3. Direct ADC reads give exact voltage readings with known math. The 3:1 divider and 3.3V reference are board constants.
+
+## Implementation Notes
+
+- `battery_service_server_init()` must be called (not just `_set_battery_value()`) — it registers the service with the ATT server.
+- ADC raw thresholds: ≤ 1241 = 0% (Vbat ≤ 3.0 V), ≥ 1737 = 100% (Vbat ≥ 4.2 V), span = 496 counts.
+- `#ifdef BATTERY_ADC_GPIO` guard makes the ADC path board-conditional; other boards report 100%.
+- `pico_btstack_ble` already provides `battery_service_server.c` — no CMake changes needed.
+- Battery updates throttled to 30-second intervals in `process()` to avoid ADC overhead.
+
+## Consequences
+
+- Battery percentage reported accurately over BLE Battery Service (UUID 0x180F) to connected hosts.
+- Host OS typically displays battery % in system tray for BLE HID devices.
+- Implementation is portable: non-battery boards compile and function normally (fixed 100% reported).
