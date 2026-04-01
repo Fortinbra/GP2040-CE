@@ -996,3 +996,22 @@ Recommended **Option B** (custom `le_device_db` backed by protobuf). See `ble-pr
 **Files Changed:**
 - headers/BLEHIDManager.h: BLEPowerState enum, getPowerState() accessor, 4 new members
 - src/BLEHIDManager.cpp: sendReport() IDLE throttle, process() ACTIVE→IDLE, disconnect reset, HIDS_INPUT_REPORT_ENABLE ACTIVE transition, CAN_SEND_NOW change detection + IDLE→ACTIVE
+
+---
+
+### 2026-06-11: BT Architecture Diagram
+
+**Tasked by:** thegu
+
+**Task:** Create `docs/development/bt-architecture.md` — a complete Mermaid architecture diagram for the GP2040-CE BLE stack.
+
+**Files read:** `src/BLEHIDManager.cpp`, `headers/BLEHIDManager.h`, `src/gp2040.cpp`, `src/OutputManager.cpp`, `src/le_device_db_proto.cpp`, `src/ble_hid.gatt`, `headers/btstack_config.h`, `CMakeLists.txt`, `configs/PimoroniPicoLipo2XLW/BoardConfig.h`, BTstack gatt-service directory listing.
+
+**Deliverable:** `docs/development/bt-architecture.md` — three Mermaid diagrams:
+1. **Block diagram** (graph TD) — 5 subgraphs: Hardware (RP2350B, CYW43439, GPIO29/ADC3), Pico SDK (cyw43_arch, async_context, btstack transport), BTstack (HCI→L2CAP→SM→ATT→GATT→services), GP2040-CE BLE layer (BLEHIDManager, BLEPowerState, handlers, le_device_db_proto), GP2040-CE Core (GP2040::run, Gamepad, OutputManager, StorageManager, FlashPROM).
+2. **Report send sequence diagram** — GamepadState update → OutputManager::dispatch() → sendReport() → cyw43_arch_poll() + request_can_send_now → CAN_SEND_NOW IRQ → hids_device_send_input_report → ATT → L2CAP → HCI → CYW43439.
+3. **Connection lifecycle sequence diagram** — Fresh pair and bonded reconnect side-by-side; correctly gates _notificationsEnabled on HCI_EVENT_ENCRYPTION_CHANGE (not SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED — critical per SKILL.md).
+
+**GATT profile table** and **power state reference table** also included.
+
+**Build status:** Document only — no firmware changes.

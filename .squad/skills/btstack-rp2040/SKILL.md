@@ -451,11 +451,51 @@ case SM_EVENT_IDENTITY_RESOLVING_FAILED: {
 
 ---
 
+## Pattern: HCI Disconnect Reason Blink Diagnostic
+
+**Confidence:** CONFIRMED — live in `src/BLEHIDManager.cpp`
+
+**Context:** In BLE-only mode (no USB serial), disconnect reason codes are invisible. Most reconnect loops have distinct HCI codes: `0x08` (supervision timeout), `0x13` (remote terminated), `0x16` (local terminated), `0x3B` (invalid parameters). Knowing the exact code identifies the root cause without a hardware debugger.
+
+**Pattern:**
+```cpp
+// In BLEHIDManager.h:
+volatile uint8_t _lastDisconnectReason = 0;
+
+// In _hciPacketHandler, HCI_EVENT_DISCONNECTION_COMPLETE:
+mgr._lastDisconnectReason = hci_event_disconnection_complete_get_reason(packet);
+// Cleared on new connection:
+// case HCI_EVENT_LE_META: mgr._lastDisconnectReason = 0;
+
+// In process() — after cyw43_arch_poll(), non-blocking state machine:
+if (_lastDisconnectReason != 0 && _advStarted && !_connected) {
+    // Blink N times where N = reason code value (capped at 15)
+    uint8_t blinkCount = (_lastDisconnectReason > 15) ? 15 : _lastDisconnectReason;
+    // ... absolute_time_t blink state machine (no sleep_ms) ...
+    // When done: _lastDisconnectReason = 0;
+}
+```
+
+**HCI reason code vocabulary for BLE reconnect debugging:**
+| Code | Value | Meaning |
+|---|---|---|
+| `0x08` | 8 blinks | Connection supervision timeout (radio range, interference) |
+| `0x13` | 13 blinks (capped 13/15) | Remote user terminated (Windows/macOS disconnected intentionally) |
+| `0x16` | 15+ blinks (capped) | Local host terminated (our firmware called `hci_disconnect`) |
+| `0x3B` | 15+ blinks (capped) | Unacceptable connection parameters |
+
+**Key Rule:** The blink state machine MUST be non-blocking — implement as an `absolute_time_t` state machine in `process()`. Never use `sleep_ms()` in `process()` after `cyw43_arch_poll()` — it starves BTstack.
+
+**When to remove:** Production firmware should #ifdef this out. It fires on every disconnect (including intentional ones), creating visible LED activity during normal usage.
+
+---
+
 ## References
 
 - **Pico SDK 2.2.0 BTstack examples:** `pico-examples/pico_w/bt/standalone/`
 - **BTstack documentation:** https://bluekitchen-gmbh.com/btstack/
 - **GP2040-CE BLE HID commits:** c494add2, 176109ef, e2584c20, 0291e55a (HIDS handler registration)
+- **GP2040-CE architecture diagram:** `docs/development/bt-architecture.md`
 - **Edward's history:** `.squad/agents/edward/history.md`
 ## Pattern: Defer State-Changing API Calls from IRQ Context to Main Loop
 
