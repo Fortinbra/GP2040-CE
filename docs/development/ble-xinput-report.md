@@ -494,3 +494,41 @@ buttons are:
 
 If future requirements call for exposing A2 or the E-buttons, extend the button count and adjust
 the padding field count in the HID descriptor accordingly.
+
+---
+
+## Implementation
+
+**Status:** Implemented 2026-05-25  
+**Build:** Clean (uild_ble3, PimoroniPicoLipo2XLW target)
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| src/BLEHIDManager.cpp | Replaced hid_report_descriptor[] with 13-byte XInput-style descriptor; updated sendReport() length clamp from 9 to 13 |
+| headers/BLEHIDManager.h | Resized _pendingReport[9] and _lastSentReport[9] to [13]; updated sendReport() doc comment |
+| src/OutputManager.cpp | Replaced 9-byte generic report builder with 13-byte XInput-style builder |
+
+### Actual Report Size
+
+**13 bytes** — no deviations from the design doc layout:
+- Byte 0: buttons 1–8 (A, B, X, Y, LB, RB, Back, Start)
+- Byte 1: buttons 9–11 (Guide, LS, RS) + 5 reserved bits
+- Byte 2: hat switch (lower 4 bits, null=8) + 4-bit padding
+- Bytes 3–4: LT, RT (uint8, 0..255)
+- Bytes 5–12: LX, LY, RX, RY (int16 LE, signed)
+
+### Axis Formula
+
+Identical to XInputDriver.cpp:
+- lx = static_cast<int16_t>(state.lx) + INT16_MIN
+- ly = static_cast<int16_t>(~state.ly) + INT16_MIN  (Y inverted)
+- x = static_cast<int16_t>(state.rx) + INT16_MIN
+- y = static_cast<int16_t>(~state.ry) + INT16_MIN  (Y inverted)
+
+### Re-pairing Required
+
+After flashing this firmware, hosts must delete the existing BLE pairing and re-pair.
+The GATT Database Hash changes when REPORT_MAP content changes; the host's cached
+descriptor will mis-parse the new 13-byte reports until re-pairing occurs.

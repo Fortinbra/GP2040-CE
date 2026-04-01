@@ -37,7 +37,7 @@ public:
     // Handles 3s deferred hardware init and drives cyw43_arch_poll.
     void process();
 
-    // Queue a 9-byte HID input report for transmission via BLE ATT notification.
+    // Queue a 13-byte XInput-style HID input report for transmission via BLE ATT notification.
     // Returns false if not connected or notifications not enabled.
     bool sendReport(const uint8_t* report, uint16_t len);
 
@@ -92,8 +92,8 @@ private:
     volatile BLEPowerState _powerState      = BLEPowerState::ADVERTISING;
     volatile uint32_t _lastInputChangeMs    = 0;    // updated when report payload changes
     volatile uint32_t _lastReportMs         = 0;    // updated each time a report is queued
-    uint8_t  _pendingReport[9]     = {};
-    uint8_t  _lastSentReport[9]    = {};  // previous payload; compared in CAN_SEND_NOW to detect changes
+    uint8_t  _pendingReport[13]    = {};
+    uint8_t  _lastSentReport[13]   = {};  // previous payload; compared in CAN_SEND_NOW to detect changes
 };
 
 #endif // BLE_HID_MANAGER_H

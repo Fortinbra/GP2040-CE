@@ -835,3 +835,24 @@ gap_request_connection_parameter_update(_conHandle, 80, 80, 0, 200);
 
 Host may ignore these. Call after transitioning state — do NOT call from inside
 HCI_EVENT_DISCONNECTION_COMPLETE or before HCI_STATE_WORKING.
+
+---
+
+## HID Descriptor: XInput-Style Gamepad Layout (13 bytes)
+
+**Verified:** 2026-05-25 on build_ble3 (PimoroniPicoLipo2XLW, BTstack, Pico SDK 2.2.0)
+
+**Key facts:**
+- Report ID is declared in descriptor (`0x85, 0x01`) but is NOT included in the ATT notification payload.
+  The Report ID is communicated via the GATT Report Reference descriptor (`REPORT_REFERENCE, READ, 1, 1`).
+  `hids_device_send_input_report()` takes the raw payload without the ID byte.
+- `LOGICAL_MINIMUM(-32768)` encodes as 3 bytes: `0x16, 0x00, 0x80` (tag 0x16 = Global LOGICAL_MINIMUM 2-byte; value 0x8000 LE).
+- `LOGICAL_MAXIMUM(32767)` encodes as 3 bytes: `0x26, 0xFF, 0x7F`.
+- Hat switch null state: set `LOGICAL_MAXIMUM(7)` + `0x81, 0x42` (Null State flag). Any value > 7 is treated as null. Use 8 for neutral.
+- Padding bits after buttons and hat are required to align to byte boundaries. Use `0x81, 0x03` (Cnst,Var,Abs) for padding.
+- Physical minimum/maximum and Unit items on the hat switch improve host recognition (optional but recommended).
+- `sendReport()` length clamp must match the descriptor payload size exactly (13 for this layout).
+- Buffer sizes in BLEHIDManager.h (_pendingReport, _lastSentReport) must be >= payload size.
+
+**Trigger Usage Page:** Simulation Controls (0x05, 0x02), Brake (0x09, 0xC5) for LT, Accelerator (0x09, 0xC4) for RT.
+This produces better host recognition than Generic Desktop Rx/Ry for triggers.

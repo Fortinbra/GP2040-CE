@@ -14,44 +14,69 @@ void OutputManager::dispatch(Gamepad* gamepad) {
     const GamepadOptions& opts = Storage::getInstance().getGamepadOptions();
     if (opts.inputMode != INPUT_MODE_BLE) return;
 
-    // Map GamepadState to the 9-byte BLE HID report body (no Report ID byte — that is
-    // carried by the GATT Report Reference descriptor):
-    //   bytes 0-3  : 32 buttons (little-endian bitmask)
-    //   byte  4    : hat (4 bits, 0-7 or 0xF=null) | padding (4 bits = 0)
-    //   bytes 5-8  : x, y, z, rz axes (uint8, unsigned 0..255, center = 0x80)
-    //                matches HIDDescriptors.h HIDReport and USB HID driver exactly
-    uint8_t report[9] = {};
+    // Map GamepadState to the 13-byte XInput-style BLE HID report body (no Report ID byte — that
+    // is carried by the GATT Report Reference descriptor):
+    //   byte  0    : face + shoulder + menu buttons (A,B,X,Y,LB,RB,Back,Start)
+    //   byte  1    : Guide, LS, RS (bits 3–7 = reserved/0)
+    //   byte  2    : hat switch (lower 4 bits, 0–7 or 8=neutral) + padding (upper 4 bits = 0)
+    //   bytes 3–4  : LT, RT (uint8, 0..255)
+    //   bytes 5–12 : LX, LY, RX, RY (int16 LE, signed −32768..32767, Y axes inverted)
+    uint8_t report[13] = {};
     const GamepadState& state = gamepad->state;
 
-    // Buttons: GP2040-CE uses a 32-bit bitmask directly
-    report[0] = (uint8_t)(state.buttons & 0xFF);
-    report[1] = (uint8_t)((state.buttons >> 8)  & 0xFF);
-    report[2] = (uint8_t)((state.buttons >> 16) & 0xFF);
-    report[3] = (uint8_t)((state.buttons >> 24) & 0xFF);
+    // Byte 0: face + shoulder + menu buttons
+    report[0] =
+        (gamepad->pressedB1() ? (1u << 0) : 0) |  // A
+        (gamepad->pressedB2() ? (1u << 1) : 0) |  // B
+        (gamepad->pressedB3() ? (1u << 2) : 0) |  // X
+        (gamepad->pressedB4() ? (1u << 3) : 0) |  // Y
+        (gamepad->pressedL1() ? (1u << 4) : 0) |  // LB
+        (gamepad->pressedR1() ? (1u << 5) : 0) |  // RB
+        (gamepad->pressedS1() ? (1u << 6) : 0) |  // Back
+        (gamepad->pressedS2() ? (1u << 7) : 0);   // Start
 
-    // Hat switch: map dpad bitmask to 0-7 (N/NE/E/SE/S/SW/W/NW) or 8 (null)
+    // Byte 1: Guide + stick clicks (bits 3–7 = reserved/0)
+    report[1] =
+        (gamepad->pressedA1() ? (1u << 0) : 0) |  // Guide
+        (gamepad->pressedL3() ? (1u << 1) : 0) |  // LS
+        (gamepad->pressedR3() ? (1u << 2) : 0);   // RS
+
+    // Byte 2: hat (lower 4 bits) + padding (upper 4 bits = 0)
     uint8_t hat;
     switch (state.dpad & GAMEPAD_MASK_DPAD) {
-        case GAMEPAD_MASK_UP:                          hat = HID_HAT_UP;        break;
-        case GAMEPAD_MASK_UP    | GAMEPAD_MASK_RIGHT:  hat = HID_HAT_UPRIGHT;   break;
-        case GAMEPAD_MASK_RIGHT:                       hat = HID_HAT_RIGHT;     break;
-        case GAMEPAD_MASK_DOWN  | GAMEPAD_MASK_RIGHT:  hat = HID_HAT_DOWNRIGHT; break;
-        case GAMEPAD_MASK_DOWN:                        hat = HID_HAT_DOWN;      break;
-        case GAMEPAD_MASK_DOWN  | GAMEPAD_MASK_LEFT:   hat = HID_HAT_DOWNLEFT;  break;
-        case GAMEPAD_MASK_LEFT:                        hat = HID_HAT_LEFT;      break;
-        case GAMEPAD_MASK_UP    | GAMEPAD_MASK_LEFT:   hat = HID_HAT_UPLEFT;    break;
-        default:                                       hat = HID_HAT_NOTHING;   break;
+        case GAMEPAD_MASK_UP:                          hat = 0; break;
+        case GAMEPAD_MASK_UP    | GAMEPAD_MASK_RIGHT:  hat = 1; break;
+        case GAMEPAD_MASK_RIGHT:                       hat = 2; break;
+        case GAMEPAD_MASK_DOWN  | GAMEPAD_MASK_RIGHT:  hat = 3; break;
+        case GAMEPAD_MASK_DOWN:                        hat = 4; break;
+        case GAMEPAD_MASK_DOWN  | GAMEPAD_MASK_LEFT:   hat = 5; break;
+        case GAMEPAD_MASK_LEFT:                        hat = 6; break;
+        case GAMEPAD_MASK_UP    | GAMEPAD_MASK_LEFT:   hat = 7; break;
+        default:                                       hat = 8; break;  // null state (>7)
     }
-    // BLE descriptor Logical Maximum (7) with Null State — clamp 8 to 0xF (null indicator)
-    if (hat > 7) hat = 0x0F;
-    report[4] = hat & 0x0F;  // lower 4 bits = hat, upper 4 bits = padding (0)
+    report[2] = hat & 0x0F;
 
-    // Axes: uint16 [0, 65535] → uint8 [0, 255] unsigned; midpoint 0x8000 → 0x80.
-    // Matches USB HID driver (HIDDriver.cpp) and descriptor unsigned 0..255 range.
-    report[5] = (uint8_t)(state.lx >> 8);
-    report[6] = (uint8_t)(state.ly >> 8);
-    report[7] = (uint8_t)(state.rx >> 8);
-    report[8] = (uint8_t)(state.ry >> 8);
+    // Bytes 3–4: triggers (digital falls back to 0xFF; analog uses state.lt/rt directly)
+    if (gamepad->hasAnalogTriggers) {
+        report[3] = gamepad->pressedL2() ? 0xFF : state.lt;
+        report[4] = gamepad->pressedR2() ? 0xFF : state.rt;
+    } else {
+        report[3] = gamepad->pressedL2() ? 0xFF : 0;
+        report[4] = gamepad->pressedR2() ? 0xFF : 0;
+    }
+
+    // Bytes 5–12: sticks as int16 LE, Y axes inverted to match XInput convention
+    // (XInput: positive Y = up; GP2040-CE stores 0 = up, so invert via bitwise NOT)
+    // Formula mirrors XInputDriver.cpp exactly.
+    int16_t lx = static_cast<int16_t>(state.lx) + INT16_MIN;
+    int16_t ly = static_cast<int16_t>(~state.ly) + INT16_MIN;
+    int16_t rx = static_cast<int16_t>(state.rx) + INT16_MIN;
+    int16_t ry = static_cast<int16_t>(~state.ry) + INT16_MIN;
+
+    report[5]  = (uint8_t)(lx & 0xFF);          report[6]  = (uint8_t)((uint16_t)lx >> 8);
+    report[7]  = (uint8_t)(ly & 0xFF);          report[8]  = (uint8_t)((uint16_t)ly >> 8);
+    report[9]  = (uint8_t)(rx & 0xFF);          report[10] = (uint8_t)((uint16_t)rx >> 8);
+    report[11] = (uint8_t)(ry & 0xFF);          report[12] = (uint8_t)((uint16_t)ry >> 8);
 
     BLEHIDManager::getInstance().sendReport(report, sizeof(report));
 #else

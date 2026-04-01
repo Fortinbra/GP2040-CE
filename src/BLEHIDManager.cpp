@@ -19,55 +19,83 @@
 // Generated GATT database header (from src/ble_hid.gatt via pico_btstack_make_gatt_header)
 #include "ble_hid.h"
 
-// HID Report Descriptor: Report ID 1 + 32 buttons (4 bytes) + hat+padding (1 byte) + 4 axes (4 bytes).
-// Body is identical to the USB HID descriptor in HIDDescriptors.h — only Report ID 1 is added.
+// HID Report Descriptor: Report ID 1 + 11 named buttons (2 bytes) + hat+padding (1 byte)
+//   + LT/RT triggers (2 bytes) + 4 signed 16-bit axes (8 bytes) = 13 bytes.
+// XInput-style layout: named face/shoulder/menu buttons, hat switch, uint8 triggers, int16 sticks.
 // For BLE HID the Report ID byte is NOT sent in the ATT notification payload; it is communicated
 // via the GATT Report Reference descriptor (0x2908) in ble_hid.gatt (REPORT_REFERENCE, READ, 1, 1).
-// Axes are unsigned 0..255; usages X/Y/Z/Rz match the USB driver exactly.
 static const uint8_t hid_report_descriptor[] = {
-    0x05, 0x01,        // USAGE_PAGE (Generic Desktop)
-    0x09, 0x05,        // USAGE (Game Pad)
-    0xA1, 0x01,        // COLLECTION (Application)
+    0x05, 0x01,              // USAGE_PAGE (Generic Desktop)
+    0x09, 0x05,              // USAGE (Game Pad)
+    0xA1, 0x01,              // COLLECTION (Application)
 
-    0x85, 0x01,        // Report ID (1)
+    0x85, 0x01,              // Report ID (1)
 
-    // 32 buttons
-    0x05, 0x09,        //   USAGE_PAGE (Button)
-    0x19, 0x01,        //   USAGE_MINIMUM (Button 1)
-    0x29, 0x20,        //   USAGE_MAXIMUM (Button 32)
-    0x15, 0x00,        //   LOGICAL_MINIMUM (0)
-    0x25, 0x01,        //   LOGICAL_MAXIMUM (1)
-    0x95, 0x20,        //   REPORT_COUNT (32)
-    0x75, 0x01,        //   REPORT_SIZE (1)
-    0x81, 0x02,        //   INPUT (Data,Var,Abs)
+    // ── 11 digital buttons (2 bytes total) ─────────────────────────────────
+    // Buttons 1–8: A, B, X, Y, LB, RB, Back, Start
+    0x05, 0x09,              //   USAGE_PAGE (Button)
+    0x19, 0x01,              //   USAGE_MINIMUM (Button 1)
+    0x29, 0x08,              //   USAGE_MAXIMUM (Button 8)
+    0x15, 0x00,              //   LOGICAL_MINIMUM (0)
+    0x25, 0x01,              //   LOGICAL_MAXIMUM (1)
+    0x95, 0x08,              //   REPORT_COUNT (8)
+    0x75, 0x01,              //   REPORT_SIZE (1)
+    0x81, 0x02,              //   INPUT (Data,Var,Abs)
 
-    // hat (dpad)
-    0x05, 0x01,        //   USAGE_PAGE (Generic Desktop)
-    0x09, 0x39,        //   USAGE (Hat switch)
-    0x25, 0x07,        //   LOGICAL_MAXIMUM (7)
-    0x95, 0x01,        //   REPORT_COUNT (1)
-    0x75, 0x04,        //   REPORT_SIZE (4)
-    0x81, 0x42,        //   INPUT (Data,Var,Abs,Null)
+    // Buttons 9–11: Guide, LS, RS
+    0x19, 0x09,              //   USAGE_MINIMUM (Button 9)
+    0x29, 0x0B,              //   USAGE_MAXIMUM (Button 11)
+    0x95, 0x03,              //   REPORT_COUNT (3)
+    0x75, 0x01,              //   REPORT_SIZE (1)
+    0x81, 0x02,              //   INPUT (Data,Var,Abs)
 
-    // padding the hat
-    0x95, 0x01,        //   REPORT_COUNT (1)
-    0x75, 0x04,        //   REPORT_SIZE (4)
-    0x81, 0x01,        //   INPUT (Cnst,Ary,Abs)
+    // 5 padding bits to complete byte 1
+    0x95, 0x05,              //   REPORT_COUNT (5)
+    0x75, 0x01,              //   REPORT_SIZE (1)
+    0x81, 0x03,              //   INPUT (Cnst,Var,Abs)
 
-    // analogs: X (left stick X), Y (left stick Y), Z (right stick X), Rz (right stick Y)
-    // unsigned 0..255; midpoint 0x80 = center — identical to USB HID driver
-    0x05, 0x01,        //   USAGE_PAGE (Generic Desktop)
-    0x26, 0xFF, 0x00,  //   LOGICAL_MAXIMUM (255)
-    0x46, 0xFF, 0x00,  //   PHYSICAL_MAXIMUM (255)
-    0x09, 0x30,        //   USAGE (X)
-    0x09, 0x31,        //   USAGE (Y)
-    0x09, 0x32,        //   USAGE (Z)
-    0x09, 0x35,        //   USAGE (Rz)
-    0x75, 0x08,        //   REPORT_SIZE (8)
-    0x95, 0x04,        //   REPORT_COUNT (4)
-    0x81, 0x02,        //   INPUT (Data,Var,Abs)
+    // ── D-pad as hat switch (1 byte total) ─────────────────────────────────
+    0x05, 0x01,              //   USAGE_PAGE (Generic Desktop)
+    0x09, 0x39,              //   USAGE (Hat switch)
+    0x15, 0x00,              //   LOGICAL_MINIMUM (0)
+    0x25, 0x07,              //   LOGICAL_MAXIMUM (7)
+    0x35, 0x00,              //   PHYSICAL_MINIMUM (0)
+    0x46, 0x3B, 0x01,        //   PHYSICAL_MAXIMUM (315 = 7×45 degrees)
+    0x65, 0x14,              //   UNIT (Eng Rot: Angular Position)
+    0x75, 0x04,              //   REPORT_SIZE (4)
+    0x95, 0x01,              //   REPORT_COUNT (1)
+    0x81, 0x42,              //   INPUT (Data,Var,Abs,Null)
 
-    0xC0,              // END_COLLECTION
+    // 4 padding bits to complete the hat byte
+    0x65, 0x00,              //   UNIT (None)
+    0x75, 0x04,              //   REPORT_SIZE (4)
+    0x95, 0x01,              //   REPORT_COUNT (1)
+    0x81, 0x03,              //   INPUT (Cnst,Var,Abs)
+
+    // ── Analog triggers: LT, RT (2 bytes total) ────────────────────────────
+    0x05, 0x02,              //   USAGE_PAGE (Simulation Controls)
+    0x09, 0xC5,              //   USAGE (Brake)       = LT
+    0x09, 0xC4,              //   USAGE (Accelerator) = RT
+    0x15, 0x00,              //   LOGICAL_MINIMUM (0)
+    0x26, 0xFF, 0x00,        //   LOGICAL_MAXIMUM (255)
+    0x75, 0x08,              //   REPORT_SIZE (8)
+    0x95, 0x02,              //   REPORT_COUNT (2)
+    0x81, 0x02,              //   INPUT (Data,Var,Abs)
+
+    // ── Analog sticks: LX, LY, RX, RY (8 bytes total) ─────────────────────
+    // Signed 16-bit, little-endian; LOGICAL_MINIMUM(-32768) = 0x16 0x00 0x80
+    0x05, 0x01,              //   USAGE_PAGE (Generic Desktop)
+    0x09, 0x30,              //   USAGE (X)  = LX
+    0x09, 0x31,              //   USAGE (Y)  = LY
+    0x09, 0x32,              //   USAGE (Z)  = RX
+    0x09, 0x35,              //   USAGE (Rz) = RY
+    0x16, 0x00, 0x80,        //   LOGICAL_MINIMUM (-32768)
+    0x26, 0xFF, 0x7F,        //   LOGICAL_MAXIMUM (32767)
+    0x75, 0x10,              //   REPORT_SIZE (16)
+    0x95, 0x04,              //   REPORT_COUNT (4)
+    0x81, 0x02,              //   INPUT (Data,Var,Abs)
+
+    0xC0,                    // END_COLLECTION
 };
 
 static_assert(sizeof(hid_report_descriptor) > 0, "HID descriptor must not be empty");
@@ -233,7 +261,7 @@ bool BLEHIDManager::sendReport(const uint8_t* report, uint16_t len) {
         if ((now - _lastReportMs) < 50) return false;
     }
 
-    if (len > 9) len = 9;
+    if (len > 13) len = 13;
     memcpy(_pendingReport, report, len);
     _pendingReportLen = len;
     _reportPending    = true;

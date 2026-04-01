@@ -1005,3 +1005,7 @@ Recommended **Option B** (custom `le_device_db` backed by protobuf). See `ble-pr
 **GATT profile table** and **power state reference table** also included.
 
 **Build status:** Document only — no firmware changes.
+### 2026-05-25: XInput-Style BLE HID Report Implementation
+
+Replaced 9-byte generic BLE HID report with 13-byte XInput-style layout. Files: BLEHIDManager.cpp (new descriptor, clamp 9->13), BLEHIDManager.h (buffers [9]->[13]), OutputManager.cpp (new 13-byte builder). Axis formula and hasAnalogTriggers guard copied from XInputDriver.cpp. Build: clean 7/7.
+
