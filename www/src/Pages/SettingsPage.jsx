@@ -520,9 +520,13 @@ export default function SettingsPage() {
 		fetchProfiles();
 		updatePeripherals();
 		fetchBootModeOptions();
+		refreshBLEStatus();
 	}, []);
 
 	const [saveMessage, setSaveMessage] = useState('');
+	const [bleStatus, setBleStatus] = useState(null);
+	const [bleMessage, setBleMessage] = useState('');
+	const [bleBusy, setBleBusy] = useState(false);
 	const [warning, setWarning] = useState({ show: false, acceptText: '' });
 	const [validated, setValidated] = useState(false);
 	const [keyMappings, setKeyMappings] = useState(baseButtonMappings);
@@ -543,6 +547,31 @@ export default function SettingsPage() {
 	const handlePS4Signature = (event) => {
 		setPS4Signature(event.target.files[0]);
 		setMessage(null);
+	};
+
+	const refreshBLEStatus = async () => {
+		const status = await WebApi.getBLEHIDStatus();
+		if (status) {
+			setBleStatus(status);
+			setBleMessage('');
+		}
+	};
+
+	const setBLEControl = async (options) => {
+		setBleBusy(true);
+		const status = await WebApi.setBLEHIDControls(options);
+		setBleBusy(false);
+		if (status) {
+			setBleStatus(status);
+			setBleMessage(t('Common:saved-success-message'));
+		} else {
+			setBleMessage(t('Common:saved-error-message'));
+		}
+	};
+
+	const clearBLEBonds = async () => {
+		if (!window.confirm('Clear all saved BLE bonds?')) return;
+		await setBLEControl({ clearBonds: true });
 	};
 
 	const verifyAndSavePS4 = async ({
@@ -1261,6 +1290,19 @@ export default function SettingsPage() {
 		}
 
 		const inputMode = INPUT_MODES.find((o) => o.value == values.inputMode);
+		if (!inputMode) {
+			return (
+				<Row className="mb-3">
+					<Col>
+						{t('SettingsPage:no-mode-settings-text', {
+							mode: values.inputMode,
+							interpolation: { escapeValue: false },
+						})}
+					</Col>
+				</Row>
+			);
+		}
+
 		switch (inputMode.labelKey) {
 			case 'input-mode-options.keyboard':
 				return keyboardModeSpecifics(
@@ -1340,6 +1382,9 @@ export default function SettingsPage() {
 				? t('Common:saved-success-message')
 				: t('Common:saved-error-message'),
 		);
+		if (success && values.inputMode == 18) {
+			await refreshBLEStatus();
+		}
 	};
 
 	const onSubmit = async (values) => {
@@ -1513,6 +1558,63 @@ export default function SettingsPage() {
 															handleChange,
 															translatedInputModeAuthentications,
 														)}
+														{values.inputMode == 18 ? (
+															<Row className="mb-3">
+																<Col sm={12}>
+																	<div className="mb-2 fw-bold">Bluetooth LE Status</div>
+																	<div className="mb-2">
+																		{bleStatus ? (
+																			<>
+																				<div>Supported: {bleStatus.supported ? 'Yes' : 'No'}</div>
+																				<div>Initialized: {bleStatus.enabled ? 'Yes' : 'No'}</div>
+																				<div>Connected: {bleStatus.connected ? 'Yes' : 'No'}</div>
+																				<div>Notifying: {bleStatus.notifying ? 'Yes' : 'No'}</div>
+																				<div>Bonded peers: {bleStatus.bondCount ?? 0}</div>
+																			</>
+																		) : (
+																			<div>Status unavailable</div>
+																		)}
+																	</div>
+																	<div className="d-flex gap-2 flex-wrap">
+																		<Button
+																			variant="secondary"
+																			type="button"
+																			disabled={bleBusy}
+																			onClick={() => refreshBLEStatus()}
+																		>
+																			Refresh BLE Status
+																		</Button>
+																		<Button
+																			variant="secondary"
+																			type="button"
+																			disabled={bleBusy}
+																			onClick={() => setBLEControl({ pairingMode: true })}
+																		>
+																			Enable Pairing Mode
+																		</Button>
+																		<Button
+																			variant="secondary"
+																			type="button"
+																			disabled={bleBusy}
+																			onClick={() => setBLEControl({ pairingMode: false })}
+																		>
+																			Disable Pairing Mode
+																		</Button>
+																		<Button
+																			variant="danger"
+																			type="button"
+																			disabled={bleBusy}
+																			onClick={() => clearBLEBonds()}
+																		>
+																			Clear BLE Bonds
+																		</Button>
+																	</div>
+																	{bleMessage ? (
+																		<div className="alert mt-2">{bleMessage}</div>
+																	) : null}
+																</Col>
+															</Row>
+														) : null}
 													</Form.Group>
 													<Button type="submit">
 														{t('Common:button-save-label')}
