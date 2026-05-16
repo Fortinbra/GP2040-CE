@@ -20,13 +20,5 @@ env.ini
 *docker-compose.yml
 www/src_gen/enums.ts
 /lib/NeoPico/src/generated/ws2812.pio.h
-# Squad: ignore runtime state (logs, inbox, sessions)
-.squad/orchestration-log/
-.squad/log/
-.squad/logs/
-.squad/decisions/inbox/
-.squad/sessions/
-# Squad: SubSquad activation file (local to this machine)
-.squad-workstream
 # Copilot: local session state
 .copilot/

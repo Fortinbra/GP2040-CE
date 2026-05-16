@@ -228,7 +228,6 @@ See [RP2350 Support](./rp2350-support.md) for custom board configuration details
 
 - **[Bluetooth HID Support](./bluetooth-support.md)** — Feature documentation for Bluetooth HID implementation
 - **[RP2350 Support](./rp2350-support.md)** — Hardware specifications and GPIO validation for all RP2350 boards
-- **[Power & Battery Analysis](./../.squad/agents/edward/power-battery-analysis.md)** — (Development notes) Technical analysis of power management requirements
 
 ---
 

@@ -2,7 +2,13 @@
 
 ## Overview
 
-GP2040-CE fully supports the **Raspberry Pi RP2350** microcontroller and its variants. The RP2350 is the successor to the RP2040 and offers improvements in CPU performance, memory, and GPIO availability. GP2040-CE automatically adapts to run on both RP2350A and RP2350B chips with no firmware source code changes required—the build system and SDK handle all hardware abstraction.
+GP2040-CE supports the **Raspberry Pi RP2350** family through Pico SDK board/platform targets and per-board GP2040 overlays. The RP2350 is the successor to the RP2040 and offers improvements in CPU performance, memory, and GPIO availability.
+
+In this repo, RP2350 behavior is selected in two layers:
+- `GP2040_BOARDCONFIG` selects the GP2040 board folder and overlay (`configs/<name>/<name>.cmake`, `BoardConfig.h`).
+- `PICO_BOARD` and `PICO_PLATFORM` select Pico SDK board/platform behavior.
+
+No RP2350-specific firmware source fork is required for normal builds; variant/package-specific behavior comes from the selected SDK board definition.
 
 **Key benefit for users:** RP2350A is a drop-in upgrade for RP2040-based boards, while RP2350B unlocks up to 48 GPIO pins, enabling more simultaneous button and feature inputs on new board designs.
 
@@ -27,21 +33,48 @@ Both variants are fully supported. The main difference is GPIO availability:
 
 ---
 
+## Variant Selection Flow (Guaranteed vs Inferred)
+
+For RP2350 targets, the selection flow is:
+1. `GP2040_BOARDCONFIG=<BoardName>` picks the GP2040 overlay and pin map defaults.
+2. That overlay sets `PICO_BOARD` and `PICO_PLATFORM` (RP2350 overlays set `PICO_PLATFORM=rp2350-arm-s`).
+3. The Pico SDK board header selected by `PICO_BOARD` determines board/chip macros and limits such as `NUM_BANK0_GPIOS`.
+
+What this guarantees:
+- The platform is RP2350 ARM Secure mode when `PICO_PLATFORM=rp2350-arm-s` is set.
+- GPIO/UI limits in firmware follow compile target macros (not board marketing names).
+
+What is inferred (SDK-dependent):
+- RP2350 package variant claims (A vs B) are guaranteed only when the selected SDK board definition explicitly implies that variant.
+- If multiple GP2040 configs map to the same SDK board target, variant/package assumptions should be treated as inferred unless separately verified.
+
+---
+
 ## Supported Boards
 
 GP2040-CE includes configuration support for the following RP2350-based boards:
 
-| Board | Chip Variant | Config Name | GPIO Count | Notable Features |
-|-------|--------------|-------------|------------|------------------|
-| **Raspberry Pi Pico 2** | RP2350A | `Pico2` | 30 | Reference RP2350A board; pin layout identical to original Pico |
-| **Flatbox Rev. 8** | RP2350A | `FlatboxRev8` | 30 | USB peripheral passthrough for arcade stick arcade mode |
-| **SparkFun Pro Micro RP2350** | RP2350B | `SparkFunProMicroRP2350` | 48 (uses 0–29) | Compact form factor; RP2350B variant ready for expansion |
-| **Raspberry Pi Pico 2 W** | RP2350A | `Pico2W` | 30 | CYW43439 wireless; same pin layout as Pico W |
-| **Pimoroni Pico Lipo 2 XL W** | RP2350B | `PimoroniPicoLipo2XLW` | 48 (uses 0–29 for inputs) | CYW43439 wireless; onboard LiPo charging; battery ADC on GPIO29 |
+| Board | Chip Variant Status | Config Name | GPIO Count at Build Time | Notable Features |
+|-------|----------------------|-------------|---------------------------|------------------|
+| **Raspberry Pi Pico 2** | RP2350A (SDK board target: `pico2`) | `Pico2` | 30 | Reference RP2350A board; pin layout identical to original Pico |
+| **Flatbox Rev. 8** | RP2350A (via `pico2` target in overlay) | `FlatboxRev8` | 30 | USB peripheral passthrough for arcade stick arcade mode |
+| **SparkFun Pro Micro RP2350** | RP2350B (SDK board target: `sparkfun_promicro_rp2350`) | `SparkFunProMicroRP2350` | SDK-dependent (`NUM_BANK0_GPIOS` from target) | Compact form factor; RP2350B-oriented target |
+| **Raspberry Pi Pico 2 W** | RP2350A (SDK board target: `pico2_w`) | `Pico2W` | 30 | CYW43439 wireless; same pin layout as Pico W |
+| **Pimoroni Pico Lipo 2 XL W** | SDK-dependent/inferred (current overlay uses `pico2_w`) | `PimoroniPicoLipo2XLW` | Currently 30 with `pico2_w` target | CYW43439 wireless; onboard LiPo charging; battery ADC on GPIO29 |
 
 All boards are CI-tested and release-ready.
 
 Both the Raspberry Pi Pico 2 W and the Pimoroni Pico Lipo 2 XL W configurations are included. Full Bluetooth HID support for CYW43439-equipped boards is planned in a future release.
+
+### Maintainer Variant Validation Checklist
+
+Use this checklist before asserting RP2350A/RP2350B in docs or release notes:
+
+1. Confirm overlay mapping in `configs/<Board>/<Board>.cmake` (`PICO_BOARD`, `PICO_PLATFORM`).
+2. Confirm the selected SDK board header under `$PICO_SDK_PATH/src/boards/include/boards/` and inspect its macros.
+3. Verify compile-time GPIO limit by checking `NUM_BANK0_GPIOS` for that target (build output, generated compile definitions, or direct header inspection).
+4. Validate runtime behavior in firmware/web config by confirming pin loops/options align with `NUM_BANK0_GPIOS`.
+5. If a board config reuses another SDK board target, label variant claims as SDK-dependent/inferred unless separate hardware/package proof is linked.
 
 ---
 
@@ -81,7 +114,7 @@ Download the appropriate UF2 firmware file from the [GP2040-CE releases page](ht
 - `GP2040-CE_*_FlatboxRev8.uf2` → for RP2350A-based Flatbox
 - `GP2040-CE_*_SparkFunProMicroRP2350.uf2` → for RP2350B-based SparkFun module
 - `GP2040-CE_*_Pico2W.uf2` → for RP2350A-based Pico 2 W
-- `GP2040-CE_*_PimoroniPicoLipo2XLW.uf2` → for RP2350B-based Pimoroni Pico Lipo 2 XL W
+- `GP2040-CE_*_PimoroniPicoLipo2XLW.uf2` → for Pimoroni Pico Lipo 2 XL W config (variant/package labeling is SDK-target dependent in this repo)
 
 ### Building from Source
 
@@ -101,7 +134,7 @@ cmake -DGP2040_BOARDCONFIG=SparkFunProMicroRP2350 -B build -S .
 cmake --build build
 ```
 
-The build system automatically selects the correct Pico SDK target platform (`rp2350-arm-s`) and GPIO configuration for the chosen board.
+The board overlay selects `PICO_PLATFORM` (RP2350 overlays use `rp2350-arm-s`), while GPIO limits and variant/package details are SDK-target dependent and come from the selected `PICO_BOARD` definition.
 
 **Note:** If Pico SDK is not installed, you can set `PICO_SDK_PATH`:
 ```bash
@@ -117,14 +150,14 @@ Each RP2350 board configuration defines its own GPIO-to-button mappings. Refer t
 ### GPIO Validation
 
 GP2040-CE automatically validates pin assignments against the target chip's available GPIO count:
-- **RP2350A:** Pins 0–29 are valid
-- **RP2350B:** Pins 0–47 are valid
+- **SDK-dependent:** Valid pins are `0..(NUM_BANK0_GPIOS - 1)` for the compiled target
+- Typical result: RP2350A-oriented targets expose 0–29; RP2350B-oriented targets may expose 0–47 when the SDK board definition does
 
 The firmware will reject any configuration that assigns buttons to unavailable pins.
 
 ### Web Configurator
 
-The web configurator automatically detects the number of available GPIO pins on the running firmware and displays only valid pins for configuration. When you flash firmware compiled for RP2350B, the configurator will show 48 GPIO options.
+The web configurator reads pin availability from firmware behavior tied to compile-target limits (`NUM_BANK0_GPIOS`) and displays only valid pins for configuration. GPIO option count is therefore SDK-target dependent.
 
 ---
 
@@ -179,7 +212,7 @@ Reference an existing config like `configs/Pico2/BoardConfig.h` or `configs/Flat
 #endif
 ```
 
-The firmware's pin validation automatically adapts to the compiled target. Pins 30–47 will only be valid if you compile for `PICO_BOARD=sparkfun_promicro_rp2350` or another RP2350B board.
+The firmware's pin validation automatically adapts to the compiled target. Pins 30–47 are only valid when the selected SDK board target exposes that range via `NUM_BANK0_GPIOS`.
 
 ### 3. Document the Pinout
 
@@ -245,7 +278,9 @@ RP2350 runs at 150 MHz by default (vs 133 MHz for RP2040). This can affect PIO t
 
 ### Pico 2 W and Pimoroni Pico Lipo 2 XL W
 
-Board configurations for both the **Raspberry Pi Pico 2 W** (RP2350A + CYW43439) and the **Pimoroni Pico Lipo 2 XL W** (RP2350B + CYW43439) are now included. The base firmware compiles and runs on both boards without issues.
+Board configurations for both the **Raspberry Pi Pico 2 W** (SDK target: `pico2_w`) and the **Pimoroni Pico Lipo 2 XL W** (current SDK target: `pico2_w`) are included. The base firmware compiles and runs on both boards.
+
+Variant/package labeling for Pimoroni Pico Lipo 2 XL W should be treated as SDK-dependent/inferred in this repo unless a dedicated SDK board target or separate hardware/package verification is cited.
 
 **Remaining gap:** Full Bluetooth HID support for CYW43439-equipped boards is not yet implemented. The CYW43 wireless driver integration (required for Bluetooth gamepad mode) is planned for a future release. USB HID works normally on both boards today.
 
@@ -264,4 +299,4 @@ RP2350 supports booting in RISC-V mode, but GP2040-CE targets ARM (Secure mode, 
 
 ---
 
-**Last Updated:** 2026-03-29
+**Last Updated:** 2026-05-07
