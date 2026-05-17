@@ -128,7 +128,7 @@ Required board config macros:
 
 ```c
 #define BATTERY_ADC_GPIO         43
-// Set BATTERY_ADC_CHANNEL to the verified ADC input for GP43 on the active RP2350B SDK target.
+// BATTERY_ADC_CHANNEL must be verified against the active RP2350B SDK target for GP43.
 ```
 
 Current BLE conversion implementation in `src/BLEHIDManager.cpp` uses fixed raw thresholds:
