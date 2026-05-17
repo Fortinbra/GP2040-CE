@@ -13,7 +13,7 @@ graph TD
     subgraph HW["🔧 Hardware"]
         RP2350B["RP2350B\nCore 0 / Core 1"]
         CYW43["CYW43439\nBT + WiFi"]
-        GP43["GP43\nBattery Voltage Divider"]
+        GP43["GP43 / ADC 3\nBattery Voltage Divider"]
         RP2350B <-->|"gSPI (GPIO 23-25,29)"| CYW43
         RP2350B -->|"ADC read"| GP43
     end

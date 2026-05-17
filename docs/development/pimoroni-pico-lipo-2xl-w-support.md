@@ -8,7 +8,7 @@ The **Pimoroni Pico Lipo 2 XL W** is an RP2350B microcontroller board with integ
 - **RP2350B** SoC with 48 GPIO pins (pins 0–29 standard, pins 30–47 are RP2350B-exclusive)
 - **CYW43439** Bluetooth + WiFi module (same chipset as Raspberry Pi Pico W / Pico 2 W)
 - **USB-C** connector for power and data
-- **LiPo battery charging circuit** with 3:1 voltage divider for battery voltage ADC readout on **GP43** (per Pimoroni documentation)
+- **LiPo battery charging circuit** with 3:1 voltage divider for battery voltage ADC readout on **GP43 (ADC 3)** (per Pimoroni documentation)
 - **VBUS detection** via **CYW43 WL GPIO 2** for power source identification
 
 **Product page:** [Pimoroni Pico Lipo 2 XL W](https://shop.pimoroni.com/products/pimoroni-pico-lipo-2-xl-w)
@@ -31,7 +31,7 @@ This board introduces two new requirements to GP2040-CE:
 | **Wireless** | CYW43439 (BT 5.3 + 802.11 a/b/g/n) |
 | **Power Input** | USB-C or LiPo battery |
 | **Battery Charging** | Onboard TP4056-based charge controller |
-| **Voltage Divider** | 3:1 for battery ADC (GP43 per Pimoroni docs) |
+| **Voltage Divider** | 3:1 for battery ADC (GP43 / ADC 3 per Pimoroni docs) |
 | **VBUS Detection** | CYW43 WL GPIO 2 |
 
 ---
@@ -122,12 +122,12 @@ The Pimoroni Pico Lipo 2 XL W reuses the standard CYW43 control pins from `pico2
 
 The board includes a 3:1 voltage divider on the LiPo battery connector. Pimoroni's board documentation routes that divided voltage to **GP43**.
 
-Current GP2040-CE BLE battery reporting expects board config battery macros and uses ADC channel selection from board config. The GPIO value should be set to **GP43** per Pimoroni documentation. The ADC input index must match the RP2350B mapping verified for the selected SDK target.
+Current GP2040-CE BLE battery reporting expects board config battery macros and uses ADC channel selection from board config. For this board, set the GPIO to **GP43** and the ADC input to **ADC 3**.
 
 Required board config values:
 
 - `BATTERY_ADC_GPIO` = `43`
-- `BATTERY_ADC_CHANNEL` = the ADC input verified for GP43 in the active RP2350B SDK target or dedicated board header
+- `BATTERY_ADC_CHANNEL` = `3` (GP43 maps to ADC 3)
 
 
 Current BLE conversion implementation in `src/BLEHIDManager.cpp` uses fixed raw thresholds:
@@ -263,14 +263,7 @@ See [RP2350 Support](./rp2350-support.md) for custom board configuration details
 
 ### GP43 Battery Sense Note
 
-For the Pimoroni Pico LiPo 2 XL W specifically, **GP43** is the documented battery-sense pin.
-
-The remaining validation item is the ADC input index:
-
-1. Confirm the Pico SDK ADC input index for GP43 on the selected RP2350B target/SDK version.
-2. Set `BATTERY_ADC_CHANNEL` to that verified mapping only after confirmation.
-
-Until this repository cites a verified RP2350B ADC mapping for the Pico LiPo 2 XL W, documentation should name **GP43** as the battery-sense GPIO and avoid hard-coding an ADC channel number.
+For the Pimoroni Pico LiPo 2 XL W specifically, battery sense is **GP43**, and **GP43 maps to ADC 3**.
 
 ### Related Documentation
 
@@ -286,7 +279,7 @@ The Pimoroni Pico Lipo 2 XL W is considered **fully supported** in GP2040-CE whe
 1. **Firmware compiles cleanly** with `PICO_BOARD=pico2_w`
 2. **USB HID works** — all button inputs and outputs function correctly over USB (device/host mode as configured)
 3. **CYW43 wireless stack initializes** — BTStack successfully configures the CYW43 module and radio powers on
-4. **Battery voltage reports correctly** — ADC reads GP43 and converts voltage as specified; reported value matches actual battery voltage
+4. **Battery voltage reports correctly** — ADC reads GP43 (ADC 3) and converts voltage as specified; reported value matches actual battery voltage
 5. **Bluetooth HID is functional** — gamepad can pair with a PC/Mac/phone and send button inputs + battery level over BT
 6. **Power management works** — firmware gracefully handles USB disconnect, switches to battery power, and respects low-battery thresholds
 

@@ -579,7 +579,7 @@ See `bluetooth-support.md` § Battery Level Reporting for details on ADC/voltage
 
 ```c
 uint8_t readBatteryPercent() {
-    adc_select_input(BATTERY_ADC_CHANNEL);        // board-specific ADC input (GP43 on Pico LiPo 2 XL W; channel value SDK-dependent)
+    adc_select_input(BATTERY_ADC_CHANNEL);        // board-specific ADC input (GP43 = ADC 3 on Pico LiPo 2 XL W)
     uint16_t raw = adc_read();
     float v_adc = (raw / 4095.0f) * 3.3f;
     float v_bat = v_adc * 3.0f;                   // voltage divider ratio

@@ -61,7 +61,7 @@ The **Pimoroni Pico Lipo 2 XL W** is the designated reference board for Bluetoot
 **Specifications:**
 - **Microcontroller:** RP2350B (48 GPIO, 150 MHz, 520 KB SRAM)
 - **Wireless:** CYW43439 (WiFi + Bluetooth HID)
-- **Battery:** Built-in LiPo charger (MCP73831), battery voltage sensing via GP43 per Pimoroni docs
+- **Battery:** Built-in LiPo charger (MCP73831), battery voltage sensing via GP43 (ADC 3) per Pimoroni docs
 - **Power input:** USB-C with integrated charging
 - **GPIO headroom:** 30+ GPIO available after CYW43 routing (RP2350B advantage over Pico 2 W)
 
@@ -78,7 +78,7 @@ set(PICO_PLATFORM rp2350-arm-s)
 
 The repository already includes a board configuration at `configs/PimoroniPicoLipo2XLW/`. Its battery and power-sense documentation should match the Pimoroni hardware docs:
 - GPIO pin mapping and CYW43 SPI/SDIO routing
-- ADC configuration for battery voltage measurement (GP43, voltage divider 3:1; ADC channel to be verified against the active RP2350B SDK target)
+- ADC configuration for battery voltage measurement (GP43 / ADC 3, voltage divider 3:1)
 - VBUS detection via `cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN)` / CYW43 WL GPIO 2
 
 ---
