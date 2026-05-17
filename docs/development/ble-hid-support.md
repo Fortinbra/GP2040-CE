@@ -579,7 +579,7 @@ See `bluetooth-support.md` § Battery Level Reporting for details on ADC/voltage
 
 ```c
 uint8_t readBatteryPercent() {
-    adc_select_input(3);                          // ADC3 = GPIO29
+    adc_select_input(BATTERY_ADC_CHANNEL);        // board-specific ADC input (GP43 on Pico LiPo 2 XL W; channel value SDK-dependent)
     uint16_t raw = adc_read();
     float v_adc = (raw / 4095.0f) * 3.3f;
     float v_bat = v_adc * 3.0f;                   // voltage divider ratio
@@ -593,7 +593,7 @@ uint8_t readBatteryPercent() {
 When USB power is present:
 
 ```c
-bool usb_connected = gpio_get(24);    // HIGH = USB present
+bool usb_connected = cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN);
 
 if (usb_connected) {
     battery_service_server_set_battery_value(100);  // Always 100% when charging

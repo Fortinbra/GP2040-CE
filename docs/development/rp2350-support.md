@@ -60,7 +60,7 @@ GP2040-CE includes configuration support for the following RP2350-based boards:
 | **Flatbox Rev. 8** | RP2350A (via `pico2` target in overlay) | `FlatboxRev8` | 30 | USB peripheral passthrough for arcade stick arcade mode |
 | **SparkFun Pro Micro RP2350** | RP2350B (SDK board target: `sparkfun_promicro_rp2350`) | `SparkFunProMicroRP2350` | SDK-dependent (`NUM_BANK0_GPIOS` from target) | Compact form factor; RP2350B-oriented target |
 | **Raspberry Pi Pico 2 W** | RP2350A (SDK board target: `pico2_w`) | `Pico2W` | 30 | CYW43439 wireless; same pin layout as Pico W |
-| **Pimoroni Pico Lipo 2 XL W** | SDK-dependent/inferred (current overlay uses `pico2_w`) | `PimoroniPicoLipo2XLW` | Currently 30 with `pico2_w` target | CYW43439 wireless; onboard LiPo charging; battery ADC on GPIO29 |
+| **Pimoroni Pico Lipo 2 XL W** | SDK-dependent/inferred (current overlay uses `pico2_w`) | `PimoroniPicoLipo2XLW` | Currently 30 with `pico2_w` target | CYW43439 wireless; onboard LiPo charging; battery sense on GP43 per Pimoroni docs |
 
 All boards are CI-tested and release-ready.
 

@@ -61,7 +61,7 @@ The **Pimoroni Pico Lipo 2 XL W** is the designated reference board for Bluetoot
 **Specifications:**
 - **Microcontroller:** RP2350B (48 GPIO, 150 MHz, 520 KB SRAM)
 - **Wireless:** CYW43439 (WiFi + Bluetooth HID)
-- **Battery:** Built-in LiPo charger (MCP73831), battery voltage sensing via GPIO29/ADC3
+- **Battery:** Built-in LiPo charger (MCP73831), battery voltage sensing via GP43 per Pimoroni docs
 - **Power input:** USB-C with integrated charging
 - **GPIO headroom:** 30+ GPIO available after CYW43 routing (RP2350B advantage over Pico 2 W)
 
@@ -76,10 +76,10 @@ set(PICO_BOARD pico2_w)
 set(PICO_PLATFORM rp2350-arm-s)
 ```
 
-A new board configuration (`configs/PimoroniPicoLipo2XLW/`) will be created during Phase 1 implementation. This configuration will include:
+The repository already includes a board configuration at `configs/PimoroniPicoLipo2XLW/`. Its battery and power-sense documentation should match the Pimoroni hardware docs:
 - GPIO pin mapping and CYW43 SPI/SDIO routing
-- ADC configuration for battery voltage measurement (GPIO29, voltage divider 3:1)
-- VBUS detection configuration (GPIO24 for USB input detection)
+- ADC configuration for battery voltage measurement (GP43, voltage divider 3:1; ADC channel to be verified against the active RP2350B SDK target)
+- VBUS detection via `cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN)` / CYW43 WL GPIO 2
 
 ---
 
@@ -324,7 +324,7 @@ static int report_request_cb(uint16_t hid_cid,
                              int * out_size,
                              uint8_t * out_report) {
     if (report_type == HID_REPORT_TYPE_FEATURE && report_id == 0x02) {
-        bool usb = gpio_get(24);
+        bool usb = cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN);
         *out_report = usb ? 100 : readBatteryPercent();
         *out_size = 1;
         return 0;  // success
@@ -400,8 +400,8 @@ The firmware implements a four-state power state machine:
 - Full clock speed (150 MHz)
 - CYW43 radio: `CYW43_PERFORMANCE_PM` (no power saving)
 - Battery reporting: always 100%
-- Entry: VBUS (GPIO24) goes HIGH
-- Exit: USB removed (VBUS goes LOW)
+- Entry: `cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN)` reports USB present
+- Exit: `cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN)` reports USB removed
 
 **ACTIVE** (playing, full power)
 - Full clock speed (150 MHz)
@@ -449,7 +449,7 @@ Called from `src/gp2040.cpp::loop()` after input processing:
 
 ```cpp
 bool any_input = gamepad->hasAnyButtonPress();
-bool usb_present = gpio_get(24);
+bool usb_present = cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN);
 powerManager.update(any_input, usb_present);
 ```
 

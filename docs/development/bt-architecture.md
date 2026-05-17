@@ -13,9 +13,9 @@ graph TD
     subgraph HW["🔧 Hardware"]
         RP2350B["RP2350B\nCore 0 / Core 1"]
         CYW43["CYW43439\nBT + WiFi"]
-        GPIO29["GPIO29 / ADC3\nBattery Voltage Divider"]
+        GP43["GP43\nBattery Voltage Divider"]
         RP2350B <-->|"gSPI (GPIO 23-25,29)"| CYW43
-        RP2350B -->|"ADC read"| GPIO29
+        RP2350B -->|"ADC read"| GP43
     end
 
     subgraph SDK["📦 Pico SDK / CYW43 Driver"]
@@ -76,7 +76,7 @@ graph TD
     CYW43 -.->|"BT RF"| RF[("📡 BT RF\n(host device)")]
     HCIHandler -->|"HCI events"| HIDS
     HCIHandler -->|"SM events"| SM
-    BattSvc -.->|"ADC read\n(30s interval)"| GPIO29
+    BattSvc -.->|"ADC read\n(30s interval)"| GP43
 ```
 
 > **Note:** `async_context_threadsafe_background` fires BTstack event processing from a periodic alarm IRQ on Core 0 — the same core as the main loop. All `BLEHIDManager` state variables shared between the IRQ context and the main thread are declared `volatile` to prevent compiler register-caching.
