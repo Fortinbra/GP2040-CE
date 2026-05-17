@@ -335,76 +335,56 @@ static int report_request_cb(uint16_t hid_cid,
 
 The full HID descriptor (including the battery Feature report) is passed to both `hid_device_init()` and the `hid_sdp_record_t` struct in `hid_create_sdp_record()`, so the host discovers the battery capability via SDP.
 
-### ADC Voltage Measurement
+### BLE Battery Reporting (Current Implementation)
 
-On the Pimoroni Pico Lipo 2 XL W, battery voltage is measured via **GPIO29 (ADC3)** through a voltage divider:
+Battery percentage is currently delivered over **BLE GATT Battery Service** (UUID `0x180F`), not BT Classic HID Feature reports.
 
-```c
-constexpr float ADC_VREF        = 3.3f;           // Reference voltage
-constexpr float ADC_MAX         = 4095.0f;        // 12-bit ADC resolution
-constexpr float BATT_DIVIDER    = 3.0f;           // 200kΩ / 100kΩ divider
-constexpr float BATT_MIN_V      = 3.0f;           // 0% (discharged)
-constexpr float BATT_MAX_V      = 4.2f;           // 100% (charged)
+Current behavior in `src/BLEHIDManager.cpp`:
 
-// Read battery percentage from ADC
-uint8_t readBatteryPercent() {
-    adc_select_input(3);                          // ADC3 = GPIO29
-    uint16_t raw = adc_read();
-    float v_adc = (raw / ADC_MAX) * ADC_VREF;
-    float v_bat = v_adc * BATT_DIVIDER;
-    float pct = (v_bat - BATT_MIN_V) / (BATT_MAX_V - BATT_MIN_V) * 100.0f;
-    return (uint8_t)std::clamp(pct, 0.0f, 100.0f);
-}
-```
+- The Battery Service is initialized at BLE startup with `battery_service_server_init(_readBatteryPercent())`.
+- During runtime, battery reads are attempted only when BLE is both connected and notifying.
+- Update cadence is throttled to 30 seconds (`_lastBatteryUpdateMs`) and only pushes when value changes.
+- Pushing uses `battery_service_server_set_battery_value(level)`.
 
-The divider ratio **3.0** is standard for Pimoroni Pico LiPo boards. Verify this value from your board's schematic before implementation.
-
-**Note:** LiPo discharge is non-linear in reality. This linear approximation is acceptable for user feedback. A lookup table can be added later for greater accuracy at low battery levels.
-
-### VBUS Detection and USB Charging
-
-When USB power is connected, **GPIO24** reads HIGH (via VBUS sense). In this state, report battery level as **100%** to the host, even if the actual battery is partially discharged:
+Current conversion logic in `_readBatteryPercent()`:
 
 ```c
-bool usb_connected = gpio_get(24);    // HIGH = USB present
-
-if (usb_connected) {
-    // USB charging: always report 100%
-    gamepad->auxState.power.pluggedIn = true;
-    gamepad->auxState.power.charging = true;
-    gamepad->auxState.power.level = 100;
-} else {
-    // Battery-only: read ADC and report real percentage
-    uint8_t batt_pct = readBatteryPercent();
-    gamepad->auxState.power.pluggedIn = false;
-    gamepad->auxState.power.charging = false;
-    gamepad->auxState.power.level = batt_pct;
-}
+// Uses BATTERY_ADC_CHANNEL when BATTERY_ADC_GPIO is defined.
+adc_select_input(BATTERY_ADC_CHANNEL);
+uint16_t raw = adc_read();
+if (raw <= 1241) return 0;
+if (raw >= 1737) return 100;
+return (uint8_t)((raw - 1241) * 100 / 496);
 ```
 
-The `GamepadAuxPower` struct is already defined in `headers/gamepad/GamepadAuxState.h`. Update this struct when the host queries the Feature report, and periodically during the main loop.
+These constants correspond to a 12-bit ADC (`0..4095`), `3.3V` reference, `3:1` divider, and a `3.0V..4.2V` LiPo window.
 
-### Polling Interval
+### Board Config Requirements for Battery Sense
 
-**Battery level should be read at most every 30–60 seconds** to avoid excessive ADC sampling. The host initiates `GET_REPORT(Feature)` requests at its own cadence (typically every 30–120 seconds for a connected controller); the device responds with the current ADC reading. No notification flooding concern applies because the device does not push unsolicited battery updates.
+For board-level battery sensing to be active in BLE battery reports, board config must define at least:
 
-```c
-constexpr uint32_t BATTERY_POLL_MS = 30000;  // 30 seconds
+- `BATTERY_ADC_GPIO`
+- `BATTERY_ADC_CHANNEL`
 
-if (time_us_64() - last_battery_update > BATTERY_POLL_MS * 1000) {
-    uint8_t new_level = readBatteryPercent();
-    if (new_level != last_reported_level) {
-        // Update auxState for the next GET_REPORT callback response
-        gamepad->auxState.power.level = new_level;
-        last_reported_level = new_level;
-    }
-    last_battery_update = time_us_64();
-}
-```
+If `BATTERY_ADC_GPIO` is not defined, `_readBatteryPercent()` returns `100` unconditionally.
 
-### Future: BLE HID Battery Service
+Note: `BATTERY_VOLTAGE_DIVIDER`, `BATTERY_MIN_VOLTAGE`, and `BATTERY_MAX_VOLTAGE` are useful board documentation macros, but current BLE conversion code uses fixed raw ADC thresholds and does not consume those macros yet.
 
-If BLE HID mode is added in a future phase (in addition to or instead of BT Classic), the GATT Battery Service (UUID 0x180F) with characteristic UUID 0x2A19 and the BTStack API `battery_service_server_init()` / `battery_service_server_set_battery_value()` would then be the correct mechanism for battery reporting over BLE. This is a BLE GATT construct and has no effect over a BT Classic HID connection. The ADC reading logic and VBUS detection would remain unchanged; only the delivery mechanism (HID descriptor vs. GATT) would differ.
+### Current Limits and UI Visibility
+
+- There is currently no BLE battery field exposed in `/api/getBleHidStatus` (`src/webconfig.cpp`) or in the Web Config BLE status panel (`www/src/Pages/SettingsPage.jsx`).
+- There is currently no VBUS/charging override in the BLE battery reporting path; reported value comes from ADC conversion (or the 100% fallback when battery ADC macros are absent).
+
+### Validation Checklist (Recommended)
+
+Use this checklist when validating a board battery setup:
+
+1. Confirm board macros define the intended ADC input (`BATTERY_ADC_GPIO` and `BATTERY_ADC_CHANNEL`).
+2. Measure actual battery voltage on hardware with a meter.
+3. Read host-reported BLE battery percentage (OS battery indicator for the paired BLE controller).
+4. Verify BLE value tracks expected percentage for the measured voltage using the current linear conversion.
+5. Check edge behavior near low and high thresholds (approximately `3.0V -> 0%`, `4.2V -> 100%`).
+6. Repeat at multiple points across discharge to quantify linear-model error.
 
 ---
 

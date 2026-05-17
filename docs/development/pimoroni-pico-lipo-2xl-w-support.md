@@ -110,7 +110,28 @@ The Pimoroni Pico Lipo 2 XL W has two GPIO pins with **dual function assignments
 
 The board includes a 3:1 voltage divider on the LiPo battery connector. The divided voltage is routed to **GPIO29 / ADC3**.
 
-**ADC Reading to Actual Voltage:**
+Current GP2040-CE BLE battery reporting expects board config battery macros and uses ADC channel selection from board config.
+
+Required board config macros:
+
+```c
+#define BATTERY_ADC_GPIO         29
+#define BATTERY_ADC_CHANNEL      3
+```
+
+Current BLE conversion implementation in `src/BLEHIDManager.cpp` uses fixed raw thresholds:
+
+```c
+adc_select_input(BATTERY_ADC_CHANNEL);
+uint16_t raw = adc_read();
+if (raw <= 1241) return 0;
+if (raw >= 1737) return 100;
+return (uint8_t)((raw - 1241) * 100 / 496);
+```
+
+If `BATTERY_ADC_GPIO` is not defined for a board, BLE battery reporting falls back to `100%`.
+
+**Reference conversion model (used to derive the threshold constants):**
 
 ```c
 // Read ADC3 (connected to GPIO29 / battery divider)
@@ -152,7 +173,12 @@ The board uses **GPIO24 for VBUS detection**, but GPIO24 is also the CYW43 data 
 
 ### Battery Percentage Reporting via Bluetooth
 
-When Bluetooth HID is active, the firmware must report battery level to the connected host using the **Bluetooth HID Battery Service** (UUID `0x180F`). The host OS (Windows, macOS, Linux, iOS, Android) will display battery percentage in system notifications.
+When Bluetooth HID is active, firmware reports battery level to the connected host using the **BLE GATT Battery Service** (UUID `0x180F`).
+
+Current status caveats:
+
+- BLE status endpoints/UI currently show connectivity/bond state but do not expose battery percentage.
+- USB charging/VBUS override behavior is not currently wired into the BLE battery conversion path.
 
 ---
 
@@ -223,6 +249,18 @@ The RP2350B's 18 additional GPIO pins (30–47) are available for expansion on t
 - Other peripheral control
 
 See [RP2350 Support](./rp2350-support.md) for custom board configuration details.
+
+### GP43 Battery Sense Planning Note
+
+For custom RP2350B boards, **GP43** is a potential future battery-sense routing target.
+
+Before defining battery macros against GP43, validate hardware and SDK mapping end-to-end:
+
+1. Confirm board schematic routes battery divider output to GP43.
+2. Confirm Pico SDK ADC input index for GP43 on the selected target/SDK version.
+3. Set `BATTERY_ADC_GPIO` and `BATTERY_ADC_CHANNEL` to that verified mapping only after confirmation.
+
+Open validation item: GP43 ADC channel mapping must be verified on hardware/SDK before documenting a fixed `BATTERY_ADC_CHANNEL` value.
 
 ### Related Documentation
 
