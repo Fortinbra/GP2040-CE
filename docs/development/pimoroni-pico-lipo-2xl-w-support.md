@@ -122,14 +122,13 @@ The Pimoroni Pico Lipo 2 XL W reuses the standard CYW43 control pins from `pico2
 
 The board includes a 3:1 voltage divider on the LiPo battery connector. Pimoroni's board documentation routes that divided voltage to **GP43**.
 
-Current GP2040-CE BLE battery reporting expects board config battery macros and uses ADC channel selection from board config. The GPIO value for this board should follow the documented **GP43** routing, while the ADC input index should match the verified RP2350B mapping used by the selected SDK target.
+Current GP2040-CE BLE battery reporting expects board config battery macros and uses ADC channel selection from board config. The GPIO value should be set to **GP43** per Pimoroni documentation. The ADC input index must match the RP2350B mapping verified for the selected SDK target.
 
-Required board config macros:
+Required board config values:
 
-```c
-#define BATTERY_ADC_GPIO         43
-// BATTERY_ADC_CHANNEL must be verified against the active RP2350B SDK target for GP43.
-```
+- `BATTERY_ADC_GPIO` = `43`
+- `BATTERY_ADC_CHANNEL` = the ADC input verified for GP43 in the active RP2350B SDK target or dedicated board header
+
 
 Current BLE conversion implementation in `src/BLEHIDManager.cpp` uses fixed raw thresholds:
 
@@ -271,7 +270,7 @@ The remaining validation item is the ADC input index:
 1. Confirm the Pico SDK ADC input index for GP43 on the selected RP2350B target/SDK version.
 2. Set `BATTERY_ADC_CHANNEL` to that verified mapping only after confirmation.
 
-Until that validation is complete, documentation should name **GP43** as the battery-sense GPIO without hard-coding an ADC channel number.
+Until this repository cites a verified RP2350B ADC mapping for the Pico LiPo 2 XL W, documentation should name **GP43** as the battery-sense GPIO and avoid hard-coding an ADC channel number.
 
 ### Related Documentation
 
