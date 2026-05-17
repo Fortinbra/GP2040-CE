@@ -81,6 +81,8 @@ The repository already includes a board configuration at `configs/PimoroniPicoLi
 - ADC configuration for battery voltage measurement (GP43 / ADC 3, voltage divider 3:1)
 - VBUS detection via `cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN)` / CYW43 WL GPIO 2
 
+For planned build-time selection of Pimoroni-provided SDK board definitions (as an option alongside the current `pico2_w` path), see [Pimoroni SDK Board Definition Option for Pico LiPo 2 XL W](./pimoroni-sdk-board-definition-option.md).
+
 ---
 
 ## Architecture

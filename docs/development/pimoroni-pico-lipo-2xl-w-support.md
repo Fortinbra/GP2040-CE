@@ -51,6 +51,7 @@ cmake --build build
 - `PICO_BOARD=pico2_w` enables both RP2350B support AND CYW43 wireless driver compilation in the Pico SDK
 - The **default** `PICO_BOARD=pico` does NOT include CYW43 drivers; do not use for this board
 - This board target is named `pico2_w` in the SDK (not `pico_lipo_2xl_w`) because it follows the Raspberry Pi naming convention for RP2350 + CYW43 combinations
+- Optional use of Pimoroni-provided SDK board definitions is tracked as a separate feature proposal and is not implemented yet: see [Pimoroni SDK Board Definition Option for Pico LiPo 2 XL W](./pimoroni-sdk-board-definition-option.md)
 
 ### Pico SDK Version Requirement
 
@@ -122,9 +123,11 @@ The Pimoroni Pico Lipo 2 XL W reuses the standard CYW43 control pins from `pico2
 
 The board includes a 3:1 voltage divider on the LiPo battery connector. Pimoroni's board documentation routes that divided voltage to **GP43**.
 
-Current GP2040-CE BLE battery reporting expects board config battery macros and uses ADC channel selection from board config. For this board, set the GPIO to **GP43** and the ADC input to **ADC 3**.
+Current GP2040-CE BLE battery reporting expects board config battery macros and uses ADC channel selection from board config.
 
-Required board config values:
+Implementation note: this document describes the intended Pimoroni-docs mapping (**GP43 / ADC 3**), but the current repository board config still maps battery ADC to **GPIO29 / ADC 3**. Treat this as a required reconciliation item before implementation is considered complete.
+
+Target board config values after reconciliation:
 
 - `BATTERY_ADC_GPIO` = `43`
 - `BATTERY_ADC_CHANNEL` = `3` (GP43 maps to ADC 3)
@@ -269,6 +272,7 @@ For the Pimoroni Pico LiPo 2 XL W specifically, battery sense is **GP43**, and *
 
 - **[Bluetooth HID Support](./bluetooth-support.md)** — Feature documentation for Bluetooth HID implementation
 - **[RP2350 Support](./rp2350-support.md)** — Hardware specifications and GPIO validation for all RP2350 boards
+- **[Pimoroni SDK Board Definition Option for Pico LiPo 2 XL W](./pimoroni-sdk-board-definition-option.md)** — Implementation-gating feature document for optional Pimoroni board-definition build path
 
 ---
 

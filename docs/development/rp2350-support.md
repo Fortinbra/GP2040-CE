@@ -280,6 +280,8 @@ RP2350 runs at 150 MHz by default (vs 133 MHz for RP2040). This can affect PIO t
 
 Board configurations for both the **Raspberry Pi Pico 2 W** (SDK target: `pico2_w`) and the **Pimoroni Pico Lipo 2 XL W** (current SDK target: `pico2_w`) are included. The base firmware compiles and runs on both boards.
 
+Planned optional support for Pimoroni-provided SDK board definitions for Pico LiPo 2 XL W is documented in [Pimoroni SDK Board Definition Option for Pico LiPo 2 XL W](./pimoroni-sdk-board-definition-option.md). That proposal is implementation-gating only and does not change current build defaults.
+
 Variant/package labeling for Pimoroni Pico Lipo 2 XL W should be treated as SDK-dependent/inferred in this repo unless a dedicated SDK board target or separate hardware/package verification is cited.
 
 **Remaining gap:** Full Bluetooth HID support for CYW43439-equipped boards is not yet implemented. The CYW43 wireless driver integration (required for Bluetooth gamepad mode) is planned for a future release. USB HID works normally on both boards today.
