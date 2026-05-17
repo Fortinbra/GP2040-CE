@@ -14,6 +14,11 @@
 #include "types.h"
 #include "version.h"
 
+#ifdef ENABLE_BLUETOOTH
+#include "BLEHIDManager.h"
+#include "ble/le_device_db.h"
+#endif
+
 #include <cstring>
 #include <string>
 #include <vector>
@@ -2503,6 +2508,68 @@ std::string getMemoryReport()
     return serialize_json(doc);
 }
 
+std::string getBLEHIDStatus()
+{
+    const size_t capacity = JSON_OBJECT_SIZE(16);
+    DynamicJsonDocument doc(capacity);
+
+#ifdef ENABLE_BLUETOOTH
+    BLEHIDManager& ble = BLEHIDManager::getInstance();
+    writeDoc(doc, "supported", true);
+    writeDoc(doc, "enabled", ble.isEnabled());
+    writeDoc(doc, "connected", ble.isConnected());
+    writeDoc(doc, "notifying", ble.isNotifying());
+    writeDoc(doc, "hasBondedPeers", ble.hasBondedPeers());
+    writeDoc(doc, "bondCount", le_device_db_count());
+#else
+    writeDoc(doc, "supported", false);
+    writeDoc(doc, "enabled", false);
+    writeDoc(doc, "connected", false);
+    writeDoc(doc, "notifying", false);
+    writeDoc(doc, "hasBondedPeers", false);
+    writeDoc(doc, "bondCount", 0);
+#endif
+
+    return serialize_json(doc);
+}
+
+std::string setBLEHIDControls()
+{
+    DynamicJsonDocument doc = get_post_data();
+
+#ifdef ENABLE_BLUETOOTH
+    BLEHIDManager& ble = BLEHIDManager::getInstance();
+
+    if (doc["pairingMode"] != nullptr) {
+        bool enabled = doc["pairingMode"];
+        ble.setPairingMode(enabled);
+    }
+
+    if (doc["clearBonds"] != nullptr && (bool)doc["clearBonds"]) {
+        int maxCount = le_device_db_max_count();
+        for (int i = 0; i < maxCount; i++) {
+            le_device_db_remove(i);
+        }
+    }
+
+    writeDoc(doc, "supported", true);
+    writeDoc(doc, "enabled", ble.isEnabled());
+    writeDoc(doc, "connected", ble.isConnected());
+    writeDoc(doc, "notifying", ble.isNotifying());
+    writeDoc(doc, "hasBondedPeers", ble.hasBondedPeers());
+    writeDoc(doc, "bondCount", le_device_db_count());
+#else
+    writeDoc(doc, "supported", false);
+    writeDoc(doc, "enabled", false);
+    writeDoc(doc, "connected", false);
+    writeDoc(doc, "notifying", false);
+    writeDoc(doc, "hasBondedPeers", false);
+    writeDoc(doc, "bondCount", 0);
+#endif
+
+    return serialize_json(doc);
+}
+
 static bool _abortGetHeldPins = false;
 
 std::string getHeldPins()
@@ -2771,6 +2838,8 @@ static const std::pair<const char*, HandlerFuncPtr> handlerFuncs[] =
     { "/api/getSplashImage", getSplashImage },
     { "/api/getFirmwareVersion", getFirmwareVersion },
     { "/api/getMemoryReport", getMemoryReport },
+    { "/api/getBLEHIDStatus", getBLEHIDStatus },
+    { "/api/setBLEHIDControls", setBLEHIDControls },
     { "/api/getHeldPins", getHeldPins },
     { "/api/abortGetHeldPins", abortGetHeldPins },
     { "/api/getUsedPins", getUsedPins },
