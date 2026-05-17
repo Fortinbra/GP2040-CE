@@ -12,6 +12,9 @@
 
 #include <cstdlib>
 
+// Pico SDK
+#include "pico/stdlib.h"
+
 // Custom implementation of __gnu_cxx::__verbose_terminate_handler() to reduce binary size
 namespace __gnu_cxx {
 void __verbose_terminate_handler()
@@ -36,6 +39,9 @@ int main() {
 	// Create GP2040 Main Core (core0), Core1 is dependent on Core0
 	gp2040Core0 = new GP2040();
 	gp2040Core1 = new GP2040Aux();
+
+	// Enable UART stdio so printf() output appears on UART0 TX (GPIO0)
+	stdio_init_all();
 
 	// Create GP2040 Main Core - Setup Core0
 	gp2040Core0->setup();

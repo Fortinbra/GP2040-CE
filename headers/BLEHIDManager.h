@@ -51,6 +51,9 @@ public:
     BLEPowerState getPowerState() const { return _powerState; }
 
 private:
+    static constexpr uint8_t REPORT_SIZE_BYTES = 13;
+    static constexpr uint8_t REPORT_QUEUE_DEPTH = 4;
+
     BLEHIDManager() = default;
 
     void _doInit();
@@ -84,7 +87,6 @@ private:
     volatile bool     _hasBondedPeers       = false;
     volatile bool     _needsAdvRestart      = false;
     volatile uint16_t _conHandle            = 0xFFFF;
-    volatile uint16_t _pendingReportLen     = 0;
     volatile uint8_t  _pendingBlinkType     = 0;  // 1 = report sent, 3 = disabled, 5 = enabled
     volatile uint8_t  _lastDisconnectReason = 0;  // HCI disconnect reason code; cleared on new connection
     volatile uint32_t _lastBatteryUpdateMs  = 0;
@@ -92,8 +94,12 @@ private:
     volatile BLEPowerState _powerState      = BLEPowerState::ADVERTISING;
     volatile uint32_t _lastInputChangeMs    = 0;    // updated when report payload changes
     volatile uint32_t _lastReportMs         = 0;    // updated each time a report is queued
-    uint8_t  _pendingReport[13]    = {};
-    uint8_t  _lastSentReport[13]   = {};  // previous payload; compared in CAN_SEND_NOW to detect changes
+    volatile uint8_t  _reportQueueHead      = 0;
+    volatile uint8_t  _reportQueueTail      = 0;
+    volatile uint8_t  _reportQueueCount     = 0;
+    uint16_t _reportQueueLen[REPORT_QUEUE_DEPTH] = {};
+    uint8_t  _reportQueue[REPORT_QUEUE_DEPTH][REPORT_SIZE_BYTES] = {};
+    uint8_t  _lastSentReport[REPORT_SIZE_BYTES]   = {};  // previous payload; compared in CAN_SEND_NOW to detect changes
 };
 
 #endif // BLE_HID_MANAGER_H

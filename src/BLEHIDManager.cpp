@@ -7,6 +7,7 @@
 #include <string.h>
 
 // Pico SDK CYW43 / BTstack headers
+#include <stdio.h>
 #include "pico/stdlib.h"
 #include "pico/time.h"
 #include "pico/cyw43_arch.h"
@@ -19,21 +20,15 @@
 // Generated GATT database header (from src/ble_hid.gatt via pico_btstack_make_gatt_header)
 #include "ble_hid.h"
 
-// HID Report Descriptor: NO Report ID — 11 named buttons (2 bytes) + hat+padding (1 byte)
-//   + LT/RT triggers (2 bytes) + 4 signed 16-bit axes (8 bytes) = 13 bytes total.
+// HID Report Descriptor: Report ID 1 + 11 named buttons (2 bytes) + hat+padding (1 byte)
+//   + LT/RT triggers (2 bytes) + 4 signed 16-bit axes (8 bytes) = 13-byte report body.
 // XInput-style layout: named face/shoulder/menu buttons, hat switch, uint8 triggers, int16 sticks.
-//
-// Report ID is intentionally omitted from this descriptor. For a single-report BLE HID device,
-// the GATT Report Reference descriptor (0x2908) in ble_hid.gatt (REPORT_REFERENCE, READ, 1, 1)
-// already communicates the Report ID to the host. Including 0x85/0x01 here causes some Windows
-// BLE HID driver versions to expect the Report ID as the first byte of every ATT notification
-// payload (USB HID behaviour), which shifts all data by one byte and breaks button parsing.
-// BTstack's hids_device_send_input_report() does NOT prepend a Report ID byte regardless;
-// but removing it from the map eliminates the host-side misinterpretation.
+// Report ID byte is prepended in HIDS_SUBEVENT_CAN_SEND_NOW before sending the notification.
 static const uint8_t hid_report_descriptor[] = {
     0x05, 0x01,              // USAGE_PAGE (Generic Desktop)
     0x09, 0x05,              // USAGE (Game Pad)
     0xA1, 0x01,              // COLLECTION (Application)
+    0x85, 0x01,              // REPORT_ID (1)
 
     // ── 11 digital buttons (2 bytes total) ─────────────────────────────────
     // Buttons 1–8: A, B, X, Y, LB, RB, Back, Start
@@ -254,10 +249,40 @@ void BLEHIDManager::process() {
     if (_reportPending && _connected && _notificationsEnabled) {
         hids_device_request_can_send_now_event(_conHandle);
     }
+
+    // Periodic UART status dump (every 5 s)
+    {
+        static uint32_t lastDumpMs = 0;
+        if (now - lastDumpMs >= 5000) {
+            lastDumpMs = now;
+            printf("[BLE] status: connected=%d notif=%d power=%d bonds=%d handle=0x%04X\n",
+                   (int)_connected, (int)_notificationsEnabled,
+                   (int)_powerState, (int)_hasBondedPeers, (unsigned)_conHandle);
+        }
+    }
 }
 
 bool BLEHIDManager::sendReport(const uint8_t* report, uint16_t len) {
-    if (!_connected || !_notificationsEnabled) return false;
+    if (!_connected || !_notificationsEnabled) {
+        // Periodic "blocked" log — avoids flooding at frame rate
+        static uint32_t lastBlockLogMs = 0;
+        uint32_t now3 = to_ms_since_boot(get_absolute_time());
+        if (now3 - lastBlockLogMs >= 2000) {
+            lastBlockLogMs = now3;
+            printf("[BLE] sendReport blocked: connected=%d notif=%d\n",
+                   (int)_connected, (int)_notificationsEnabled);
+        }
+        return false;
+    }
+    // Periodic "flowing" log
+    {
+        static uint32_t lastSendMs = 0;
+        uint32_t now4 = to_ms_since_boot(get_absolute_time());
+        if (now4 - lastSendMs >= 2000) {
+            lastSendMs = now4;
+            printf("[BLE] sendReport queued len=%u\n", (unsigned)len);
+        }
+    }
 
     // In IDLE state, throttle report submission to ~50ms to reduce power consumption.
     if (_powerState == BLEPowerState::IDLE) {
@@ -265,10 +290,34 @@ bool BLEHIDManager::sendReport(const uint8_t* report, uint16_t len) {
         if ((now - _lastReportMs) < 50) return false;
     }
 
-    if (len > 13) len = 13;
-    memcpy(_pendingReport, report, len);
-    _pendingReportLen = len;
-    _reportPending    = true;
+    if (len > REPORT_SIZE_BYTES) len = REPORT_SIZE_BYTES;
+
+    const uint8_t* previousReport = _lastSentReport;
+    uint16_t previousLen = REPORT_SIZE_BYTES;
+    if (_reportQueueCount > 0) {
+        uint8_t lastIndex = (_reportQueueTail + REPORT_QUEUE_DEPTH - 1) % REPORT_QUEUE_DEPTH;
+        previousReport = _reportQueue[lastIndex];
+        previousLen = _reportQueueLen[lastIndex];
+    }
+
+    if (previousLen == len && memcmp(previousReport, report, len) == 0) {
+        return true;
+    }
+
+    uint8_t writeIndex;
+    if (_reportQueueCount < REPORT_QUEUE_DEPTH) {
+        writeIndex = _reportQueueTail;
+        _reportQueueTail = (_reportQueueTail + 1) % REPORT_QUEUE_DEPTH;
+        _reportQueueCount++;
+    } else {
+        // Preserve the oldest unsent state and collapse only the newest queued state.
+        writeIndex = (_reportQueueTail + REPORT_QUEUE_DEPTH - 1) % REPORT_QUEUE_DEPTH;
+    }
+
+    memset(_reportQueue[writeIndex], 0, REPORT_SIZE_BYTES);
+    memcpy(_reportQueue[writeIndex], report, len);
+    _reportQueueLen[writeIndex] = len;
+    _reportPending    = (_reportQueueCount > 0);
     _lastReportMs     = to_ms_since_boot(get_absolute_time());
     return true;
 }
@@ -424,8 +473,12 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
 
         case HCI_EVENT_DISCONNECTION_COMPLETE: {
             uint8_t reason = hci_event_disconnection_complete_get_reason(packet);
+            printf("[BLE] Disconnected reason=0x%02X\n", (unsigned)reason);
             mgr._lastDisconnectReason = reason;
             mgr._reportPending        = false;
+            mgr._reportQueueHead      = 0;
+            mgr._reportQueueTail      = 0;
+            mgr._reportQueueCount     = 0;
             mgr._connected            = false;
             mgr._notificationsEnabled = false;
             mgr._conHandle            = HCI_CON_HANDLE_INVALID;
@@ -444,6 +497,7 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
                 mgr._conHandle  = hci_subevent_le_connection_complete_get_connection_handle(packet);
                 mgr._connected  = true;
                 mgr._advStarted = false;
+                printf("[BLE] Connected handle=0x%04X\n", (unsigned)mgr._conHandle);
             }
             break;
 
@@ -453,6 +507,7 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
                     {
                         uint8_t enable = hids_subevent_input_report_enable_get_enable(packet);
                         mgr._notificationsEnabled = (enable != 0);
+                        printf("[BLE] INPUT_REPORT_ENABLE enable=%u\n", (unsigned)enable);
                         // Set flag to blink LED in process() — don't block IRQ handler with sleep_ms
                         mgr._pendingBlinkType = (enable != 0) ? 5 : 3;
                         if (enable != 0) {
@@ -462,15 +517,33 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
                     }
                     break;
                 case HIDS_SUBEVENT_CAN_SEND_NOW:
-                    if (mgr._reportPending) {
+                    if (mgr._reportPending && mgr._reportQueueCount > 0) {
+                        uint8_t readIndex = mgr._reportQueueHead;
+                        uint16_t reportLen = mgr._reportQueueLen[readIndex];
+
                         hids_device_send_input_report(mgr._conHandle,
-                                                      mgr._pendingReport,
-                                                      mgr._pendingReportLen);
-                        mgr._reportPending = false;
+                                                      mgr._reportQueue[readIndex],
+                                                      reportLen);
                         // Detect input change for IDLE → ACTIVE transition.
+                        // Periodic log: first send + every 2 s
+                        {
+                            static uint32_t lastSendLogMs = 0;
+                            static bool firstSend = true;
+                            uint32_t t = to_ms_since_boot(get_absolute_time());
+                            if (firstSend || t - lastSendLogMs >= 2000) {
+                                firstSend    = false;
+                                lastSendLogMs = t;
+                                printf("[BLE] CAN_SEND_NOW: sent %u bytes"
+                                       " btns=[0x%02X 0x%02X] hat=0x%02X\n",
+                                        (unsigned)reportLen,
+                                       mgr._reportQueue[readIndex][0], mgr._reportQueue[readIndex][1],
+                                       mgr._reportQueue[readIndex][2]);
+                            }
+                        }
                         // _lastSentReport is only accessed here (IRQ context) so no volatile needed.
-                        if (memcmp(mgr._lastSentReport, mgr._pendingReport, mgr._pendingReportLen) != 0) {
-                            memcpy(mgr._lastSentReport, mgr._pendingReport, mgr._pendingReportLen);
+                        if (memcmp(mgr._lastSentReport, mgr._reportQueue[readIndex], reportLen) != 0) {
+                            memset(mgr._lastSentReport, 0, BLEHIDManager::REPORT_SIZE_BYTES);
+                            memcpy(mgr._lastSentReport, mgr._reportQueue[readIndex], reportLen);
                             mgr._lastInputChangeMs = to_ms_since_boot(get_absolute_time());
                             if (mgr._powerState == BLEPowerState::IDLE) {
                                 mgr._powerState = BLEPowerState::ACTIVE;
@@ -478,6 +551,9 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
                                 // gap_request_connection_parameter_update(mgr._conHandle, 6, 6, 0, 200);
                             }
                         }
+                        mgr._reportQueueHead = (mgr._reportQueueHead + 1) % BLEHIDManager::REPORT_QUEUE_DEPTH;
+                        mgr._reportQueueCount--;
+                        mgr._reportPending = (mgr._reportQueueCount > 0);
                         // Don't blink per-report — reports fire at HID frame rate,
                         // continuously restarting the blink sequence keeps the LED solid.
                     }
