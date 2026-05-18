@@ -64,7 +64,7 @@ GP2040-CE includes configuration support for the following RP2350-based boards:
 
 All boards are CI-tested and release-ready.
 
-Both the Raspberry Pi Pico 2 W and the Pimoroni Pico Lipo 2 XL W configurations are included. Full Bluetooth HID support for CYW43439-equipped boards is planned in a future release. Pimoroni-specific behavior is centralized in [Pimoroni Pico Lipo 2 XL W Board Support](./pimoroni-pico-lipo-2xl-w-support.md).
+Both the Raspberry Pi Pico 2 W and the Pimoroni Pico Lipo 2 XL W configurations are included. Bluetooth HID support for CYW43439-equipped boards is implemented in the current firmware path, with continued refinement and host-matrix hardening tracked as ongoing work. Pimoroni-specific behavior is centralized in [Pimoroni Pico Lipo 2 XL W Board Support](./pimoroni-pico-lipo-2xl-w-support.md).
 
 ### Maintainer Variant Validation Checklist
 
@@ -286,7 +286,7 @@ Planned optional support for Pimoroni-provided SDK board definitions for Pico Li
 
 Variant/package labeling for Pimoroni Pico Lipo 2 XL W should be treated as SDK-dependent/inferred in this repo unless a dedicated SDK board target or separate hardware/package verification is cited.
 
-**Remaining gap:** Full Bluetooth HID support for CYW43439-equipped boards is not yet implemented. The CYW43 wireless driver integration (required for Bluetooth gamepad mode) is planned for a future release. USB HID works normally on both boards today.
+**Current Bluetooth status:** CYW43439-equipped boards use the implemented Bluetooth HID path in current firmware builds, while compatibility/regression coverage and UX polish remain active follow-up work. USB HID works normally on both boards today.
 
 ### RISC-V Mode
 

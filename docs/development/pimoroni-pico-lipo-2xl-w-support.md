@@ -216,13 +216,13 @@ All CYW43 pins are automatically configured by the Pico SDK when `PICO_BOARD=pic
 
 ### BTStack Integration
 
-**Confirmed:** RP2350B + CYW43439 is fully compatible with BTStack Bluetooth HID implementation. The Pimoroni Pico Lipo 2 XL W is the designated reference hardware for this integration.
+**Current status:** RP2350B + CYW43439 is compatible with the BTStack-based Bluetooth HID path used by GP2040-CE. The Pimoroni Pico Lipo 2 XL W remains the designated reference hardware for implementation validation and regression testing.
 
 **Build flags for Bluetooth:**
 ```bash
-# When Bluetooth support is added to GP2040-CE, the build command will be:
+# Current Bluetooth-capable build command:
 PICO_BOARD=pico2_w SKIP_WEBBUILD=TRUE GP2040_BOARDCONFIG=PimoroniPicoLipo2XLW cmake -G Ninja -B build -S .
-# (BTStack integration remains conditional in firmware code)
+# (Bluetooth code paths remain conditional in firmware code)
 ```
 
 ### TinyUSB ↔ BTStack Namespace Conflict
