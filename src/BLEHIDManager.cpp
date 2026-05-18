@@ -342,19 +342,24 @@ void BLEHIDManager::_ledBlink(uint32_t count, uint32_t onMs, uint32_t offMs) {
     }
 }
 
-// Read battery percentage from the onboard voltage divider on GPIO29/ADC3.
-// Divider ratio is 3:1 → Vbat = Vadc * 3. LiPo range: 3.0 V (0%) to 4.2 V (100%).
-// Raw ADC thresholds for a 3.3 V reference on a 12-bit (0–4095) converter:
-//   3.0 V → Vadc = 1.0 V → raw ≈ 1241
-//   4.2 V → Vadc = 1.4 V → raw ≈ 1737 (span = 496 counts)
+// Read battery percentage from the onboard voltage divider.
+// Thresholds are derived at compile time from board-config macros:
+//   BATTERY_VOLTAGE_DIVIDER — resistor divider ratio (e.g. 3.0)
+//   BATTERY_MIN_VOLTAGE     — cell empty voltage in V (e.g. 3.0)
+//   BATTERY_MAX_VOLTAGE     — cell full voltage in V  (e.g. 4.2)
+//   VREF = 3.3 V, ADC = 12-bit (4096 counts)
+//   raw = (V_bat / VREF) / BATTERY_VOLTAGE_DIVIDER * 4096
 // Falls back to 100 % on boards that do not define BATTERY_ADC_GPIO.
 uint8_t BLEHIDManager::_readBatteryPercent() {
 #ifdef BATTERY_ADC_GPIO
+    constexpr float BATTERY_VREF    = 3.3f;
+    constexpr int BATTERY_ADC_MIN   = (int)((BATTERY_MIN_VOLTAGE / BATTERY_VREF) / BATTERY_VOLTAGE_DIVIDER * 4096.0f);
+    constexpr int BATTERY_ADC_MAX   = (int)((BATTERY_MAX_VOLTAGE / BATTERY_VREF) / BATTERY_VOLTAGE_DIVIDER * 4096.0f);
     adc_select_input(BATTERY_ADC_CHANNEL);
     uint16_t raw = adc_read();
-    if (raw <= 1241) return 0;
-    if (raw >= 1737) return 100;
-    return (uint8_t)((raw - 1241) * 100 / 496);
+    if (raw <= BATTERY_ADC_MIN) return 0;
+    if (raw >= BATTERY_ADC_MAX) return 100;
+    return (uint8_t)((raw - BATTERY_ADC_MIN) * 100 / (BATTERY_ADC_MAX - BATTERY_ADC_MIN));
 #else
     return 100;
 #endif
