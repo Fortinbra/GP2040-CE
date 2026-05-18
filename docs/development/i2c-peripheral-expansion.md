@@ -27,7 +27,7 @@ The full output ecosystem, across current and planned features:
 |---|---|---|
 | USB HID (XInput, HID, PS4, Switch, etc.) | ✅ Shipping | — (current implementation) |
 | I2C expansion bus (this doc) | 📋 Planned | `i2c-peripheral-expansion.md` |
-| BLE HID (HOGP over GATT) | 📋 Planned | `ble-hid-support.md` |
+| BLE HID (HOGP over GATT) | 📋 Planned | `bluetooth-support.md` |
 | BT Classic HID | 🔧 In progress | `feature/bluetooth-hid` branch |
 | HID over I2C (slave mode, for SBCs) | 📋 Planned | `hid-over-i2c.md` |
 | WiFi web config (station mode) | 📋 Planned | `wifi-web-config.md` |
