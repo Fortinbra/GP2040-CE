@@ -1,8 +1,21 @@
 # Pimoroni SDK Board Definition Option for Pico LiPo 2 XL W
 
-**Status:** Recommended implementation strategy (documentation-only; no code changes in this pass)  
+**Status:** Implementation authorized — board header copied in-tree from pimoroni/pico-lipo repo  
 **Scope type:** Build/configuration capability expansion (default behavior preserved)  
 **Target board:** Pimoroni Pico LiPo 2 XL W (`GP2040_BOARDCONFIG=PimoroniPicoLipo2XLW`)
+
+---
+
+## Decision
+
+Implementation approach selected (May 2026):
+
+- **Board header source:** Copy `pimoroni_pico_lipo2xl_w.h` from the [pimoroni/pico-lipo](https://github.com/pimoroni/pico-lipo) repository directly into `configs/PimoroniPicoLipo2XLW/pimoroni_pico_lipo2xl_w.h`.
+- **No Pimoroni SDK CMake integration required.** The `GP2040_BOARD_DEFINITION_SOURCE` selector mechanism described below is not being implemented; the in-tree header copy is sufficient.
+- **`PimoroniPicoLipo2XLW.cmake`** will set `PICO_BOARD=pimoroni_pico_lipo2xl_w` and `PICO_NUM_GPIOS=48`.
+- **`BoardConfig.h`** correction: `BATTERY_ADC_GPIO=43`; `BATTERY_VBUS_GPIO=24` is removed (VBUS is read via the CYW43 GPIO path, not an RP GPIO).
+
+The proposal content below is retained for context and rationale.
 
 ---
 

@@ -54,28 +54,19 @@
 //   float v_bat = v_adc * BATTERY_VOLTAGE_DIVIDER;
 //   float pct   = (v_bat - BATTERY_MIN_VOLTAGE) / (BATTERY_MAX_VOLTAGE - BATTERY_MIN_VOLTAGE) * 100.0f;
 //
-// GPIO29 is shared with WL_CLK but ADC reads coexist safely — no GPIO conflict.
-#define BATTERY_ADC_GPIO         29
+// GP43 (ADC channel 3) is the Pimoroni battery voltage-divider output on this board.
+// WL_CLK is on GPIO29, which has no battery connection.
+#define BATTERY_ADC_GPIO         43
 #define BATTERY_ADC_CHANNEL      3
 #define BATTERY_VOLTAGE_DIVIDER  3.0f
 #define BATTERY_MIN_VOLTAGE      3.0f
 #define BATTERY_MAX_VOLTAGE      4.2f
 
-// VBUS (USB power) detection
-// GPIO24 is HIGH when a USB cable is connected, LOW when running on battery only.
-//
-// IMPORTANT: GPIO24 is also WL_DATA for the CYW43439 wireless driver. Once the
-// CYW43 driver is initialized (required for Bluetooth), it takes ownership of
-// GPIO24 and direct gpio_get() reads will conflict with wireless operation.
-// When Bluetooth support is added, VBUS detection must be replaced with a
-// software-based approach (e.g., monitoring TinyUSB enumeration state via
-// tud_connected() or tud_mounted()).
-//
-// For USB-only builds (before BT is implemented), GPIO24 can be read directly:
-//   gpio_init(BATTERY_VBUS_GPIO);
-//   gpio_set_dir(BATTERY_VBUS_GPIO, GPIO_IN);
-//   bool usb_connected = gpio_get(BATTERY_VBUS_GPIO);
-#define BATTERY_VBUS_GPIO        24
+// VBUS detection: not via an RP GPIO on this board.
+// VBUS state must be read through the CYW43 wireless chip:
+//   cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN)  (CYW43_WL_GPIO_VBUS_PIN = 2)
+// BATTERY_VBUS_GPIO is intentionally not defined here — it has no consumers in
+// src/ and GPIO24 = WL_DATA (CYW43), not VBUS.
 
 // Keyboard Mapping Configuration
 //                                            // GP2040 | Xinput | Switch  | PS3/4/5  | Dinput | Arcade |
