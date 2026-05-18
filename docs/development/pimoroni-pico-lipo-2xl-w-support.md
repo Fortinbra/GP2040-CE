@@ -4,6 +4,8 @@
 
 The **Pimoroni Pico Lipo 2 XL W** is an RP2350B microcontroller board with integrated Bluetooth wireless support and onboard LiPo battery charging. This board is the **designated reference hardware for GP2040-CE Bluetooth HID development and testing**.
 
+This document is the **canonical board-specific reference** for Pimoroni Pico Lipo 2 XL W support in GP2040-CE (`GP2040_BOARDCONFIG=PimoroniPicoLipo2XLW`). Other development docs should link here for Pimoroni-specific pin/power details instead of duplicating them.
+
 **Key features:**
 - **RP2350B** SoC with 48 GPIO pins (pins 0–29 standard, pins 30–47 are RP2350B-exclusive)
 - **CYW43439** Bluetooth + WiFi module (same chipset as Raspberry Pi Pico W / Pico 2 W)
@@ -125,13 +127,12 @@ The board includes a 3:1 voltage divider on the LiPo battery connector. Pimoroni
 
 Current GP2040-CE BLE battery reporting expects board config battery macros and uses ADC channel selection from board config.
 
-Implementation note: this document describes the intended Pimoroni-docs mapping (**GP43 / ADC 3**), but the current repository board config still maps battery ADC to **GPIO29 / ADC 3**. Treat this as a required reconciliation item before implementation is considered complete.
-
-Target board config values after reconciliation:
+Authoritative mapping for this board:
 
 - `BATTERY_ADC_GPIO` = `43`
 - `BATTERY_ADC_CHANNEL` = `3` (GP43 maps to ADC 3)
 
+If implementation or board-config values differ from this mapping, treat that as a defect against the Pimoroni board contract documented here.
 
 Current BLE conversion implementation in `src/BLEHIDManager.cpp` uses fixed raw thresholds:
 

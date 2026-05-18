@@ -60,11 +60,11 @@ GP2040-CE includes configuration support for the following RP2350-based boards:
 | **Flatbox Rev. 8** | RP2350A (via `pico2` target in overlay) | `FlatboxRev8` | 30 | USB peripheral passthrough for arcade stick arcade mode |
 | **SparkFun Pro Micro RP2350** | RP2350B (SDK board target: `sparkfun_promicro_rp2350`) | `SparkFunProMicroRP2350` | SDK-dependent (`NUM_BANK0_GPIOS` from target) | Compact form factor; RP2350B-oriented target |
 | **Raspberry Pi Pico 2 W** | RP2350A (SDK board target: `pico2_w`) | `Pico2W` | 30 | CYW43439 wireless; same pin layout as Pico W |
-| **Pimoroni Pico Lipo 2 XL W** | SDK-dependent/inferred (current overlay uses `pico2_w`) | `PimoroniPicoLipo2XLW` | Currently 30 with `pico2_w` target | CYW43439 wireless; onboard LiPo charging; battery sense on GP43 (ADC 3) per Pimoroni docs |
+| **Pimoroni Pico Lipo 2 XL W** | SDK-dependent/inferred (current overlay uses `pico2_w`) | `PimoroniPicoLipo2XLW` | Currently 30 with `pico2_w` target | CYW43439 wireless; onboard LiPo charging. See [Pimoroni Pico Lipo 2 XL W Board Support](./pimoroni-pico-lipo-2xl-w-support.md) for board-specific pin and power details. |
 
 All boards are CI-tested and release-ready.
 
-Both the Raspberry Pi Pico 2 W and the Pimoroni Pico Lipo 2 XL W configurations are included. Full Bluetooth HID support for CYW43439-equipped boards is planned in a future release.
+Both the Raspberry Pi Pico 2 W and the Pimoroni Pico Lipo 2 XL W configurations are included. Full Bluetooth HID support for CYW43439-equipped boards is planned in a future release. Pimoroni-specific behavior is centralized in [Pimoroni Pico Lipo 2 XL W Board Support](./pimoroni-pico-lipo-2xl-w-support.md).
 
 ### Maintainer Variant Validation Checklist
 
@@ -279,6 +279,8 @@ RP2350 runs at 150 MHz by default (vs 133 MHz for RP2040). This can affect PIO t
 ### Pico 2 W and Pimoroni Pico Lipo 2 XL W
 
 Board configurations for both the **Raspberry Pi Pico 2 W** (SDK target: `pico2_w`) and the **Pimoroni Pico Lipo 2 XL W** (current SDK target: `pico2_w`) are included. The base firmware compiles and runs on both boards.
+
+For Pimoroni-specific board wiring, battery sense mapping (**GP43 / ADC 3**), and VBUS handling details, use [Pimoroni Pico Lipo 2 XL W Board Support](./pimoroni-pico-lipo-2xl-w-support.md) as the canonical reference.
 
 Planned optional support for Pimoroni-provided SDK board definitions for Pico LiPo 2 XL W is documented in [Pimoroni SDK Board Definition Option for Pico LiPo 2 XL W](./pimoroni-sdk-board-definition-option.md). That proposal is implementation-gating only and does not change current build defaults.
 

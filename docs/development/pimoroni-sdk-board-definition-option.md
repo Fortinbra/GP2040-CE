@@ -62,6 +62,8 @@ This section captures implementation-relevant mismatches and current-state behav
   - VBUS via `CYW43_WL_GPIO_VBUS_PIN` through `cyw43_arch_gpio_get(...)`
 - Pimoroni external board header indicates CYW43 VBUS GPIO path (`CYW43_WL_GPIO_VBUS_PIN=2`) and CYW43 SPI pin assignments on 23/24/25/29.
 
+Authoritative documentation decision for GP2040-CE docs: Pimoroni Pico Lipo 2 XL W battery sense mapping is **GP43 / ADC3**. Treat [pimoroni-pico-lipo-2xl-w-support.md](./pimoroni-pico-lipo-2xl-w-support.md) as the canonical board-specific source.
+
 Implication: the repository needs one explicit, test-backed contract for this board before enabling external-board auto-matching as a stable feature.
 
 ---
@@ -280,8 +282,7 @@ Rollback plan:
 1. What variable name should be standardized for external board-header roots in this repository's CMake flow?
 2. Should external support be delivered via submodule, documented prerequisite path, package fetch, or a hybrid model?
 3. What exact compatibility tuple (Pico SDK 2.2.0 + Pimoroni repo commit/tag) should be considered supported for first release?
-4. Is the Pico LiPo 2 XL W battery sense canonical mapping GPIO29/ADC3, GP43/ADC3, or mode-dependent by board revision? Evidence is currently mixed and requires hardware-verified reconciliation before hard enforcement.
-5. Should CI include `PimoroniPicoLipo2XLW` in the default matrix, or only in dedicated optional jobs initially?
+4. Should CI include `PimoroniPicoLipo2XLW` in the default matrix, or only in dedicated optional jobs initially?
 
 ---
 
