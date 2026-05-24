@@ -2,7 +2,7 @@
 
 **Last updated:** 2026-05-24
 **Maintained by:** GP2040-CE core team
-**Status:** Feature spec — implementation pending sign-off
+**Status:** Feature spec — signed off, ready for implementation
 **Related:** [bluetooth-support.md](./bluetooth-support.md), [ble-hid-report-rework.md](./ble-hid-report-rework.md)
 
 ---
@@ -171,9 +171,9 @@ Regression checks:
 - **Risk — stale bonds.** Existing pairings won't see the new PnP ID until re-paired. Documented; not a code problem.
 - **Rollback.** Revert the `BLEHIDManager::init()` block and the macro defaults. No persistent storage, no schema impact.
 
-## Open Questions (require sign-off before implementation)
+## Resolved Decisions
 
-1. **Which Product ID option?** A (single fixed), B (per-board required), or C (single fixed + override). Default recommendation: **C**.
-2. **Concrete default PID value.** `0x0001` is a placeholder. If GP2040-CE has or wants a coordinated pid.codes allocation, list it here before implementation.
-3. **Per-board override mechanism.** New `BleIdentityConfig.h` per board (matching `BatteryConfig.h`) vs single `ble_identity.h` consumed by both `BoardConfig.h` and `BLEHIDManager.cpp`. Default recommendation: **per-board `BleIdentityConfig.h`**.
-4. **Serial Number.** Populate from chip unique ID (`pico_get_unique_board_id`), leave empty, or skip the characteristic entirely. Default recommendation: **populate** — it's free identity info that helps host-side bond management.
+1. **Product ID strategy:** **Option C** — single fixed firmware-wide default with optional per-board override.
+2. **Default Product ID:** `0x0001` placeholder under pid.codes VID `0x1209`. Revisit if/when a coordinated pid.codes allocation is acquired for GP2040-CE.
+3. **Per-board override mechanism:** `configs/<Board>/BleIdentityConfig.h`, mirroring the existing `BatteryConfig.h` pattern. `BoardConfig.h` includes it (for the rest of the firmware) and `src/BLEHIDManager.cpp` includes it directly via `__has_include("BleIdentityConfig.h")` to preserve the TinyUSB-conflict isolation. Defaults live in a central header (`headers/BLEHIDManager.h` or a new `headers/ble_identity.h`).
+4. **Serial Number characteristic:** populate from the RP2040/RP2350 unique chip ID via `pico_get_unique_board_id()`. Format as uppercase hex, no separators.
