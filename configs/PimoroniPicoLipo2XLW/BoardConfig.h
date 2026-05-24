@@ -40,33 +40,17 @@
 // All four pins are configured automatically by the Pico SDK when PICO_BOARD=pico2_w.
 // User code must not reconfigure them.
 
-// Battery voltage monitoring (LiPo, GPIO29 / ADC channel 3)
-// The onboard 3:1 voltage divider routes battery voltage to ADC3.
-// Actual battery voltage = ADC_voltage * BATTERY_VOLTAGE_DIVIDER
-// LiPo range: 3.0 V (0%) to 4.2 V (100%)
+// Battery voltage monitoring (LiPo, GP43 / ADC channel 3 on RP2350B).
+// Macros live in BatteryConfig.h so they can be consumed independently by
+// src/BLEHIDManager.cpp without dragging in TinyUSB/BTstack-conflicting
+// headers. See BatteryConfig.h for ratio/voltage details and usage notes.
 //
-// Usage:
-//   adc_init();
-//   adc_gpio_init(BATTERY_ADC_GPIO);
-//   adc_select_input(BATTERY_ADC_CHANNEL);
-//   uint16_t raw = adc_read();  // 12-bit, 0–4095
-//   float v_adc = (raw / 4095.0f) * 3.3f;
-//   float v_bat = v_adc * BATTERY_VOLTAGE_DIVIDER;
-//   float pct   = (v_bat - BATTERY_MIN_VOLTAGE) / (BATTERY_MAX_VOLTAGE - BATTERY_MIN_VOLTAGE) * 100.0f;
-//
-// GP43 (ADC channel 3) is the Pimoroni battery voltage-divider output on this board.
-// WL_CLK is on GPIO29, which has no battery connection.
-#define BATTERY_ADC_GPIO         43
-#define BATTERY_ADC_CHANNEL      3
-#define BATTERY_VOLTAGE_DIVIDER  3.0f
-#define BATTERY_MIN_VOLTAGE      3.0f
-#define BATTERY_MAX_VOLTAGE      4.2f
-
 // VBUS detection: not via an RP GPIO on this board.
 // VBUS state must be read through the CYW43 wireless chip:
 //   cyw43_arch_gpio_get(CYW43_WL_GPIO_VBUS_PIN)  (CYW43_WL_GPIO_VBUS_PIN = 2)
 // BATTERY_VBUS_GPIO is intentionally not defined here — it has no consumers in
 // src/ and GPIO24 = WL_DATA (CYW43), not VBUS.
+#include "BatteryConfig.h"
 
 // Keyboard Mapping Configuration
 //                                            // GP2040 | Xinput | Switch  | PS3/4/5  | Dinput | Arcade |

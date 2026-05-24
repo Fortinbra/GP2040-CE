@@ -4,6 +4,19 @@
 
 #include "BLEHIDManager.h"
 
+// Battery-sense macros (BATTERY_ADC_GPIO / BATTERY_ADC_CHANNEL /
+// BATTERY_VOLTAGE_DIVIDER / BATTERY_MIN_VOLTAGE / BATTERY_MAX_VOLTAGE) live in
+// the per-board BatteryConfig.h when the board has battery sense hardware.
+// BoardConfig.h itself cannot be included here — it pulls in TinyUSB's hid.h,
+// which conflicts with BTstack's hid_report_type_t in this translation unit.
+// Without these macros, _readBatteryPercent() silently returns the 100 %
+// fallback, so battery reporting appears stuck at full.
+#if defined(__has_include)
+#  if __has_include("BatteryConfig.h")
+#    include "BatteryConfig.h"
+#  endif
+#endif
+
 #include <string.h>
 
 // Pico SDK CYW43 / BTstack headers
