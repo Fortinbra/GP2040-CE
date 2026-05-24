@@ -17,6 +17,9 @@
 #  endif
 #endif
 
+#include "ble_identity.h"
+#include "version.h"
+
 #include <string.h>
 
 // Pico SDK CYW43 / BTstack headers
@@ -25,6 +28,7 @@
 #include "pico/time.h"
 #include "pico/cyw43_arch.h"
 #include "pico/btstack_run_loop_async_context.h"
+#include "pico/unique_id.h"
 #include "hardware/adc.h"
 
 // BTstack core
@@ -403,9 +407,31 @@ void BLEHIDManager::_doInit() {
     battery_service_server_init(_readBatteryPercent());
 
     // Device Information Service
-    device_information_service_server_set_manufacturer_name("OpenStickCommunity");
-    device_information_service_server_set_model_number("GP2040-CE");
-    device_information_service_server_set_firmware_revision("1.0");
+    device_information_service_server_set_manufacturer_name(BLE_MANUFACTURER_NAME);
+    device_information_service_server_set_model_number(BLE_MODEL_NUMBER);
+    device_information_service_server_set_hardware_revision(BLE_HARDWARE_REVISION);
+    device_information_service_server_set_firmware_revision(GP2040VERSION);
+    device_information_service_server_set_software_revision(GP2040VERSION);
+
+    // Serial Number: RP2040/RP2350 unique board ID as uppercase hex (no separators).
+    // Stored static so the const char* handed to BTstack remains valid for the
+    // lifetime of the DIS server.
+    static char ble_serial_number[2 * PICO_UNIQUE_BOARD_ID_SIZE_BYTES + 1] = {0};
+    pico_unique_board_id_t board_id;
+    pico_get_unique_board_id(&board_id);
+    for (unsigned i = 0; i < PICO_UNIQUE_BOARD_ID_SIZE_BYTES; ++i) {
+        snprintf(&ble_serial_number[i * 2], 3, "%02X", board_id.id[i]);
+    }
+    device_information_service_server_set_serial_number(ble_serial_number);
+
+    // PnP ID (0x2A50) — hosts like the Windows Gamepad Tester key the visible
+    // vendor / product name off this characteristic. Leaving it unset is the
+    // reason the controller previously showed up as
+    // "Unknown Gamepad / Vendor: 0000 / Product: 0000".
+    device_information_service_server_set_pnp_id(BLE_VENDOR_SOURCE_ID,
+                                                 BLE_VENDOR_ID,
+                                                 BLE_PRODUCT_ID,
+                                                 BLE_PRODUCT_VERSION);
 
     // Register event handlers
     hci_event_callback_registration.callback = &_hciPacketHandler;
