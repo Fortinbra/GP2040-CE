@@ -148,20 +148,19 @@ Current control surface includes:
 
 ## BLE Report Format
 
-BLE report layout uses an XInput-style shape for host friendliness while remaining standard BLE HID.
+BLE report layout is currently a digital-only generic HID gamepad. Analog stick and analog trigger reporting are intentionally absent until real analog input plumbing exists for the BLE path. See the [BLE HID Report Rework feature doc](./ble-hid-report-rework.md) for the full button-assignment table, descriptor outline, and rationale.
 
 Current intended payload profile:
 
-- 13-byte input report
-- Named primary button mapping (A/B/X/Y style mapping)
-- Hat switch for D-pad
-- Separate trigger bytes
-- Signed 16-bit stick axes
+- 3-byte input report (no Report ID byte on the wire; carried by GATT Report Reference)
+- 14 generic HID buttons covering B1–B4, L1, R1, L2, R2, S1, S2, L3, R3, A1, A2
+- Hat switch for D-pad (0..7 cardinals/diagonals, 8 = neutral)
+- No analog sticks, no analog triggers
 
 Operational notes:
 
 - Report ID remains defined by HID descriptor/Report Reference, not prepended in ATT payload.
-- Descriptor/report changes require host-side unpair/re-pair to refresh cached HID metadata.
+- Descriptor/report changes require host-side unpair/re-pair to refresh cached HID metadata. After upgrading firmware across the v1 digital-only rework, remove the existing pairing on every host before reconnecting; cached HID Report Map data from older firmware will misrepresent the new layout.
 
 ---
 

@@ -33,9 +33,9 @@
 // Generated GATT database header (from src/ble_hid.gatt via pico_btstack_make_gatt_header)
 #include "ble_hid.h"
 
-// HID Report Descriptor: Report ID 1 + 11 named buttons (2 bytes) + hat+padding (1 byte)
-//   + LT/RT triggers (2 bytes) + 4 signed 16-bit axes (8 bytes) = 13-byte report body.
-// XInput-style layout: named face/shoulder/menu buttons, hat switch, uint8 triggers, int16 sticks.
+// HID Report Descriptor: Report ID 1 + 14 generic HID buttons (2 bytes) + hat switch (1 byte)
+//   = 3-byte digital-only report body.
+// See docs/development/ble-hid-report-rework.md for the button assignment and rationale.
 // Report ID byte is prepended in HIDS_SUBEVENT_CAN_SEND_NOW before sending the notification.
 static const uint8_t hid_report_descriptor[] = {
     0x05, 0x01,              // USAGE_PAGE (Generic Desktop)
@@ -43,27 +43,21 @@ static const uint8_t hid_report_descriptor[] = {
     0xA1, 0x01,              // COLLECTION (Application)
     0x85, 0x01,              // REPORT_ID (1)
 
-    // ── 11 digital buttons (2 bytes total) ─────────────────────────────────
-    // Buttons 1–8: A, B, X, Y, LB, RB, Back, Start
+    // ── 14 digital buttons + 2 padding bits (2 bytes total) ────────────────
+    // Button 1..8 = B1, B2, B3, B4, L1, R1, L2, R2
+    // Button 9..14 = S1, S2, L3, R3, A1, A2
     0x05, 0x09,              //   USAGE_PAGE (Button)
     0x19, 0x01,              //   USAGE_MINIMUM (Button 1)
-    0x29, 0x08,              //   USAGE_MAXIMUM (Button 8)
+    0x29, 0x0E,              //   USAGE_MAXIMUM (Button 14)
     0x15, 0x00,              //   LOGICAL_MINIMUM (0)
     0x25, 0x01,              //   LOGICAL_MAXIMUM (1)
-    0x95, 0x08,              //   REPORT_COUNT (8)
     0x75, 0x01,              //   REPORT_SIZE (1)
+    0x95, 0x0E,              //   REPORT_COUNT (14)
     0x81, 0x02,              //   INPUT (Data,Var,Abs)
 
-    // Buttons 9–11: Guide, LS, RS
-    0x19, 0x09,              //   USAGE_MINIMUM (Button 9)
-    0x29, 0x0B,              //   USAGE_MAXIMUM (Button 11)
-    0x95, 0x03,              //   REPORT_COUNT (3)
+    // 2 padding bits to complete byte 1
     0x75, 0x01,              //   REPORT_SIZE (1)
-    0x81, 0x02,              //   INPUT (Data,Var,Abs)
-
-    // 5 padding bits to complete byte 1
-    0x95, 0x05,              //   REPORT_COUNT (5)
-    0x75, 0x01,              //   REPORT_SIZE (1)
+    0x95, 0x02,              //   REPORT_COUNT (2)
     0x81, 0x03,              //   INPUT (Cnst,Var,Abs)
 
     // ── D-pad as hat switch (1 byte total) ─────────────────────────────────
@@ -83,29 +77,6 @@ static const uint8_t hid_report_descriptor[] = {
     0x75, 0x04,              //   REPORT_SIZE (4)
     0x95, 0x01,              //   REPORT_COUNT (1)
     0x81, 0x03,              //   INPUT (Cnst,Var,Abs)
-
-    // ── Analog triggers: LT, RT (2 bytes total) ────────────────────────────
-    0x05, 0x02,              //   USAGE_PAGE (Simulation Controls)
-    0x09, 0xC5,              //   USAGE (Brake)       = LT
-    0x09, 0xC4,              //   USAGE (Accelerator) = RT
-    0x15, 0x00,              //   LOGICAL_MINIMUM (0)
-    0x26, 0xFF, 0x00,        //   LOGICAL_MAXIMUM (255)
-    0x75, 0x08,              //   REPORT_SIZE (8)
-    0x95, 0x02,              //   REPORT_COUNT (2)
-    0x81, 0x02,              //   INPUT (Data,Var,Abs)
-
-    // ── Analog sticks: LX, LY, RX, RY (8 bytes total) ─────────────────────
-    // Signed 16-bit, little-endian; LOGICAL_MINIMUM(-32768) = 0x16 0x00 0x80
-    0x05, 0x01,              //   USAGE_PAGE (Generic Desktop)
-    0x09, 0x30,              //   USAGE (X)  = LX
-    0x09, 0x31,              //   USAGE (Y)  = LY
-    0x09, 0x32,              //   USAGE (Z)  = RX
-    0x09, 0x35,              //   USAGE (Rz) = RY
-    0x16, 0x00, 0x80,        //   LOGICAL_MINIMUM (-32768)
-    0x26, 0xFF, 0x7F,        //   LOGICAL_MAXIMUM (32767)
-    0x75, 0x10,              //   REPORT_SIZE (16)
-    0x95, 0x04,              //   REPORT_COUNT (4)
-    0x81, 0x02,              //   INPUT (Data,Var,Abs)
 
     0xC0,                    // END_COLLECTION
 };
