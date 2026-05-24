@@ -406,6 +406,12 @@ void BLEHIDManager::_doInit() {
     // Battery service — init() registers with ATT server; must be called before hci_power_control.
     battery_service_server_init(_readBatteryPercent());
 
+    // Device Information Service — init() registers the ATT read handler.
+    // Without this call the DIS characteristics from the imported GATT template
+    // exist in the database but every read returns empty, so hosts show
+    // "Manufacturer: Unavailable / Model: Unavailable" and PnP ID stays 0.
+    device_information_service_server_init();
+
     // Device Information Service
     device_information_service_server_set_manufacturer_name(BLE_MANUFACTURER_NAME);
     device_information_service_server_set_model_number(BLE_MODEL_NUMBER);
