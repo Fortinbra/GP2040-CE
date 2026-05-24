@@ -49,6 +49,7 @@ public:
     bool isNotifying() const    { return _notificationsEnabled; }
     bool hasBondedPeers() const { return _hasBondedPeers; }
     BLEPowerState getPowerState() const { return _powerState; }
+    uint8_t getBatteryLevel() const { return _lastBatteryLevel; }
 
 private:
     static constexpr uint8_t REPORT_SIZE_BYTES = 13;

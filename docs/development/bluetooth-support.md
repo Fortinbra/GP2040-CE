@@ -197,6 +197,53 @@ Recommended validation:
 2. Verify measured voltage versus reported percent at low/mid/high points.
 3. Validate host-observed battery changes during discharge/charge states.
 
+### ADC Threshold Values
+
+The ADC raw-count thresholds used for battery percentage mapping (currently hardcoded as `1241` and `1737`) must be derived from board config macros — specifically `BATTERY_VOLTAGE_DIVIDER`, `BATTERY_MIN_VOLTAGE`, and `BATTERY_MAX_VOLTAGE` — rather than literal constants. This change is required before battery boards other than the Pimoroni reference can be declared correct.
+
+### RP2350B ADC Channel Mapping
+
+For the Pimoroni Pico Lipo 2 XL W, battery sense is documented as ADC channel 3 → GPIO 43. This mapping must be verified against the RP2350B datasheet and the Pimoroni schematic before the battery read path is considered validated on that board.
+
+---
+
+## Display Integration
+
+BLE connection state and battery level must be surfaced on the OLED status bar when BLE mode is active. All BLE display code must be wrapped in `#ifdef ENABLE_BLUETOOTH` guards.
+
+### Status Bar (OLED)
+
+Authorized change: add an `INPUT_MODE_BLE` case to `generateHeader()` in `src/display/ui/screens/ButtonLayoutScreen.cpp`.
+
+Required behavior:
+
+- BLE connected, battery hardware present: display `CHAR_BT` + `"BLE "` + battery percentage (e.g. `"BLE 87%"`) — total token must not exceed the 21-character row limit.
+- BLE connected, no battery hardware: display `CHAR_BT` + `"BLE"` only.
+- BLE advertising / not yet connected: display `CHAR_BT` + `"BLE..."` or `CHAR_BT` + `"BLE"` (advertising indicator).
+- Whether battery hardware is present is determined by the board config battery sense macros (`BATTERY_VOLTAGE_DIVIDER`, etc.). Boards lacking these macros are treated as "no battery hardware".
+- The display code reads battery level through `BLEHIDManager::getBatteryLevel()` (see below); it must not trigger an ADC read directly.
+
+### Bluetooth Glyph Character
+
+Authorized change: add a Bluetooth symbol glyph as custom character `\x94` (`CHAR_BT`) in the following font files:
+
+- `GP_Font_Standard`
+- `GP_Font_Basic`
+- `GP_Font_Big`
+
+`CHAR_BT` must be defined as `"\x94"` in `headers/display/GPGFX_core.h`. The glyph is used as a prefix in the BLE status bar token described above.
+
+### BLEHIDManager Public Getter
+
+Authorized change: expose `getBatteryLevel()` as a public method on `BLEHIDManager`, returning the cached `_lastBatteryLevel` value without triggering an ADC read.
+
+This getter is required by the display code so that `ButtonLayoutScreen` can read current battery state through the manager interface rather than accessing hardware directly.
+
+Affected files:
+
+- `headers/BLEHIDManager.h` — public method declaration
+- `src/BLEHIDManager.cpp` — implementation (return `_lastBatteryLevel`)
+
 ---
 
 ## Power Management
@@ -250,4 +297,6 @@ When validating Bluetooth functionality on a target board:
 - Expand and harden BLE UI controls in Web Config.
 - Complete host matrix regression checklists.
 - Continue tightening documentation around mode selection and troubleshooting.
+- Derive ADC battery thresholds from board config macros (`BATTERY_VOLTAGE_DIVIDER`, `BATTERY_MIN_VOLTAGE`, `BATTERY_MAX_VOLTAGE`) and remove hardcoded raw-count literals.
+- Verify RP2350B ADC channel 3 → GPIO 43 mapping against datasheet and Pimoroni schematic.
 
