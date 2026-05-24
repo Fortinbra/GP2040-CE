@@ -1,6 +1,6 @@
 # Bluetooth Support (Consolidated)
 
-**Last updated:** 2026-05-17  
+**Last updated:** 2026-05-23  
 **Maintained by:** GP2040-CE core team  
 **Status:** Active implementation + ongoing refinement  
 **SDK baseline:** 2.2.0+
@@ -233,6 +233,8 @@ Authorized change: add a Bluetooth symbol glyph as custom character `\x94` (`CHA
 
 `CHAR_BT` must be defined as `"\x94"` in `headers/display/GPGFX_core.h`. The glyph is used as a prefix in the BLE status bar token described above.
 
+Glyph form is the stylised "runic B" silhouette used by the standard Bluetooth logo (two stacked triangles sharing a vertical bar), rendered in the 5×7 cell shared by these fonts. The original placeholder "bowtie" glyph that shipped in `GP_Font_Standard` has been replaced with the runic-B form to match the other two fonts. All three fonts must remain visually consistent at the `CHAR_BT` codepoint.
+
 ### BLEHIDManager Public Getter
 
 Authorized change: expose `getBatteryLevel()` as a public method on `BLEHIDManager`, returning the cached `_lastBatteryLevel` value without triggering an ADC read.
@@ -243,6 +245,38 @@ Affected files:
 
 - `headers/BLEHIDManager.h` — public method declaration
 - `src/BLEHIDManager.cpp` — implementation (return `_lastBatteryLevel`)
+
+### DriverManager Dispatch for INPUT_MODE_BLE
+
+Authorized change: `DriverManager::setup()` must accept `INPUT_MODE_BLE` as a first-class mode.
+
+BLE HID is a wireless-only output transport; it has no TinyUSB driver instance. The previous switch in `src/drivermanager.cpp` fell through to the `default:` arm for `INPUT_MODE_BLE` and returned without recording the active mode, so `DriverManager::getInputMode()` continued to report whatever USB mode was previously selected. Consumers that branch on `getInputMode()` — most notably the OLED status bar in `ButtonLayoutScreen::generateHeader()` — therefore never saw `INPUT_MODE_BLE` and could not render the BLE token.
+
+Required behavior in `DriverManager::setup()` when `mode == INPUT_MODE_BLE` (guarded by `#ifdef ENABLE_BLUETOOTH`):
+
+- Record the mode (`inputMode = mode`) so that subsequent `getInputMode()` calls report BLE.
+- Do **not** instantiate any TinyUSB driver.
+- Return without touching `driver`.
+
+This is the minimal, surgical change required to let display and other consumers detect BLE mode. Wider driver-manager refactoring is out of scope here.
+
+Affected files:
+
+- `src/drivermanager.cpp` — add `INPUT_MODE_BLE` case to the mode switch.
+
+---
+
+## Battery Reporting — Translation-Unit Macro Visibility
+
+`src/BLEHIDManager.cpp` deliberately does **not** include `BoardConfig.h`. The per-board `BoardConfig.h` transitively includes TinyUSB's `class/hid/hid.h`, which declares `hid_report_type_t` — a name that also exists in BTstack and is required by this translation unit. Including both causes a hard compile error in `BLEHIDManager.cpp`.
+
+Consequence (historical bug): without `BoardConfig.h`, the battery-sense macros (`BATTERY_ADC_GPIO`, `BATTERY_ADC_CHANNEL`, `BATTERY_VOLTAGE_DIVIDER`, `BATTERY_MIN_VOLTAGE`, `BATTERY_MAX_VOLTAGE`) were undefined inside `BLEHIDManager.cpp`, and `_readBatteryPercent()` silently fell through to the `#else` branch which returns `100`. The OLED and BLE host both reported a stuck 100 % indefinitely.
+
+Authorized fix: per-board battery-sense macros live in a minimal, dependency-free header `configs/<Board>/BatteryConfig.h` co-located with `BoardConfig.h`. The board's `BoardConfig.h` includes `BatteryConfig.h` (so the full firmware build still sees the macros), and `src/BLEHIDManager.cpp` pulls the same file in through `__has_include("BatteryConfig.h")`. The header must include nothing else — in particular it must not include `class/hid/hid.h`, `enums.pb.h`, or any other header that introduces TinyUSB/BTstack-conflicting typedefs.
+
+Boards without battery sense hardware simply omit `BatteryConfig.h`; `_readBatteryPercent()` then keeps its existing `100 %` fallback.
+
+Reference implementation: `configs/PimoroniPicoLipo2XLW/BatteryConfig.h`.
 
 ---
 
