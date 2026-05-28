@@ -284,6 +284,8 @@ For Pimoroni-specific board wiring, battery sense mapping (**GP43 / ADC 3**), an
 
 Planned optional support for Pimoroni-provided SDK board definitions for Pico LiPo 2 XL W is documented in [Pimoroni SDK Board Definition Option for Pico LiPo 2 XL W](./pimoroni-sdk-board-definition-option.md). That proposal is implementation-gating only and does not change current build defaults.
 
+For an in-depth assessment of external PSRAM adoption (use cases, integration requirements, and risks) on Pimoroni-class RP2350 boards, see [PSRAM Support Evaluation](./psram-support-evaluation.md).
+
 Variant/package labeling for Pimoroni Pico Lipo 2 XL W should be treated as SDK-dependent/inferred in this repo unless a dedicated SDK board target or separate hardware/package verification is cited.
 
 **Current Bluetooth status:** CYW43439-equipped boards use the implemented Bluetooth HID path in current firmware builds, while compatibility/regression coverage and UX polish remain active follow-up work. USB HID works normally on both boards today.
