@@ -12,7 +12,7 @@ External PSRAM on RP2350-class boards is promising for **capacity-oriented, non-
 
 For GP2040-CE specifically, the biggest blocker is not API surface area; it is **platform integration risk**:
 
-1. Current Pimoroni board support in-tree intentionally uses `PICO_BOARD=pico2_w` with a 4 MB declared flash profile due a validated persistence regression when 16 MB flash is declared (config save lost across reboot).  
+1. Current Pimoroni board support in-tree intentionally uses `PICO_BOARD=pico2_w` with a 4 MB declared flash profile due to a validated persistence regression when 16 MB flash is declared (config save lost across reboot).  
 2. PSRAM enablement on RP2350 is tied to QMI/CS1 setup and board-level definitions; this must be introduced without reintroducing the flash persistence regression.
 
 **Recommendation:** proceed with a **phased opt-in PSRAM path** for carefully selected buffers only, behind compile-time + runtime guards, after first establishing a stable board configuration that preserves current FlashPROM behavior.
