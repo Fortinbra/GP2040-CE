@@ -71,7 +71,7 @@ Pico SDK spin lock runtime notes that global exclusive monitor handling on RP235
 
 ## 4) Where PSRAM Is Likely Valuable for GP2040-CE
 
-## 4.1 High-value candidates (recommended)
+### 4.1 High-value candidates (recommended)
 
 1. **Web-config transient working memory**
    - JSON parse/serialize scratch and larger import/export payload handling.
@@ -104,26 +104,26 @@ These should remain in on-chip SRAM.
 
 ## 5) What It Will Take to Use PSRAM Safely
 
-## 5.1 Board/SDK integration work
+### 5.1 Board/SDK integration work
 
 1. Introduce a PSRAM-capable RP2350 board path for Pimoroni-class targets while preserving current persistence behavior.
 2. Avoid coupling PSRAM rollout to the unresolved 16 MB flash declaration issue.  
 3. Ensure CS1/device info handling is explicit and validated during boot for the selected board target.
 
-## 5.2 Firmware architecture work
+### 5.2 Firmware architecture work
 
 1. Add a small **PSRAM memory service layer** (allocator wrappers + availability checks).
 2. Keep all PSRAM usage **opt-in** by feature/module, not global heap redirection at first.
 3. Require **fallback allocation path** to internal SRAM for non-PSRAM boards.
 4. Add guardrails so critical modules cannot silently migrate hot-path memory to PSRAM.
 
-## 5.3 Persistence and flash-operation safety
+### 5.3 Persistence and flash-operation safety
 
 1. Audit all flash write/erase paths for cache-coherency ordering requirements.
 2. Validate config save/load behavior under repeated writes + reboot on PSRAM-enabled builds.
 3. Treat flash/PSRAM interaction as release-gating for affected boards.
 
-## 5.4 Validation and release criteria
+### 5.4 Validation and release criteria
 
 1. Add CI build target(s) for PSRAM-enabled board config.
 2. Execute hardware regression suite:
