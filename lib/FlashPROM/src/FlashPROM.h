@@ -13,8 +13,18 @@
 #include <hardware/flash.h>
 #include <hardware/timer.h>
 
+// Default EEPROM region. Boards may override these via a compile definition
+// (typically `add_compile_definitions(EEPROM_ADDRESS_START=0x...U)` in the
+// board's <Board>.cmake) to relocate the EEPROM — required for boards
+// declaring > 4 MB of flash on RP2350, where the legacy 0x101F8000 page is
+// erased by the boot/partition path on reboot.
+// See docs/development/flashprom-large-flash-support.md.
+#ifndef EEPROM_SIZE_BYTES
 #define EEPROM_SIZE_BYTES    0x8000           // Reserve 32k of flash memory (ensure this value is divisible by 256)
+#endif
+#ifndef EEPROM_ADDRESS_START
 #define EEPROM_ADDRESS_START _u(0x101F8000) // The arduino-pico EEPROM lib starts here, so we'll do the same
+#endif
 
 // Warning: If the write wait is too long it can stall other processes
 #define EEPROM_WRITE_WAIT    50             // Amount of time in ms to wait before blocking core1 and committing to flash

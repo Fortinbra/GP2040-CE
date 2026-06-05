@@ -145,7 +145,7 @@ set(PICO_BOARD_HEADER_DIRS ${CMAKE_SOURCE_DIR}/configs/${GP2040_BOARDCONFIG})
 include(FetchContent)
 FetchContent_Declare(ArduinoJson
     GIT_REPOSITORY https://github.com/bblanchon/ArduinoJson.git
-    GIT_TAG        v6.21.2
+    GIT_TAG        v6.21.5
 )
 FetchContent_MakeAvailable(ArduinoJson)
 
@@ -308,6 +308,9 @@ ${PROTO_OUTPUT_DIR}/enums.pb.c
 ${PROTO_OUTPUT_DIR}/config.pb.c
 )
 
+pico_enable_stdio_uart(${PROJECT_NAME} 1)
+pico_enable_stdio_usb(${PROJECT_NAME} 0)
+
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME ${PROJECT_NAME}_${CMAKE_PROJECT_VERSION}_${GP2040_BOARDCONFIG})
 
 pico_set_program_name(GP2040-CE "GP2040-CE")
@@ -374,6 +377,43 @@ target_include_directories(${PROJECT_NAME}  PRIVATE
   )
 
 pico_add_extra_outputs(${PROJECT_NAME})
+
+# ─── BLE HID support (CYW43-equipped boards only) ───────────────────────────
+if(PICO_CYW43_SUPPORTED)
+    message(STATUS "CYW43 supported — enabling BLE HID")
+
+    target_sources(${PROJECT_NAME} PRIVATE
+        src/BLEHIDManager.cpp
+        src/OutputManager.cpp
+        src/le_device_db_proto.cpp
+    )
+
+    # Exclude BTstack's TLV-backed le_device_db — our protobuf implementation
+    # provides all the same symbols.  le_device_db_memory.c is already disabled
+    # by NVM_NUM_DEVICE_DB_ENTRIES being defined; only tlv needs explicit exclusion.
+    set_source_files_properties(
+        "${PICO_SDK_PATH}/lib/btstack/src/ble/le_device_db_tlv.c"
+        PROPERTIES HEADER_FILE_ONLY TRUE
+    )
+
+    target_link_libraries(${PROJECT_NAME}
+        pico_cyw43_arch_none
+        pico_btstack_ble
+        pico_btstack_cyw43
+    )
+
+    target_compile_definitions(${PROJECT_NAME} PUBLIC
+        ENABLE_BLUETOOTH=1
+    )
+
+    pico_btstack_make_gatt_header(${PROJECT_NAME} PRIVATE
+        "${CMAKE_CURRENT_LIST_DIR}/src/ble_hid.gatt")
+else()
+    target_sources(${PROJECT_NAME} PRIVATE
+        src/OutputManager.cpp
+    )
+endif()
+# ────────────────────────────────────────────────────────────────────────────
 
 install(FILES
     ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}_${CMAKE_PROJECT_VERSION}_${GP2040_BOARDCONFIG}.uf2
