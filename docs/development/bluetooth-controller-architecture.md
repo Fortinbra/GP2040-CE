@@ -10,6 +10,8 @@
 
 Define a safe architecture for supporting multiple Bluetooth controller types (starting with BLE), adding keyboard/mouse modes, and introducing Classic-vs-LE switching, while preserving all existing GP2040-CE behavior.
 
+It also expands the architecture to treat modern controllers as bidirectional devices: input plus outbound channels (rumble/force-feedback, audio, and similar host-to-device data paths), with staged rollout that starts from observability before hardware actuation.
+
 This document is based on current repository implementation and is intended to guide future incremental work.
 
 ---
@@ -58,6 +60,7 @@ Current BLE implementation is monolithic and gamepad-specific. We need a structu
 2. Adds keyboard and mouse Bluetooth modes safely.
 3. Allows LE vs Classic selection without breaking existing LE gamepad behavior.
 4. Preserves current config, web controls, pairing persistence, and non-Bluetooth builds.
+5. Cleanly accepts controller output data (rumble/audio/other output reports) without blocking current input-only BLE behavior.
 
 ---
 
@@ -104,6 +107,22 @@ To avoid regression risk:
 - Keep current `BLEHIDManager` public API stable for current web/UI call sites.
 - Internally delegate report descriptor + report packing + service registration to active profile module.
 - Stage 1 should keep default profile = current gamepad LE report exactly.
+
+## D) Add explicit output-channel handling in profile contracts
+
+Modern controllers are not input-only; they receive output reports and streams. The profile contract should reserve explicit output hooks, e.g.:
+
+- `onOutputReport(reportId, payload)` for HID output/feature traffic (rumble LEDs, etc.)
+- `onAudioControl/control metadata` for audio-capability signaling where applicable
+- `getOutputCapabilities()` for per-profile capability declaration
+
+Immediate behavior (required now):
+
+- If UART logging is enabled, parse and log received output-channel data for diagnostics.
+- If UART logging is not enabled, safely no-op (discard after validation).
+- Never block or degrade input report timing because of output-channel handling.
+
+This preserves current functionality while ensuring profile modules are structurally ready for later actuation hardware.
 
 ---
 
@@ -207,6 +226,7 @@ Classic HID and LE HOGP differ heavily in discovery, security, descriptor handli
 
 - Add LE keyboard profile.
 - Add LE mouse profile.
+- Add profile-level output-report parsing hooks and UART diagnostic logging path (no hardware actuation yet).
 - Add profile-specific validation matrix for pairing, reconnect, and report correctness.
 
 ## Phase 2: Mode policy and persistence
@@ -225,6 +245,13 @@ Classic HID and LE HOGP differ heavily in discovery, security, descriptor handli
 
 - Optional auto-selection policy, only after deterministic host interoperability evidence.
 - Add migration and troubleshooting docs for host cache clearing and re-pair requirements.
+
+## Phase 5: Output actuation integration (future)
+
+- Integrate a motor-driver backend for rumble/force-feedback actuation.
+- Integrate an I2S amplifier/audio backend for controller audio output paths.
+- Map profile output capabilities to concrete board hardware routing with feature guards.
+- Preserve UART diagnostics as a fallback observability path when actuation hardware is absent.
 
 ---
 
@@ -271,4 +298,3 @@ Classic HID and LE HOGP differ heavily in discovery, security, descriptor handli
 3. Refactor current LE gamepad path into `BleGamepadProfile` with byte-for-byte behavioral parity.
 4. Add design docs for LE keyboard and LE mouse report maps and mapping policy.
 5. Decide Classic enablement strategy (LE default vs dual-mode opt-in) before CMake/link changes.
-
