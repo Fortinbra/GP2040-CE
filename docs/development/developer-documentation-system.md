@@ -23,7 +23,7 @@ This feature introduces a repository-native developer documentation system that:
 1. Establish a clear, maintained developer documentation source of truth.
 2. Include developer docs in CI build outputs.
 3. Automatically detect and apply release-time documentation updates.
-4. Open an automated PR back to `main` when release-driven doc changes are generated.
+4. Open an automated PR back to `develop` when release-driven doc changes are generated.
 5. Keep workflow reviewable and auditable through normal PR process.
 
 ## Non-Goals
@@ -126,13 +126,75 @@ On release/tag events:
 1. Checkout release commit.
 2. Run doc generation/sync tasks.
 3. If changes are produced, commit on an automation branch.
-4. Open or update a PR targeting `main`.
+4. Open or update a PR targeting `develop`.
 5. Include release tag and changed-doc summary in PR body.
 
 ## 4) Drift prevention
 
 - Add a CI validation step that fails if generated docs are stale.
 - Require docs impact acknowledgment in PR review flow for feature-level changes.
+
+---
+
+## Implementation Plan (Detailed)
+
+## Branch strategy
+
+- This feature is implemented and maintained on `develop`.
+- Automation-generated documentation PRs from release events also target `develop`.
+- Promotion from `develop` to `main` stays in the existing repository release flow.
+
+## Planned workflow files
+
+1. Extend `/tmp/workspace/Fortinbra/GP2040-CE/.github/workflows/node.js.yml`
+   - Add a docs packaging step after existing web build.
+   - Upload a developer-doc artifact for PR/push visibility.
+2. Add `/tmp/workspace/Fortinbra/GP2040-CE/.github/workflows/docs-release-sync.yml`
+   - Trigger on release/tag events.
+   - Run doc sync/generation tasks.
+   - Create/update a PR to `develop` when docs changes exist.
+3. Add `/tmp/workspace/Fortinbra/GP2040-CE/.github/workflows/docs-drift-check.yml`
+   - Trigger on pull requests.
+   - Fail if generated docs are out of date relative to source inputs.
+
+## Documentation artifacts and sources
+
+- Authoritative source docs remain in `docs/development/`.
+- Generated outputs should be deterministic and limited to maintainable targets, for example:
+  - auto-generated index/navigation summaries,
+  - release-linked documentation metadata,
+  - generated reference tables sourced from code/config where applicable.
+- Generated files should live in clearly marked paths so review scope is obvious.
+
+## Automation behavior requirements
+
+1. **No-op safety:** if release sync produces no file changes, workflow exits successfully without PR creation.
+2. **Single PR policy:** one open docs-sync PR per release line/branch to avoid PR spam.
+3. **Traceability:** PR body includes release tag, generator task summary, and changed file list.
+4. **Review safety:** automation never bypasses branch protections or auto-merges by default.
+5. **Repeatability:** rerunning the workflow on same inputs should produce identical output.
+
+## Validation and rollout checklist
+
+### Phase 1 validation (artifact path)
+- Confirm docs artifact appears for PR and push runs.
+- Confirm artifact content maps to expected `docs/development/` sources.
+
+### Phase 2 validation (release sync path)
+- Test with a dry-run tag/release event in a safe branch context.
+- Confirm PR creation targets `develop`.
+- Confirm PR updates (rather than duplicates) on rerun.
+
+### Phase 3 validation (drift enforcement)
+- Confirm drift check fails when generated docs are intentionally stale.
+- Confirm drift check passes after regeneration.
+- Confirm contributor guidance is clear in failure output.
+
+## Operational ownership
+
+- **Primary owners:** core maintainers responsible for release automation and docs governance.
+- **Review expectations:** docs-sync PRs require maintainer review before merge.
+- **Fallback procedure:** if automation fails, maintainers run doc sync locally and open a manual PR to `develop`.
 
 ---
 
@@ -177,7 +239,7 @@ On release/tag events:
 
 1. Developer docs have a canonical source path and index.
 2. CI publishes developer docs artifacts on PRs/pushes.
-3. Release event can generate docs updates and open/update a PR to `main`.
+3. Release event can generate docs updates and open/update a PR to `develop`.
 4. Generated-doc drift is detectable in CI.
 5. Process is documented for maintainers, including fallback manual steps.
 
