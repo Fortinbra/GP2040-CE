@@ -1,6 +1,6 @@
 # Bluetooth Controller Architecture: BLE Controller Types, Keyboard/Mouse Modes, and Classic/LE Switching
 
-**Last updated:** 2026-06-04  
+**Last updated:** 2026-06-05  
 **Maintained by:** GP2040-CE contributors  
 **Status:** Research + feature design (implementation-ready roadmap)
 
@@ -113,7 +113,7 @@ To avoid regression risk:
 Modern controllers are not input-only; they receive output reports and streams. The profile contract should reserve explicit output hooks, e.g.:
 
 - `onOutputReport(reportId, payload)` for HID output/feature traffic (rumble LEDs, etc.)
-- `onAudioControl/control metadata` for audio-capability signaling where applicable
+- `onAudioControl(controlMetadata)` for audio-capability signaling where applicable
 - `getOutputCapabilities()` for per-profile capability declaration
 
 Immediate behavior (required now):
