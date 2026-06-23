@@ -85,6 +85,11 @@ void DriverManager::setup(InputMode mode) {
             inputMode = mode;
             return;
 #endif
+    case INPUT_MODE_HID_I2C:
+        // HID over I2C is a transport-only mode with no TinyUSB driver.
+        // Keep mode bookkeeping consistent with BLE and return.
+        inputMode = mode;
+        return;
         default:
             return;
     }

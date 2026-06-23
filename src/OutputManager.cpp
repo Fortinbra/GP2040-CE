@@ -4,15 +4,15 @@
 #include "storagemanager.h"
 #include "gamepad.h"
 #include "drivers/hid/HIDDescriptors.h"
+#include "HoI2CManager.h"
 
 #ifdef ENABLE_BLUETOOTH
 #include "BLEHIDManager.h"
 #endif
 
 void OutputManager::dispatch(Gamepad* gamepad) {
-#ifdef ENABLE_BLUETOOTH
     const GamepadOptions& opts = Storage::getInstance().getGamepadOptions();
-    if (opts.inputMode != INPUT_MODE_BLE) return;
+    if (opts.inputMode != INPUT_MODE_BLE && opts.inputMode != INPUT_MODE_HID_I2C) return;
 
     // Map GamepadState to the 3-byte digital-only BLE HID report body (no Report ID byte —
     // that is carried by the GATT Report Reference descriptor). See
@@ -58,8 +58,14 @@ void OutputManager::dispatch(Gamepad* gamepad) {
     }
     report[2] = hat & 0x0F;
 
-    BLEHIDManager::getInstance().sendReport(report, sizeof(report));
-#else
-    (void)gamepad;
+#ifdef ENABLE_BLUETOOTH
+    if (opts.inputMode == INPUT_MODE_BLE) {
+        BLEHIDManager::getInstance().sendReport(report, sizeof(report));
+        return;
+    }
 #endif
+
+    if (opts.inputMode == INPUT_MODE_HID_I2C) {
+        HoI2CManager::getInstance().sendReport(report, sizeof(report));
+    }
 }

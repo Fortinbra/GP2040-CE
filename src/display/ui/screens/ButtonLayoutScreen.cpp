@@ -214,6 +214,7 @@ void ButtonLayoutScreen::generateHeader() {
                 else
                     statusBar += "INPUT";
                 break;
+            case INPUT_MODE_HID_I2C: statusBar += "HIDI2C"; break;
             case INPUT_MODE_KEYBOARD: statusBar += "HID-KB"; break;
             case INPUT_MODE_CONFIG: statusBar += "CONFIG"; break;
 #ifdef ENABLE_BLUETOOTH

@@ -49,6 +49,7 @@
 
 // Wireless output
 #include "OutputManager.h"
+#include "HoI2CManager.h"
 
 #ifdef ENABLE_BLUETOOTH
 #include "BLEHIDManager.h"
@@ -245,30 +246,37 @@ void GP2040::run() {
 	Gamepad * processedGamepad = Storage::getInstance().GetProcessedGamepad();
 	GamepadState prevState;
 
-	// Determine if this is a wireless-only mode (no TinyUSB).
+	// Determine if this is a transport-only mode (no TinyUSB).
 	// Never skip USB when configMode is active — S2 web config override must always work.
-	bool wirelessOnly = false;
+	bool transportOnly = false;
 #ifdef ENABLE_BLUETOOTH
 	if (!configMode && Storage::getInstance().getGamepadOptions().inputMode == INPUT_MODE_BLE) {
-		wirelessOnly = true;
+		transportOnly = true;
 	}
 #endif
+	if (!configMode && Storage::getInstance().getGamepadOptions().inputMode == INPUT_MODE_HID_I2C) {
+		transportOnly = true;
+	}
 
-	// Start the TinyUSB Device functionality (skipped in wireless-only mode)
-	if (!wirelessOnly) {
+	// Start the TinyUSB Device functionality (skipped in transport-only mode)
+	if (!transportOnly) {
 		tud_init(TUD_OPT_RHPORT);
 	}
 
 	// Initialize our USB manager
 	USBHostManager::getInstance().start();
 
-	// RNDIS web-config interface (skipped in wireless-only mode)
-	if (!wirelessOnly && configMode == true) {
+	// RNDIS web-config interface (skipped in transport-only mode)
+	if (!transportOnly && configMode == true) {
 		rndis_init(WEB_CONFIG_HOSTNAME);
 	}
 
+	if (!configMode && Storage::getInstance().getGamepadOptions().inputMode == INPUT_MODE_HID_I2C) {
+		HoI2CManager::getInstance().init();
+	}
+
 #ifdef ENABLE_BLUETOOTH
-	if (wirelessOnly) {
+	if (!configMode && Storage::getInstance().getGamepadOptions().inputMode == INPUT_MODE_BLE) {
 		BLEHIDManager::getInstance().init();
 	}
 #endif
@@ -288,9 +296,13 @@ void GP2040::run() {
 		// Process USB Host on Core0
 		USBHostManager::getInstance().process();
 
+		if (!configMode && Storage::getInstance().getGamepadOptions().inputMode == INPUT_MODE_HID_I2C) {
+			HoI2CManager::getInstance().process();
+		}
+
 #ifdef ENABLE_BLUETOOTH
-		// Drive BTstack run loop in wireless-only mode
-		if (wirelessOnly) {
+		// Drive BTstack run loop in transport-only BLE mode
+		if (!configMode && Storage::getInstance().getGamepadOptions().inputMode == INPUT_MODE_BLE) {
 			BLEHIDManager::getInstance().process();
 		}
 #endif
@@ -330,8 +342,8 @@ void GP2040::run() {
 		// Dispatch wireless output (BLE HID)
 		OutputManager::dispatch(gamepad);
 
-		// TinyUSB Task update (skipped in wireless-only mode)
-		if (!wirelessOnly) {
+		// TinyUSB Task update (skipped in transport-only mode)
+		if (!transportOnly) {
 			tud_task();
 		}
 
