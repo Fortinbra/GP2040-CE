@@ -109,6 +109,24 @@ static const uint8_t scan_resp_data[] = {
 static btstack_packet_callback_registration_t hci_event_callback_registration;
 static btstack_packet_callback_registration_t sm_event_callback_registration;
 
+// BLE timing constants
+static constexpr uint32_t INIT_RETRY_DELAY_MS = 5000;
+static constexpr uint32_t BATTERY_UPDATE_INTERVAL_MS = 30000;
+static constexpr uint32_t IDLE_TIMEOUT_MS = 30000;
+static constexpr uint32_t REPORT_IDLE_THROTTLE_MS = 50;
+static constexpr uint32_t STATUS_DUMP_INTERVAL_MS = 5000;
+static constexpr uint32_t SEND_LOG_INTERVAL_MS = 2000;
+
+// LED blink type codes for diagnostic and status signaling
+static constexpr uint8_t PENDING_BLINK_REPORT_SENT = 1;
+static constexpr uint8_t PENDING_BLINK_NOTIFICATIONS_DISABLED = 3;
+static constexpr uint8_t PENDING_BLINK_NOTIFICATIONS_ENABLED = 5;
+
+// Disconnect reason diagnostic blink parameters
+static constexpr uint8_t DISCONNECT_REASON_BLINK_CAP = 15;
+static constexpr uint32_t DISCONNECT_REASON_INITIAL_PAUSE_MS = 1000;
+static constexpr uint32_t DISCONNECT_REASON_BLINK_MS = 300;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API
 // ─────────────────────────────────────────────────────────────────────────────
@@ -126,7 +144,7 @@ void BLEHIDManager::process() {
 
         // Retry-delay after a failed cyw43_arch_init
         if (_initFailed) {
-            if ((now - _retryTimeMs) < 5000) return;
+            if ((now - _retryTimeMs) < INIT_RETRY_DELAY_MS) return;
             _initFailed = false;
         }
 
@@ -145,7 +163,7 @@ void BLEHIDManager::process() {
     {
         uint32_t now = to_ms_since_boot(get_absolute_time());
         if (_connected && _notificationsEnabled &&
-                (now - _lastBatteryUpdateMs >= 30000 || _lastBatteryLevel == 255)) {
+                (now - _lastBatteryUpdateMs >= BATTERY_UPDATE_INTERVAL_MS || _lastBatteryLevel == 255)) {
             uint8_t level = _readBatteryPercent();
             if (level != _lastBatteryLevel) {
                 battery_service_server_set_battery_value(level);
@@ -157,7 +175,7 @@ void BLEHIDManager::process() {
 
     // Power state management — transition ACTIVE → IDLE after 30s of no input change.
     if (_powerState == BLEPowerState::ACTIVE) {
-        if ((now - _lastInputChangeMs) >= 30000) {
+        if ((now - _lastInputChangeMs) >= IDLE_TIMEOUT_MS) {
             _powerState = BLEPowerState::IDLE;
             // Optional connection parameter request for longer interval in idle:
             // gap_request_connection_parameter_update(_conHandle, 80, 80, 0, 200);
@@ -183,11 +201,11 @@ void BLEHIDManager::process() {
         if (_pendingBlinkType != 0) {
             uint8_t blinkType = _pendingBlinkType;
             _pendingBlinkType = 0;
-            if (blinkType == 5) {
+            if (blinkType == PENDING_BLINK_NOTIFICATIONS_ENABLED) {
                 blinkOnMs = 200; blinkOffMs = 200; blinkRemaining = 10;
-            } else if (blinkType == 3) {
+            } else if (blinkType == PENDING_BLINK_NOTIFICATIONS_DISABLED) {
                 blinkOnMs = 300; blinkOffMs = 300; blinkRemaining = 6;
-            } else if (blinkType == 1) {
+            } else if (blinkType == PENDING_BLINK_REPORT_SENT) {
                 blinkOnMs = 50;  blinkOffMs = 50;  blinkRemaining = 2;
             }
             blinkLedOn = true;
@@ -217,15 +235,16 @@ void BLEHIDManager::process() {
         static absolute_time_t diagBlinkNext = {0};
         static bool diagBlinkInit = false;
         if (!diagBlinkInit) {
-            diagBlinkCount = (_lastDisconnectReason > 15) ? 15 : _lastDisconnectReason;
-            diagBlinkNext = make_timeout_time_ms(1000); // 1s initial pause
+            diagBlinkCount = (_lastDisconnectReason > DISCONNECT_REASON_BLINK_CAP) ?
+                    DISCONNECT_REASON_BLINK_CAP : _lastDisconnectReason;
+            diagBlinkNext = make_timeout_time_ms(DISCONNECT_REASON_INITIAL_PAUSE_MS);
             diagBlinkInit = true;
         }
         if (diagBlinkCount > 0 && absolute_time_diff_us(diagBlinkNext, get_absolute_time()) >= 0) {
             static bool diagLedOn = false;
             diagLedOn = !diagLedOn;
             cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, diagLedOn ? 1 : 0);
-            diagBlinkNext = make_timeout_time_ms(diagLedOn ? 300 : 300);
+            diagBlinkNext = make_timeout_time_ms(DISCONNECT_REASON_BLINK_MS);
             if (!diagLedOn) diagBlinkCount--;
             if (diagBlinkCount == 0) {
                 _lastDisconnectReason = 0;
@@ -241,7 +260,7 @@ void BLEHIDManager::process() {
     // Periodic UART status dump (every 5 s)
     {
         static uint32_t lastDumpMs = 0;
-        if (now - lastDumpMs >= 5000) {
+        if (now - lastDumpMs >= STATUS_DUMP_INTERVAL_MS) {
             lastDumpMs = now;
             printf("[BLE] status: connected=%d notif=%d power=%d bonds=%d handle=0x%04X\n",
                    (int)_connected, (int)_notificationsEnabled,
@@ -255,7 +274,7 @@ bool BLEHIDManager::sendReport(const uint8_t* report, uint16_t len) {
         // Periodic "blocked" log — avoids flooding at frame rate
         static uint32_t lastBlockLogMs = 0;
         uint32_t now3 = to_ms_since_boot(get_absolute_time());
-        if (now3 - lastBlockLogMs >= 2000) {
+        if (now3 - lastBlockLogMs >= SEND_LOG_INTERVAL_MS) {
             lastBlockLogMs = now3;
             printf("[BLE] sendReport blocked: connected=%d notif=%d\n",
                    (int)_connected, (int)_notificationsEnabled);
@@ -266,7 +285,7 @@ bool BLEHIDManager::sendReport(const uint8_t* report, uint16_t len) {
     {
         static uint32_t lastSendMs = 0;
         uint32_t now4 = to_ms_since_boot(get_absolute_time());
-        if (now4 - lastSendMs >= 2000) {
+        if (now4 - lastSendMs >= SEND_LOG_INTERVAL_MS) {
             lastSendMs = now4;
             printf("[BLE] sendReport queued len=%u\n", (unsigned)len);
         }
@@ -275,7 +294,7 @@ bool BLEHIDManager::sendReport(const uint8_t* report, uint16_t len) {
     // In IDLE state, throttle report submission to ~50ms to reduce power consumption.
     if (_powerState == BLEPowerState::IDLE) {
         uint32_t now = to_ms_since_boot(get_absolute_time());
-        if ((now - _lastReportMs) < 50) return false;
+        if ((now - _lastReportMs) < REPORT_IDLE_THROTTLE_MS) return false;
     }
 
     if (len > REPORT_SIZE_BYTES) len = REPORT_SIZE_BYTES;
@@ -328,6 +347,27 @@ void BLEHIDManager::_ledBlink(uint32_t count, uint32_t onMs, uint32_t offMs) {
         cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
         sleep_ms(offMs);
     }
+}
+
+void BLEHIDManager::_resetReportQueue() {
+    _reportPending    = false;
+    _reportQueueHead  = 0;
+    _reportQueueTail  = 0;
+    _reportQueueCount = 0;
+}
+
+void BLEHIDManager::_handleDisconnect(uint8_t reason) {
+    printf("[BLE] Disconnected reason=0x%02X\n", (unsigned)reason);
+    _lastDisconnectReason = reason;
+    _resetReportQueue();
+    _connected            = false;
+    _notificationsEnabled = false;
+    _conHandle            = HCI_CON_HANDLE_INVALID;
+    _advStarted           = false;
+    _powerState           = BLEPowerState::ADVERTISING;
+    _lastInputChangeMs    = 0;
+    // Defer advertising restart to process() to avoid race with LL cleanup
+    _needsAdvRestart = true;
 }
 
 // Read battery percentage from the onboard voltage divider.
@@ -494,20 +534,7 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
 
         case HCI_EVENT_DISCONNECTION_COMPLETE: {
             uint8_t reason = hci_event_disconnection_complete_get_reason(packet);
-            printf("[BLE] Disconnected reason=0x%02X\n", (unsigned)reason);
-            mgr._lastDisconnectReason = reason;
-            mgr._reportPending        = false;
-            mgr._reportQueueHead      = 0;
-            mgr._reportQueueTail      = 0;
-            mgr._reportQueueCount     = 0;
-            mgr._connected            = false;
-            mgr._notificationsEnabled = false;
-            mgr._conHandle            = HCI_CON_HANDLE_INVALID;
-            mgr._advStarted           = false;
-            mgr._powerState           = BLEPowerState::ADVERTISING;
-            mgr._lastInputChangeMs    = 0;
-            // Defer advertising restart to process() to avoid race with LL cleanup
-            mgr._needsAdvRestart = true;
+            mgr._handleDisconnect(reason);
             break;
         }
 
@@ -530,7 +557,9 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
                         mgr._notificationsEnabled = (enable != 0);
                         printf("[BLE] INPUT_REPORT_ENABLE enable=%u\n", (unsigned)enable);
                         // Set flag to blink LED in process() — don't block IRQ handler with sleep_ms
-                        mgr._pendingBlinkType = (enable != 0) ? 5 : 3;
+                        mgr._pendingBlinkType = (enable != 0) ?
+                            PENDING_BLINK_NOTIFICATIONS_ENABLED :
+                            PENDING_BLINK_NOTIFICATIONS_DISABLED;
                         if (enable != 0) {
                             mgr._powerState        = BLEPowerState::ACTIVE;
                             mgr._lastInputChangeMs = to_ms_since_boot(get_absolute_time());
@@ -634,7 +663,7 @@ void BLEHIDManager::_smPacketHandler(uint8_t packetType, uint16_t channel,
             if (status == ERROR_CODE_SUCCESS) {
                 mgr._hasBondedPeers = true;
                 // Re-verify bond was stored — 2 fast blinks = pairing+bond confirmed
-                mgr._pendingBlinkType = 1;  // use the report-sent blink as "success" indicator
+                mgr._pendingBlinkType = PENDING_BLINK_REPORT_SENT;
             }
             // On failure: do nothing. Bond was not stored. Advertising will restart
             // on disconnect and the host can try again.

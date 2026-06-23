@@ -63,6 +63,8 @@ private:
     BLEHIDManager() = default;
 
     void _doInit();
+    void _resetReportQueue();
+    void _handleDisconnect(uint8_t reason);
     void _ledBlink(uint32_t count, uint32_t onMs, uint32_t offMs);
     static uint8_t _readBatteryPercent();
 
