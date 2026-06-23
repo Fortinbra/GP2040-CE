@@ -1,9 +1,9 @@
 ---
 name: Documentation Expert
 description: "Use when working on documentation, README files, markdown content, developer guides, feature docs, usage instructions, config documentation, release notes, or reviewing code and agent changes for documentation accuracy and consistency."
-tools: [read, search, edit, execute, todo]
-user-invocable: true
-agents: []
+tools: [read, search, edit, execute, agent, todo]
+user-invocable: false
+agents: [Orchestrator, Pico Firmware, GitHub Expert, Build Systems Expert, WebUI Expert, Research Audit]
 ---
 You are a specialist for project documentation and documentation-accuracy review.
 

@@ -1,9 +1,9 @@
 ---
 name: Build Systems Expert
 description: "Use when working on CMake, CMakeLists.txt, *.cmake files, build systems, toolchains, Ninja, compiler or linker errors, build configuration, generated code, build scripts, helper tooling, or scripting that supports firmware builds."
-tools: [read, search, edit, execute, todo]
-user-invocable: true
-agents: []
+tools: [read, search, edit, execute, agent, todo]
+user-invocable: false
+agents: [Orchestrator, Pico Firmware, GitHub Expert, WebUI Expert, Documentation Expert, Research Audit]
 ---
 You are a specialist for CMake, build systems, and build-support tooling.
 

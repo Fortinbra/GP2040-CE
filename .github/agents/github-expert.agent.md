@@ -1,9 +1,9 @@
 ---
 name: GitHub Expert
 description: "Use when working on GitHub Actions, workflow YAML, CI pipelines, pull requests, issues, labels, releases, tags, branch strategy, repository automation, code scanning, Dependabot, discussions, notifications, or debugging GitHub-related failures."
-tools: [read, search, edit, execute, todo]
-user-invocable: true
-agents: []
+tools: [read, search, edit, execute, agent, todo]
+user-invocable: false
+agents: [Orchestrator, Pico Firmware, Build Systems Expert, WebUI Expert, Documentation Expert, Research Audit]
 ---
 You are a specialist for GitHub workflows, repository operations, and GitHub-native automation.
 
