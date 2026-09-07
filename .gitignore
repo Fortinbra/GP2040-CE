@@ -25,3 +25,6 @@ www/src_gen/enums.ts
 
 # Archived local development docs (not tracked)
 docs/development/archive/
+
+# Language Server config
+.clangd

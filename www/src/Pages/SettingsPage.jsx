@@ -21,7 +21,7 @@ import { hexToInt } from '../Services/Utilities';
 import { InputModeDeviceType, PS4ControllerType } from '@proto/enums';
 
 import './SettingsPage.scss';
-import { INPUT_MODE_OPTIONS as INPUT_MODES } from '../Data/InputBootModes'
+import { INPUT_MODE_OPTIONS as INPUT_MODES } from '../Data/InputBootModes';
 import { useBootModeStore, useBootModeStoreActions } from '../Store/useBootModesStore';
 
 const SHA256 = (ascii) => {
@@ -170,6 +170,7 @@ const INPUT_BOOT_MODES = [
 	{ labelKey: 'input-mode-options.egret', value: 9, group: 'mini' },
 	{ labelKey: 'input-mode-options.astro', value: 10, group: 'mini' },
 	{ labelKey: 'input-mode-options.psclassic', value: 11, group: 'mini' },
+	{ labelKey: 'input-mode-options.sinput', value: 17, group: 'primary' },
 	{ labelKey: 'input-mode-options.ble', value: 18, group: 'wireless' },
 ];
 
