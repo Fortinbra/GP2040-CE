@@ -1,15 +1,78 @@
 # Bluetooth Support (Consolidated)
 
-**Last updated:** 2026-05-23  
+**Last updated:** 2026-09-29\
 **Maintained by:** GP2040-CE core team  
 **Status:** Active implementation + ongoing refinement  
-**SDK baseline:** 2.2.0+
+**SDK baseline:** 2.3.1
 
 ---
 
 ## Purpose
 
 This is the single source of truth for Bluetooth support in GP2040-CE.
+
+## Canonical Development Branch
+
+Use `feature/bluetooth-next` for Bluetooth development. The supported baseline is
+BLE HID gamepad output, with battery reporting on `PimoroniPicoLipo2XLW`.
+Classic Bluetooth and the additional controller profiles in the architecture
+roadmap are not part of this working baseline.
+
+The 2026-09-29 branch audit found the following history already contained in
+`feature/bluetooth-next`:
+
+| Former branch | Audited tip | Contribution |
+| --- | --- | --- |
+| `feature/ble-hid-v2` | `e392a22e` | Replacement BLE implementation and Windows input fix |
+| `feature/bt-battery-oled-display` | `dc43456f` | Battery ADC definitions, reporting, and OLED status |
+| `feature/ble-hid-report-rework` | `045ea5c5` | Digital-only 14-button gamepad report |
+| `feature/ble-device-identity` | `fe9c5c46` | Device Information Service registration and identity |
+| `feature/bluetooth-refactor` | `8d5d247e` | BLE timing constants and disconnect handling |
+| `copilot/feature-document-bluetooth-handling` | `b348c1fa` | Controller architecture roadmap |
+| `copilot/deepen-bluetooth-architecture-document` | `d456ec72` | Output-channel roadmap refinements |
+
+The older `feature/bluetooth-hid` (`cf1a9457`, Classic HID) and `feature/ble-hid`
+(`79546ab1`, abandoned first BLE implementation) contain 6 and 23 commits,
+respectively, not reachable from the canonical branch. The latter includes the
+former's history. Their Classic SDP/reconnect and early BLE bring-up work is not
+an additional supported transport to merge over the replacement implementation.
+
+All audited branch refs were preserved in a verified, self-contained Git bundle
+before branch cleanup. The local archive is
+`C:/ws/GP2040-CE-bluetooth-archive-20260929.bundle`; it is not part of the repository
+or a hosted backup. To inspect or recover an old branch without keeping obsolete
+branch names in the active repository:
+
+```powershell
+git bundle list-heads C:/ws/GP2040-CE-bluetooth-archive-20260929.bundle
+git clone --mirror C:/ws/GP2040-CE-bluetooth-archive-20260929.bundle C:/ws/GP2040-CE-bluetooth-history.git
+```
+
+The reference build uses `PICO_BOARD=pico2_w`,
+`GP2040_BOARDCONFIG=PimoroniPicoLipo2XLW`, and Pico SDK 2.3.1. This SDK baseline
+matches the upstream changes integrated into `feature/bluetooth-next` and
+supersedes the older 2.2.0 build guidance for this branch.
+
+Validation on 2026-09-29 passed a fresh Ninja configure in `build/`, with
+`SKIP_WEBBUILD=FALSE` and `CMAKE_BUILD_TYPE=Release`, followed by cleaning outputs
+and completing all 1,559 build steps. The firmware source tip was `7c3d0905`;
+the consolidation itself changed documentation only. The output is
+`build/GP2040-CE_0.7.12_PimoroniPicoLipo2XLW.uf2`.
+
+The Python interpreter used by CMake needs `pycryptodomex` for BTstack's GATT
+database hash generation. Without a crypto backend, the generator warns and
+substitutes a random hash. Installing `pycryptodomex` 3.23.0 and rebuilding from
+clean outputs removed that warning. Existing unrelated compiler/deprecation
+warnings remain, and npm reported 33 dependency vulnerabilities during the web
+build; dependency remediation is outside this branch consolidation.
+
+A successful build alone does not establish radio or battery correctness.
+No hardware was flashed or runtime-tested during this audit. Release validation
+still requires fresh pairing, all buttons and hat directions,
+bonded reconnect after power cycling, measured battery reporting on the host and
+OLED, and entry into USB web configuration using the boot override.
+
+## Earlier Documentation
 
 It consolidates and replaces the following older docs:
 
@@ -198,7 +261,10 @@ Recommended validation:
 
 ### ADC Threshold Values
 
-The ADC raw-count thresholds used for battery percentage mapping (currently hardcoded as `1241` and `1737`) must be derived from board config macros — specifically `BATTERY_VOLTAGE_DIVIDER`, `BATTERY_MIN_VOLTAGE`, and `BATTERY_MAX_VOLTAGE` — rather than literal constants. This change is required before battery boards other than the Pimoroni reference can be declared correct.
+The ADC raw-count thresholds used for battery percentage mapping are derived at
+compile time from `BATTERY_VOLTAGE_DIVIDER`, `BATTERY_MIN_VOLTAGE`, and
+`BATTERY_MAX_VOLTAGE` in the board's `BatteryConfig.h`. Boards without battery
+sense definitions fall back to 100 percent; that fallback is not a measurement.
 
 ### RP2350B ADC Channel Mapping
 
