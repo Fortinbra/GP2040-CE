@@ -30,11 +30,12 @@ audit notes distinguish the current implementation from old plans and claims.
 
 | Document | Audit disposition |
 | --- | --- |
+| [Roadmap to 1.0](roadmap-to-1.0.md) | Added 2026-09-30. Living gamepad-only parity roadmap for PlayStation, Xbox, and Nintendo Pro controllers. Wireless is first and audio later; Joy-Con parity is excluded and licensing/authentication work is deferred. The 16 feature drafts below cover the active gaps while preserving existing features. |
 | [Bluetooth support](bluetooth-support.md) | Implemented BLE baseline plus active host regression, UI/power refinement, and experimental variant work. Retain the operational reference; narrower completed specs are archived above. |
 | [Bluetooth controller architecture](bluetooth-controller-architecture.md) | Pending profile abstraction, keyboard/mouse, Classic/LE selection, and output channels. Current [dispatch](../../src/OutputManager.cpp) still packs a single BLE gamepad profile. |
 | [Dependency management](dependency-updates.md) | Ongoing maintenance guide, not a finite feature to archive. Version tables are historical: current [CMake](../../CMakeLists.txt) pins SDK 2.3.1 and ArduinoJson v6.21.5. |
 | [Developer documentation system](developer-documentation-system.md) | Docs artifact generation, release-sync PR automation, and drift enforcement are still pending. This audit index does not implement that CI system. |
-| [FlashPROM large-flash support](flashprom-large-flash-support.md) | Deferred after recorded persistence failures. Override guards exist, but the [Pimoroni overlay](../../configs/PimoroniPicoLipo2XLW/PimoroniPicoLipo2XLW.cmake) retains the safe flash limit. |
+| [FlashPROM large-flash support](flashprom-large-flash-support.md) | Reopened for specification review on 2026-09-30: full-flash persistence/layout qualification first, then derived 2/4/8/16 MiB compile flags. No new firmware implementation in the specification pass; the Pimoroni 4 MiB safety limit remains. |
 | [GPIO retro output](gpio-retro-output.md) | Planned output adapters and configuration are absent; existing retro input adapters do not fulfill this scope. |
 | [HID over I2C](hid-over-i2c.md) | Planned HID target/slave transport and configuration are absent. Existing I2C peripheral input support is not this feature. |
 | [I2C peripheral expansion](i2c-peripheral-expansion.md) | Planned satellite-output addon and packet/configuration contract are absent. Historical BLE/Classic status in its context table is superseded by the active Bluetooth reference. |
@@ -47,6 +48,31 @@ audit notes distinguish the current implementation from old plans and claims.
 | [TinyUSB upstream port](tinyusb-upstream-port.md) | [tusb_option.h](../../lib/tinyusb/src/tusb_option.h) still declares 0.17.0, and [.gitmodules](../../.gitmodules) retains the project fork. |
 | [Unified board selection](unified-board-selection.md) | Authorized follow-up implementation on `feature/unified-board-selection`: shared registry, `GP2040_BOARD` resolver, CI/local task migration, and hardware/storage assertions are present. Eight reference clean builds passed, including the web build; hardware persistence/reconnect qualification remains pending. |
 | [WiFi web configuration](wifi-web-config.md) | Planned STA connection/configuration path is absent; CYW43 BLE support alone does not provide WiFi web configuration. |
+
+## 1.0 Feature Specifications
+
+Added 2026-09-30 after the historical audit above. These are living planning
+documents, not completed implementations. The roadmap owns the requirement-ID
+mapping, shared scope decisions, and release contract.
+
+| Document | Feature scope |
+| --- | --- |
+| [PlayStation gamepad profiles](playstation-gamepad-parity.md) | Standard PS5 protocol and native wireless. |
+| [Xbox gamepad profiles](xbox-gamepad-parity.md) | Standard Xbox protocol and native radio integration. |
+| [Nintendo Pro gamepad profiles](nintendo-pro-gamepad-parity.md) | Original Switch Pro and Switch 2 Pro protocols/wireless. |
+| [Complete analog inputs](gamepad-analog-input-parity.md) | Sticks, triggers, complete input state, and calibration. |
+| [Pairing and host management](wireless-pairing-and-host-management.md) | Identities, bonds, reconnect, and host selection. |
+| [Power lifecycle](controller-power-lifecycle.md) | Sleep, wake, shutdown, and transport handover. |
+| [Battery and charging](controller-battery-and-charging.md) | Measurement, host status, and safe power hardware. |
+| [System controls and output routing](controller-output-and-system-controls.md) | Console buttons, indicators, and command dispatch. |
+| [Motion sensors](controller-motion-sensors.md) | IMU acquisition, timing, and calibration. |
+| [PlayStation touchpad](playstation-touchpad.md) | Physical two-contact tracking and click. |
+| [Haptics and impulse triggers](controller-haptics.md) | High-definition feedback and independent Xbox channels. |
+| [Adaptive triggers](playstation-adaptive-triggers.md) | PlayStation trigger resistance and safe actuation. |
+| [Nintendo NFC reader](nintendo-nfc-reader.md) | Physical reader and console tag interactions. |
+| [Controller audio](controller-audio.md) | Headsets, microphones, speaker, and accessory streams. |
+| [Capabilities and configuration](controller-capabilities-and-configuration.md) | Hardware validation, settings, migrations, and recovery. |
+| [Parity qualification](controller-parity-qualification.md) | Performance, hardware evidence, and existing-feature regression gates. |
 
 ## Existing Archive
 
