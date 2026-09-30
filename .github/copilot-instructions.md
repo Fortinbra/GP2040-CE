@@ -66,35 +66,38 @@ target_include_directories(gp2040_firmware PRIVATE
 
 ### Default Target Board
 - **Default to Raspberry Pi Pico** unless explicitly specified otherwise
-- Use environment variable: `PICO_BOARD=pico`
+- Use `-DGP2040_BOARD=Pico`; hardware board and platform are derived before SDK import
 - Supported boards are listed in `configs/` directory
 - Only suggest alternative boards (Pico W, Pico 2, etc.) when explicitly requested
 
 ### Pico SDK Version
-- **Always use Pico SDK version 2.2.0** for all builds (RP2040 and RP2350)
+- **Always use Pico SDK version 2.3.1** for all builds (RP2040 and RP2350)
 - SDK path: `${env:USERPROFILE}/.pico-sdk/`
 - SDK is imported via `pico_sdk_import.cmake`
 
 ### Build Tools
 - **Ninja**: v1.12.1
-- **Picotool**: 2.2.0-a4 (for flashing and device operations)
+- **Picotool**: 2.3.1 (for flashing and device operations)
 - **OpenOCD**: 0.12.0+dev (for debugging)
-- **CMake**: 3.10+
+- **CMake**: 3.24+
 
 ## Build System
 
 ### CMake Configuration
 Standard Pico build command:
 ```bash
-cmake -B build -S .
+cmake -G Ninja -B build -S . --fresh -DGP2040_BOARD=Pico
 ```
 
 With environment variables:
 ```
-PICO_BOARD=pico
 SKIP_WEBBUILD=TRUE
-GP2040_BOARDCONFIG=Pico
 ```
+
+Do not set `PICO_BOARD`, `PICO_PLATFORM`, or `GP2040_BOARDCONFIG` alongside the
+public selector. Clear inherited legacy defaults; conflicting values fail.
+Use `cmake -G Ninja -P modules/ListBoards.cmake` to list registered targets.
+Wireless builds require `pycryptodomex` in the Python interpreter used by CMake.
 
 ### Build Directory
 - Always use `build/` directory for CMake builds
@@ -240,7 +243,7 @@ Use descriptive names with prefixes:
 ### Review Expectations
 - Code must follow the style guide in this document
 - Indentation must be exactly 4 spaces (no exceptions)
-- No hardcoded board assumptions — respect `PICO_BOARD` configuration
+- No hardcoded board assumptions — respect `GP2040_BOARD` and its resolved hardware definition
 - Include comments only where code clarity genuinely benefits
 - Performance matters — minimize latency and memory usage
 

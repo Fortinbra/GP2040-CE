@@ -3,7 +3,7 @@
 
 // BLE Device Identity defaults
 //
-// See docs/development/ble-device-identity.md for the full design.
+// See docs/development/archive/ble-device-identity.md for the full design.
 //
 // These macros populate the BLE Device Information Service (0x180A) so that
 // hosts like the Windows Gamepad Tester display a meaningful vendor / product

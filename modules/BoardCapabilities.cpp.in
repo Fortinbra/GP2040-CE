@@ -1,0 +1,40 @@
+#include "pico/stdlib.h"
+#include "hardware/regs/addressmap.h"
+#include "FlashPROM.h"
+
+#if __has_include("BatteryConfig.h")
+#include "BatteryConfig.h"
+#endif
+
+#ifdef CYW43_DEFAULT_PIN_WL_REG_ON
+static constexpr unsigned boardWireless = 1;
+#else
+static constexpr unsigned boardWireless = 0;
+#endif
+
+#if @GP2040_RESOLVED_RP2350@
+static_assert(PICO_RP2350 == 1, "Compiler and SDK platform disagree");
+#else
+static_assert(PICO_RP2040 == 1, "Compiler and SDK platform disagree");
+#endif
+static_assert(NUM_BANK0_GPIOS == 30 || NUM_BANK0_GPIOS == 48, "Unsupported GPIO capacity");
+static_assert(ADC_BASE_PIN + NUM_ADC_CHANNELS - 1 == NUM_BANK0_GPIOS, "GPIO and ADC package mismatch");
+static_assert(PICO_FLASH_SIZE_BYTES == @GP2040_RESOLVED_FLASH_BYTES@, "Compiler and linker flash limits disagree");
+static_assert(boardWireless == @GP2040_RESOLVED_WIRELESS@, "Hardware header and CMake wireless capabilities disagree");
+static_assert(EEPROM_ADDRESS_START == 0x101F8000 && EEPROM_SIZE_BYTES == 0x8000, "EEPROM relocation requires a separate migration policy");
+static_assert(EEPROM_ADDRESS_START >= XIP_BASE, "EEPROM is outside flash");
+static_assert(EEPROM_ADDRESS_START - XIP_BASE + EEPROM_SIZE_BYTES <= PICO_FLASH_SIZE_BYTES, "EEPROM exceeds flash capacity");
+static_assert(EEPROM_ADDRESS_START % FLASH_SECTOR_SIZE == 0 && EEPROM_SIZE_BYTES % FLASH_SECTOR_SIZE == 0, "EEPROM must be sector-aligned");
+
+#ifdef BATTERY_ADC_GPIO
+static_assert(BATTERY_ADC_CHANNEL < NUM_ADC_CHANNELS - 1, "Battery ADC channel unavailable");
+static_assert(BATTERY_ADC_GPIO == ADC_BASE_PIN + BATTERY_ADC_CHANNEL, "Battery GPIO does not match selected ADC package");
+#endif
+
+#if @GP2040_EXPECT_GPIO@ > 0
+static_assert(NUM_BANK0_GPIOS == @GP2040_EXPECT_GPIO@, "Reference GPIO capacity mismatch");
+static_assert(NUM_ADC_CHANNELS == @GP2040_EXPECT_ADC@, "Reference ADC capacity mismatch");
+static_assert(ADC_BASE_PIN == @GP2040_EXPECT_ADC_BASE@, "Reference ADC base mismatch");
+static_assert(PICO_FLASH_SIZE_BYTES == @GP2040_EXPECT_FLASH@, "Reference flash policy mismatch");
+static_assert(boardWireless == @GP2040_EXPECT_WIRELESS@, "Reference wireless capability mismatch");
+#endif

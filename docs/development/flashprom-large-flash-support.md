@@ -108,4 +108,4 @@ EEPROM remains at the default `0x101F8000`. No `add_compile_definitions(EEPROM_A
 - [lib/FlashPROM/src/FlashPROM.h](../../lib/FlashPROM/src/FlashPROM.h)
 - [lib/FlashPROM/src/FlashPROM.cpp](../../lib/FlashPROM/src/FlashPROM.cpp)
 - [configs/PimoroniPicoLipo2XLW/PimoroniPicoLipo2XLW.cmake](../../configs/PimoroniPicoLipo2XLW/PimoroniPicoLipo2XLW.cmake)
-- [docs/development/rp2350-support.md](rp2350-support.md)
+- [docs/development/archive/rp2350-support.md](archive/rp2350-support.md)

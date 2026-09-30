@@ -1,0 +1,2 @@
+ASSERT(__flash_binary_end <= 0x101F8000, "Firmware overlaps the preserved EEPROM reservation")
+ASSERT(__flash_binary_end <= 0x10000000 + @GP2040_RESOLVED_FLASH_BYTES@, "Firmware exceeds the selected flash limit")

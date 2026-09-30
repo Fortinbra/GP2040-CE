@@ -39,7 +39,7 @@
 
 // HID Report Descriptor: Report ID 1 + 14 generic HID buttons (2 bytes) + hat switch (1 byte)
 //   = 3-byte digital-only report body.
-// See docs/development/ble-hid-report-rework.md for the button assignment and rationale.
+// See docs/development/archive/ble-hid-report-rework.md for the button assignment and rationale.
 // Report ID byte is prepended in HIDS_SUBEVENT_CAN_SEND_NOW before sending the notification.
 static const uint8_t hid_report_descriptor[] = {
     0x05, 0x01,              // USAGE_PAGE (Generic Desktop)

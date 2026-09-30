@@ -577,7 +577,7 @@ Phases are ordered by **implementation complexity and protocol maturity** (not b
 ## Cross-Reference
 
 - **Related feature:** See `docs/development/bluetooth-support.md` for the parallel USB/Bluetooth coexistence architecture — GPIO output follows the same multi-output pattern
-- **Board configurations:** See `docs/development/rp2350-support.md` for RP2350 GPIO availability and custom board config creation
+- **Board configurations:** See [RP2350 Support](archive/rp2350-support.md) for RP2350 GPIO availability and custom board config creation
 - **Dependency updates:** See `docs/development/dependency-updates.md` for firmware stack version requirements (Pico SDK 2.2.0+, nanopb, etc.)
 
 ---

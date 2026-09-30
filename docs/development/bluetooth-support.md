@@ -127,7 +127,7 @@ Bluetooth functionality requires CYW43-supported targets.
 |---|---|---|
 | Pico W | Yes | BLE-capable target |
 | Pico 2 W | Yes | BLE-capable target |
-| Pimoroni Pico Lipo 2 XL W | Yes | Recommended battery-backed reference board. Board-specific details are in [Pimoroni Pico Lipo 2 XL W Board Support](./pimoroni-pico-lipo-2xl-w-support.md). |
+| Pimoroni Pico Lipo 2 XL W | Yes | Recommended battery-backed reference board. Board-specific details are in [Pimoroni Pico Lipo 2 XL W Board Support](./archive/pimoroni-pico-lipo-2xl-w-support.md). |
 | Non-CYW43 boards | No | USB only |
 
 Build integration is gated through `PICO_CYW43_SUPPORTED` in CMake.
@@ -211,7 +211,7 @@ Current control surface includes:
 
 ## BLE Report Format
 
-BLE report layout is currently a digital-only generic HID gamepad. Analog stick and analog trigger reporting are intentionally absent until real analog input plumbing exists for the BLE path. See the [BLE HID Report Rework feature doc](./ble-hid-report-rework.md) for the full button-assignment table, descriptor outline, and rationale.
+BLE report layout is currently a digital-only generic HID gamepad. Analog stick and analog trigger reporting are intentionally absent until real analog input plumbing exists for the BLE path. See the [archived BLE HID Report Rework feature doc](./archive/ble-hid-report-rework.md) for the full button-assignment table, descriptor outline, and rationale.
 
 Current intended payload profile:
 
@@ -228,6 +228,11 @@ Operational notes:
 ---
 
 ## Host Compatibility
+
+Device Information Service identity is implemented; see the
+[archived BLE Device Identity spec](./archive/ble-device-identity.md).
+Hosts cache DIS values alongside the HID Report Map. Remove the existing bond
+and re-pair after identity changes to refresh vendor/product and version data.
 
 ### BLE HID
 
@@ -251,7 +256,7 @@ Key points:
 - Battery percentage is exposed to connected hosts through BLE battery service behavior.
 - Board battery sense macros determine whether real ADC-based values are available.
 - If board-level battery sense definitions are absent, fallback behavior applies.
-- For Pimoroni Pico Lipo 2 XL W (`PimoroniPicoLipo2XLW`), the canonical board mapping is documented in [Pimoroni Pico Lipo 2 XL W Board Support](./pimoroni-pico-lipo-2xl-w-support.md) (battery sense on GP43 / ADC 3).
+- For Pimoroni Pico Lipo 2 XL W (`PimoroniPicoLipo2XLW`), the canonical board mapping is documented in [Pimoroni Pico Lipo 2 XL W Board Support](./archive/pimoroni-pico-lipo-2xl-w-support.md) (battery sense on GP43 / ADC 3).
 
 Recommended validation:
 

@@ -1,0 +1,2 @@
+set(PICO_BOARD gp2040_test_pico)
+set(GP2040_BOARD_HEADER_DIR hardware)

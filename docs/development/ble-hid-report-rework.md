@@ -1,9 +1,18 @@
 # BLE HID Report Rework (Digital-Only v1)
 
-**Last updated:** 2026-05-23
+**Last updated:** 2026-09-29
 **Maintained by:** GP2040-CE core team
-**Status:** Feature spec — implementation pending sign-off
+**Status:** Implemented; archived after the 2026-09-29 source audit.
 **Related:** [bluetooth-support.md](./bluetooth-support.md)
+
+## Archive Audit
+
+The current descriptor in `src/BLEHIDManager.cpp` and packing in
+`OutputManager::dispatch()` implement the 14-button, hat-only, three-byte
+payload below. The active Bluetooth reference includes the re-pair guidance.
+The original design is retained below as historical context, not pending work.
+Host/hardware checks in the verification plan were not rerun during this
+documentation audit; archiving records implementation, not release validation.
 
 ---
 

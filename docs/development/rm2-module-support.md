@@ -73,7 +73,7 @@ On any board that wires the RM2 to Pico W-compatible pins, **GPIO 23, 24, 25, an
 | RP2350A | 30 (GPIO 0–29) | GPIO 23, 24, 25, 29 | **26 GPIOs** (GPIO 0–22, 26–28) |
 | RP2350B | 48 (GPIO 0–47) | GPIO 23, 24, 25, 29 | **44 GPIOs** (GPIO 0–22, 26–28, 30–47) |
 
-For RP2040 and RP2350A boards, GPIO availability is identical to Pico W. For RP2350B boards, GPIO 30–47 are freely available with no CYW43 conflict (see [rp2350-support.md](rp2350-support.md) for a full GPIO reference).
+For RP2040 and RP2350A boards, GPIO availability is identical to Pico W. For RP2350B boards, GPIO 30–47 are freely available with no CYW43 conflict (see [rp2350-support.md](archive/rp2350-support.md) for a full GPIO reference).
 
 ### RP2350B Alternate Wiring (TBD — Advanced)
 
@@ -270,5 +270,5 @@ The following items require confirmation or resolution before or during implemen
 ## Related Documents
 
 - [Bluetooth HID Support](bluetooth-support.md) — Feature planning for BT HID Classic output, power management, and battery reporting. The RM2 module is the hardware enabler for this feature on custom boards.
-- [RP2350 Support](rp2350-support.md) — RP2350A/B GPIO availability, board configurations, and migration guidance. See this document for RP2350A/B GPIO 30–47 details relevant to custom RM2 board design.
+- [RP2350 Support](archive/rp2350-support.md) — RP2350A/B GPIO availability, board configurations, and migration guidance. See this document for RP2350A/B GPIO 30–47 details relevant to custom RM2 board design.
 - [Dependency Updates](dependency-updates.md) — SDK, toolchain, and library version management, including Pico SDK 2.2.0 and Picotool 2.2.0-a4 version references.

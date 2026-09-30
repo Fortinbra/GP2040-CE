@@ -27,7 +27,9 @@ jobs:
 
     - name: Build WWW
       working-directory: ${{github.workspace}}/www
-      run: CI=false npm run build --if-present
+      env:
+          CI: "false"
+      run: npm run build
 
     - name: Upload www Artifact
       uses: actions/upload-artifact@v6.0.0

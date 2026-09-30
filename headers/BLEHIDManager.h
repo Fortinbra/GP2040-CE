@@ -56,7 +56,7 @@ private:
     //   byte 0 : Buttons 1..8   (B1, B2, B3, B4, L1, R1, L2, R2)
     //   byte 1 : Buttons 9..14 + 2 pad bits (S1, S2, L3, R3, A1, A2, 0, 0)
     //   byte 2 : Hat switch (lower nibble 0..7 = direction, 8 = neutral)
-    // See docs/development/ble-hid-report-rework.md.
+    // See docs/development/archive/ble-hid-report-rework.md.
     static constexpr uint8_t REPORT_SIZE_BYTES = 3;
     static constexpr uint8_t REPORT_QUEUE_DEPTH = 4;
 

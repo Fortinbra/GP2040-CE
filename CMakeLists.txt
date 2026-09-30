@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.24...4.0)
+
 # == DO NOT EDIT THE FOLLOWING LINES for the Raspberry Pi Pico VS Code Extension to work ==
 if(WIN32)
     set(USERHOME $ENV{USERPROFILE})
@@ -12,44 +14,7 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
-if(DEFINED ENV{PICO_BOARD})
-  set(PICO_BOARD $ENV{PICO_BOARD} CACHE STRING "Board type")
-else()
-  set(PICO_BOARD pico CACHE STRING "Board type")
-endif()
-
-if(DEFINED ENV{PICO_PLATFORM})
-  set(PICO_PLATFORM $ENV{PICO_PLATFORM} CACHE STRING "Board platform")
-else()
-  set(PICO_PLATFORM rp2040 CACHE STRING "Board platform")
-endif()
-
-if(DEFINED ENV{GP2040_BOARDCONFIG})
-  set(GP2040_BOARDCONFIG $ENV{GP2040_BOARDCONFIG})
-elseif(NOT DEFINED GP2040_BOARDCONFIG)
-  set(GP2040_BOARDCONFIG Pico)
-endif()
-
-# check for existing cmake files in the event of changing PICO_BOARD or PICO_PLATFORM
-if (GP2040_BOARDCONFIG)
-  message("GP2040-CE board config is set: ${GP2040_BOARDCONFIG}")
-  set(GP2040_BOARD_CONFIG_FILE "${CMAKE_CURRENT_LIST_DIR}/configs/${GP2040_BOARDCONFIG}/${GP2040_BOARDCONFIG}.cmake")
-
-  if (EXISTS "${GP2040_BOARD_CONFIG_FILE}")
-    # include the board config file
-    message(STATUS "Using board config file: ${GP2040_BOARD_CONFIG_FILE}")
-    message(STATUS "${PICO_BOARD_HEADER_DIRS}")
-
-    set(PICO_BOARD_HEADER_DIRS "${CMAKE_CURRENT_LIST_DIR}/configs/${GP2040_BOARDCONFIG}")
-
-    include("${GP2040_BOARD_CONFIG_FILE}")
-  else()
-    # skip the config and fall back to defaults
-    # message(FATAL_ERROR "GP2040_BOARDCONFIG '${GP2040_BOARDCONFIG}' not found.\n" "Expected: ${GP2040_BOARD_CONFIG_FILE}")
-  endif()
-endif()
-
-cmake_minimum_required(VERSION 3.10...4.0)
+include(modules/SelectBoard.cmake)
 include(CMakePrintHelpers)
 
 # enable compile commands for use by IDE autocompletion
@@ -58,6 +23,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # initialize the SDK based on PICO_SDK_PATH
 # note: this must happen before project()
 include(pico_sdk_import.cmake)
+gp2040_validate_sdk_board()
 
 if (PICO_SDK_VERSION_STRING VERSION_LESS "2.3.1")
   message(FATAL_ERROR "Raspberry Pi Pico SDK version 2.3.1 (or later) required. Your version is ${PICO_SDK_VERSION_STRING}")
@@ -141,7 +107,6 @@ else()
 endif()
 
 
-set(PICO_BOARD_HEADER_DIRS ${CMAKE_SOURCE_DIR}/configs/${GP2040_BOARDCONFIG})
 include(FetchContent)
 FetchContent_Declare(ArduinoJson
     GIT_REPOSITORY https://github.com/bblanchon/ArduinoJson.git
@@ -374,7 +339,7 @@ headers/display/ui/screens
 headers/animationstation
 headers/animationstation/effects
 headers/hosts
-configs/${GP2040_BOARDCONFIG}
+"${GP2040_BOARD_CONFIG_DIR}"
 ${PROTO_OUTPUT_DIR}
 ${CMAKE_BINARY_DIR}/headers
 )
@@ -391,6 +356,9 @@ target_include_directories(${PROJECT_NAME}  PRIVATE
   )
 
 pico_add_extra_outputs(${PROJECT_NAME})
+
+include(modules/ValidateBoard.cmake)
+gp2040_add_board_validation(${PROJECT_NAME})
 
 # ─── BLE HID support (CYW43-equipped boards only) ───────────────────────────
 if(PICO_CYW43_SUPPORTED)

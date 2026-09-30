@@ -1,6 +1,6 @@
 ---
 name: Pico Build System
-description: "Use when configuring, building, compiling, or running CMake for this project. Enforces Ninja as the only generator — never Visual Studio. Covers required environment variables, generator flag, and VS Code task usage for all GP2040-CE builds."
+description: "Use when configuring, building, compiling, or running CMake for this project. Enforces Ninja, the GP2040_BOARD selector, SDK prerequisites, and clean VS Code task workflows."
 applyTo: "**"
 ---
 # Pico Build System
@@ -30,14 +30,20 @@ These tasks set all required environment variables automatically. Use them whene
 
 ## Required Parameters for Manual cmake Invocations
 
-When running `cmake` directly (e.g., for a board not covered by the tasks above), **all** of the following must be set:
+Select one registered target with `GP2040_BOARD`. Use Pico SDK 2.3.1; do not also
+supply `PICO_BOARD`, `PICO_PLATFORM`, or `GP2040_BOARDCONFIG`. The resolver derives
+hardware selection before SDK import. Clear conflicting inherited legacy values.
 
 ```powershell
-$env:PICO_BOARD         = 'pico'          # or pico_w, pico2_w, etc.
-$env:SKIP_WEBBUILD      = 'TRUE'          # omit only when a web build is explicitly needed
-$env:GP2040_BOARDCONFIG = 'Pico'          # required for non-default board configs (e.g. PimoroniPicoLipo2XLW)
-cmake -G Ninja -B build -S .
+$env:PICO_SDK_PATH = "$env:USERPROFILE/.pico-sdk/sdk/2.3.1"
+$env:SKIP_WEBBUILD = 'TRUE'
+cmake -G Ninja -B build -S . --fresh -DGP2040_BOARD=Pico
 ```
+
+Set `SKIP_WEBBUILD=FALSE` for a web-inclusive build. Wireless builds require
+`pycryptodomex` in CMake's Python interpreter. List targets with
+`cmake -G Ninja -P modules/ListBoards.cmake`. External target packages use
+`GP2040_BOARD_DIRS`; this is a search path, not another board selector.
 
 And to compile:
 
@@ -50,14 +56,21 @@ And to compile:
 For a clean/fresh configure, add `--fresh` to the cmake invocation:
 
 ```powershell
-cmake -G Ninja -B build -S . --fresh
+cmake -G Ninja -B build -S . --fresh -DGP2040_BOARD=Pico
 ```
 
 This is equivalent to the "Clean and Configure" VS Code tasks.
+
+Changing targets in a reused tree requires `--fresh`. For full clean validation,
+also run Ninja's `-t clean` before the full build, or use
+`cmake -G Ninja -P tests/build-board-matrix.cmake`. That script includes a web build
+for Pico and capability assertions for the reference targets.
 
 ## Hard Rules
 
 - **Never** use `cmake -B build -S .` without `-G Ninja` in this repository.
 - **Never** invoke `msbuild`, open `.sln` files to build, or use any Visual Studio build path.
-- **Never** skip `PICO_BOARD` — the build will silently target the wrong chip.
-- If `GP2040_BOARDCONFIG` is not set, CMake defaults to the `Pico` config. Always set it explicitly when targeting any other board.
+- Use `GP2040_BOARD` for new builds. Only an absent selector defaults to `Pico`;
+	supplied unknown targets fail instead of falling back.
+- `GP2040_BOARDCONFIG` is a deprecated compatibility alias, not a second selector.
+- Preserve the Pimoroni 4 MiB safety limit and existing EEPROM placement.

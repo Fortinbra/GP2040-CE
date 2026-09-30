@@ -16,7 +16,7 @@ void OutputManager::dispatch(Gamepad* gamepad) {
 
     // Map GamepadState to the 3-byte digital-only BLE HID report body (no Report ID byte —
     // that is carried by the GATT Report Reference descriptor). See
-    // docs/development/ble-hid-report-rework.md.
+    // docs/development/archive/ble-hid-report-rework.md.
     //   byte 0 : Buttons 1..8   (B1, B2, B3, B4, L1, R1, L2, R2)
     //   byte 1 : Buttons 9..14  (S1, S2, L3, R3, A1, A2) + 2 padding bits
     //   byte 2 : Hat switch (lower nibble 0..7 = direction, 8 = neutral) + 4 padding bits

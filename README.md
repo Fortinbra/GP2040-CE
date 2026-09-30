@@ -74,6 +74,20 @@ If you would like to discuss features, issues or anything else related to GP2040
 
 Want to help improve GP2040-CE? There are a bunch of ways to contribute!
 
+### Building This Fork
+
+Select one registered controller target with `GP2040_BOARD`. Use Pico SDK 2.3.1,
+CMake 3.24 or newer, and Ninja:
+
+```powershell
+cmake -G Ninja -S . -B build --fresh -DGP2040_BOARD=Pico -DCMAKE_BUILD_TYPE=Release
+ninja -C build
+```
+
+See [board selection and build setup](docs/development/unified-board-selection.md#build-usage)
+for prerequisites, the target registry, legacy compatibility, external hardware
+definitions, web build options, and clean-build validation.
+
 ### Community Participation
 
 Have an idea for a cool new feature, or just want to discuss some technical details with the developers? Join the [OpenStick GP2040-CE Discord](https://discord.gg/k2pxhke7q8) server to participate in our active and ever-growing community!
