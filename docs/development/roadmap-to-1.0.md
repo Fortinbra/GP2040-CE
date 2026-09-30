@@ -212,6 +212,7 @@ changing the 1.0 promise requires an explicit scope decision.
 
 | Document | Roadmap relationship |
 | --- | --- |
+| [Warning-free builds](warning-free-builds.md) | Measured firmware/WebUI diagnostic backlog and strict clean-build gates supporting release qualification; separate from the 16 parity feature specifications. |
 | [Bluetooth support](bluetooth-support.md) | Preserve and qualify the implemented BLE baseline. |
 | [Bluetooth controller architecture](bluetooth-controller-architecture.md) | Foundation for transport/profile separation and output channels. Its logging/no-op output stage is an intermediate milestone, not physical feedback/audio parity. |
 | [Latency testing framework](latency-testing-framework.md) | Measurement methodology and regression evidence for wired and wireless paths. |

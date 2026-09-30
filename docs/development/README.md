@@ -31,6 +31,7 @@ audit notes distinguish the current implementation from old plans and claims.
 | Document | Audit disposition |
 | --- | --- |
 | [Roadmap to 1.0](roadmap-to-1.0.md) | Added 2026-09-30. Living gamepad-only parity roadmap for PlayStation, Xbox, and Nintendo Pro controllers. Wireless is first and audio later; Joy-Con parity is excluded and licensing/authentication work is deferred. The 16 feature drafts below cover the active gaps while preserving existing features. |
+| [Warning-free firmware and WebUI builds](warning-free-builds.md) | Added 2026-09-30. Measured clean-build/quality baseline and remediation plan: successful but warning-bearing Pico/Pico2W Release and Pico Debug builds, failing lint/types, dependency advisories, and missing strict CI gates. Planning only; diagnostics are not yet fixed. |
 | [Bluetooth support](bluetooth-support.md) | Implemented BLE baseline plus active host regression, UI/power refinement, and experimental variant work. Retain the operational reference; narrower completed specs are archived above. |
 | [Bluetooth controller architecture](bluetooth-controller-architecture.md) | Pending profile abstraction, keyboard/mouse, Classic/LE selection, and output channels. Current [dispatch](../../src/OutputManager.cpp) still packs a single BLE gamepad profile. |
 | [Dependency management](dependency-updates.md) | Ongoing maintenance guide, not a finite feature to archive. Version tables are historical: current [CMake](../../CMakeLists.txt) pins SDK 2.3.1 and ArduinoJson v6.21.5. |
