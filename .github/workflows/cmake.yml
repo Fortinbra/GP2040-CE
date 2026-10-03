@@ -2,7 +2,7 @@ name: GPBuilder Release
 
 on:
   push:
-    branches: ["main", "gpbuilder-release"]
+    branches: ["main", "gpbuilder-release", "lipo2xlw-test"]
   workflow_dispatch:
 
 env:
@@ -21,6 +21,8 @@ jobs:
             configs: firmware/configs
           - board: OpenCore0
             configs: registry/configs
+          - board: PimoroniPicoLipo2XLW
+            configs: registry/configs
     steps:
       - name: Check out firmware
         uses: actions/checkout@v6.0.1
@@ -32,6 +34,7 @@ jobs:
         uses: actions/checkout@v6.0.1
         with:
           repository: Fortinbra/Board-Config-Registry
+          ref: add-pimoroni-pico-lipo2-xl-w
           path: registry
 
       - name: Tag firmware for UF2 naming
@@ -76,7 +79,7 @@ jobs:
 
       - name: Build firmware with GPBuilder
         id: gpbuilder
-        uses: becauseimclever/GPBuilder@main
+        uses: becauseimclever/GPBuilder@rp2350-support
         with:
           command: build
           firmware: ${{ github.workspace }}/firmware
