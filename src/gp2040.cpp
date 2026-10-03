@@ -282,8 +282,8 @@ void GP2040::run() {
 	}
 
 #ifdef ENABLE_BLUETOOTH
-	if (wirelessOnly) {
-		BLEHIDManager::getInstance().init();
+	if (wirelessOnly || configMode) {
+		BLEHIDManager::getInstance().init(configMode);
 	}
 #endif
 
@@ -303,8 +303,8 @@ void GP2040::run() {
 		USBHostManager::getInstance().process();
 
 #ifdef ENABLE_BLUETOOTH
-		// Drive BTstack run loop in wireless-only mode
-		if (wirelessOnly) {
+		// Keep Bluetooth pairing available alongside USB Web Config.
+		if (wirelessOnly || configMode) {
 			BLEHIDManager::getInstance().process();
 		}
 #endif

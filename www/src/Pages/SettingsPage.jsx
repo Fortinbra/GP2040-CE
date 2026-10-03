@@ -11,6 +11,7 @@ import useProfilesStore from '../Store/useProfilesStore';
 import { AppContext } from '../Contexts/AppContext';
 
 import ContextualHelpOverlay from '../Components/ContextualHelpOverlay';
+import BluetoothSettings from '../Components/BluetoothSettings';
 import KeyboardMapper from '../Components/KeyboardMapper';
 import Section from '../Components/Section';
 import WebApi, { baseButtonMappings } from '../Services/WebApi';
@@ -534,13 +535,10 @@ export default function SettingsPage() {
 		fetchProfiles();
 		updatePeripherals();
 		fetchBootModeOptions();
-		refreshBLEStatus();
 	}, []);
 
 	const [saveMessage, setSaveMessage] = useState('');
-	const [bleStatus, setBleStatus] = useState(null);
-	const [bleMessage, setBleMessage] = useState('');
-	const [bleBusy, setBleBusy] = useState(false);
+	const [bleSupported, setBleSupported] = useState(false);
 	const [warning, setWarning] = useState({ show: false, acceptText: '' });
 	const [validated, setValidated] = useState(false);
 	const [keyMappings, setKeyMappings] = useState(baseButtonMappings);
@@ -561,31 +559,6 @@ export default function SettingsPage() {
 	const handlePS4Signature = (event) => {
 		setPS4Signature(event.target.files[0]);
 		setMessage(null);
-	};
-
-	const refreshBLEStatus = async () => {
-		const status = await WebApi.getBLEHIDStatus();
-		if (status) {
-			setBleStatus(status);
-			setBleMessage('');
-		}
-	};
-
-	const setBLEControl = async (options) => {
-		setBleBusy(true);
-		const status = await WebApi.setBLEHIDControls(options);
-		setBleBusy(false);
-		if (status) {
-			setBleStatus(status);
-			setBleMessage(t('Common:saved-success-message'));
-		} else {
-			setBleMessage(t('Common:saved-error-message'));
-		}
-	};
-
-	const clearBLEBonds = async () => {
-		if (!window.confirm(t('SettingsPage:ble-status.clear-bonds-confirm'))) return;
-		await setBLEControl({ clearBonds: true });
 	};
 
 	const verifyAndSavePS4 = async ({
@@ -1407,12 +1380,13 @@ export default function SettingsPage() {
 				? t('Common:saved-success-message')
 				: t('Common:saved-error-message'),
 		);
-		if (success && values.inputMode == 18) {
-			await refreshBLEStatus();
-		}
 	};
 
 	const onSubmit = async (values) => {
+		if (values.inputMode == 18 && !bleSupported) {
+			setSaveMessage(t('SettingsPage:ble-status.errors.not-ready'));
+			return;
+		}
 		const isKeyboardMode = values.inputMode === 3;
 
 		const data = {
@@ -1584,121 +1558,10 @@ export default function SettingsPage() {
 															translatedInputModeAuthentications,
 														)}
 														{values.inputMode == 18 ? (
-															<Row className="mb-3">
-																<Col sm={12}>
-																	<div className="mb-2 fw-bold">
-																		{t('SettingsPage:ble-status.title')}
-																	</div>
-																	<div className="mb-2">
-																		{bleStatus ? (
-																			<>
-																				<div>
-																					{t(
-																						'SettingsPage:ble-status.supported',
-																						{
-																							value: t(
-																								`SettingsPage:ble-status.${bleStatus.supported ? 'yes' : 'no'}`,
-																							),
-																						},
-																					)}
-																				</div>
-																				<div>
-																					{t(
-																						'SettingsPage:ble-status.initialized',
-																						{
-																							value: t(
-																								`SettingsPage:ble-status.${bleStatus.enabled ? 'yes' : 'no'}`,
-																							),
-																						},
-																					)}
-																				</div>
-																				<div>
-																					{t(
-																						'SettingsPage:ble-status.connected',
-																						{
-																							value: t(
-																								`SettingsPage:ble-status.${bleStatus.connected ? 'yes' : 'no'}`,
-																							),
-																						},
-																					)}
-																				</div>
-																				<div>
-																					{t(
-																						'SettingsPage:ble-status.notifying',
-																						{
-																							value: t(
-																								`SettingsPage:ble-status.${bleStatus.notifying ? 'yes' : 'no'}`,
-																							),
-																						},
-																					)}
-																				</div>
-																				<div>
-																					{t(
-																						'SettingsPage:ble-status.bond-count',
-																						{ count: bleStatus.bondCount ?? 0 },
-																					)}
-																				</div>
-																			</>
-																		) : (
-																			<div>
-																				{t(
-																					'SettingsPage:ble-status.unavailable',
-																				)}
-																			</div>
-																		)}
-																	</div>
-																	<div className="d-flex gap-2 flex-wrap">
-																		<Button
-																			variant="secondary"
-																			type="button"
-																			disabled={bleBusy}
-																			onClick={() => refreshBLEStatus()}
-																		>
-																			{t('SettingsPage:ble-status.refresh')}
-																		</Button>
-																		<Button
-																			variant="secondary"
-																			type="button"
-																			disabled={bleBusy}
-																			onClick={() =>
-																				setBLEControl({ pairingMode: true })
-																			}
-																		>
-																			{t(
-																				'SettingsPage:ble-status.enable-pairing',
-																			)}
-																		</Button>
-																		<Button
-																			variant="secondary"
-																			type="button"
-																			disabled={bleBusy}
-																			onClick={() =>
-																				setBLEControl({ pairingMode: false })
-																			}
-																		>
-																			{t(
-																				'SettingsPage:ble-status.disable-pairing',
-																			)}
-																		</Button>
-																		<Button
-																			variant="danger"
-																			type="button"
-																			disabled={bleBusy}
-																			onClick={() => clearBLEBonds()}
-																		>
-																			{t('SettingsPage:ble-status.clear-bonds')}
-																		</Button>
-																	</div>
-																	{bleMessage ? (
-																		<div className="alert mt-2">
-																			{bleMessage}
-																		</div>
-																	) : null}
-																</Col>
-															</Row>
+															<BluetoothSettings onSupportChange={setBleSupported} />
 														) : null}
 													</Form.Group>
-													<Button type="submit">
+													<Button type="submit" disabled={values.inputMode == 18 && !bleSupported}>
 														{t('Common:button-save-label')}
 													</Button>
 													{saveMessage ? (

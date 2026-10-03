@@ -702,10 +702,27 @@ async function reboot(bootMode) {
 		.catch(console.error);
 }
 
+function validateBLEHIDStatus(status) {
+	const flags = [
+		'supported', 'enabled', 'initializationFailed', 'bondSaveFailed',
+		'connected', 'notifying', 'pairingMode',
+	];
+	if (
+		!status || flags.some((flag) => typeof status[flag] !== 'boolean') ||
+		!Number.isInteger(status.bondCount) || status.bondCount < 0 ||
+		typeof status.deviceName !== 'string'
+	) {
+		throw new Error('Invalid Bluetooth status response');
+	}
+	return status;
+}
+
 async function getBLEHIDStatus() {
 	try {
-		const response = await Http.get(`${baseUrl}/api/getBLEHIDStatus`);
-		return response.data;
+		const response = await Http.get(`${baseUrl}/api/getBLEHIDStatus`, {
+			signal: AbortSignal.timeout(5000),
+		});
+		return validateBLEHIDStatus(response.data);
 	} catch (error) {
 		console.error(error);
 		return null;
@@ -717,8 +734,13 @@ async function setBLEHIDControls(options) {
 		const response = await Http.post(
 			`${baseUrl}/api/setBLEHIDControls`,
 			sanitizeRequest(options),
+			{},
+			AbortSignal.timeout(5000),
 		);
-		return response.data;
+		if (typeof response.data?.success !== 'boolean') {
+			throw new Error('Invalid Bluetooth control response');
+		}
+		return validateBLEHIDStatus(response.data);
 	} catch (error) {
 		console.error(error);
 		return null;

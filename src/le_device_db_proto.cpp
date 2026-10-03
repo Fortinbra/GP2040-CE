@@ -8,14 +8,58 @@
 #include "ble/le_device_db.h"
 #include "ble/le_device_db_tlv.h"  // for le_device_db_tlv_configure stub
 #include "storagemanager.h"
+#include "BLEHIDManager.h"
+#include "pico/cyw43_arch.h"
+#include "pico/async_context.h"
 
 #include <string.h>
 
 #define MAX_BONDS 4
 
+// Callbacks mark changes; process() saves on core0 outside IRQ context under the BTstack lock.
+static bool bondsDirty = false;
+
 static inline BLEConfig& cfg()
 {
     return Storage::getInstance().getConfig().bleConfig;
+}
+
+void BLEHIDManager::_saveBonds()
+{
+    static uint32_t lastAttemptMs = 0;
+    const uint32_t now = to_ms_since_boot(get_absolute_time());
+    if (!bondsDirty || (_bondSaveFailed && now - lastAttemptMs < 1000)) return;
+    lastAttemptMs = now;
+    _bondSaveFailed = !Storage::getInstance().save();
+    if (_bondSaveFailed) {
+        printf("[BLE] Could not save Bluetooth bonds; retrying\n");
+    } else {
+        bondsDirty = false;
+    }
+}
+
+bool BLEHIDManager::clearBonds()
+{
+    if (!_initialized) return false;
+    async_context_acquire_lock_blocking(cyw43_arch_async_context());
+    if (!_ready || _connected || _pairingMode) {
+        async_context_release_lock(cyw43_arch_async_context());
+        return false;
+    }
+
+    const BLEConfig previous = cfg();
+    cfg() = {};
+    const bool saved = Storage::getInstance().save();
+    if (!saved) {
+        cfg() = previous;
+        printf("[BLE] Could not save cleared Bluetooth bonds\n");
+    } else {
+        _hasBondedPeers = false;
+        _bondSaveFailed = false;
+        bondsDirty = false;
+    }
+    async_context_release_lock(cyw43_arch_async_context());
+    return saved;
 }
 
 // ─── init / counts ────────────────────────────────────────────────────────────
@@ -98,7 +142,7 @@ int le_device_db_add(int addr_type, bd_addr_t addr, sm_key_t irk)
                 memcpy(e.irk.bytes, irk, 16);
                 e.irk.size = 16;
             }
-            Storage::getInstance().save();
+            bondsDirty = true;
             return i;
         }
     }
@@ -110,7 +154,7 @@ int le_device_db_add(int addr_type, bd_addr_t addr, sm_key_t irk)
             if ((pb_size_t)(i + 1) > c.bonds_count) {
                 c.bonds_count = (pb_size_t)(i + 1);
             }
-            Storage::getInstance().save();
+            bondsDirty = true;
             return i;
         }
     }
@@ -118,7 +162,7 @@ int le_device_db_add(int addr_type, bd_addr_t addr, sm_key_t irk)
     // 3. Evict LRU slot.
     int lru = _find_lru(c);
     _fill_slot(c.bonds[lru], addr_type, addr, irk, nextSeq);
-    Storage::getInstance().save();
+    bondsDirty = true;
     return lru;
 }
 
@@ -127,7 +171,7 @@ void le_device_db_remove(int index)
     if (index < 0 || index >= MAX_BONDS) return;
     memset(&cfg().bonds[index], 0, sizeof(BLEBondEntry));
     cfg().bonds[index].valid = false;
-    Storage::getInstance().save();
+    bondsDirty = true;
 }
 
 // ─── device info ──────────────────────────────────────────────────────────────
@@ -163,7 +207,7 @@ void le_device_db_encryption_set(int index, uint16_t ediv, uint8_t rand[8],
     e.authenticated    = (authenticated != 0);
     e.authorized       = (authorized   != 0);
     e.secureConnection = (secure_connection != 0);
-    Storage::getInstance().save();
+    bondsDirty = true;
 }
 
 void le_device_db_encryption_get(int index, uint16_t* ediv, uint8_t rand[8],
