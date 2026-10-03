@@ -38,8 +38,10 @@
 // Generated GATT database header (from src/ble_hid.gatt via pico_btstack_make_gatt_header)
 #include "ble_hid.h"
 
-// HID Report Descriptor: Report ID 1 + 14 generic HID buttons (2 bytes) + hat switch (1 byte)
-//   = 3-byte digital-only report body.
+// HID Report Descriptor: Report ID 1 + 18 generic HID buttons + 6 padding bits
+//   + 4 x 8-bit stick axes (X, Y, Z, Rz) = 7-byte report body.
+//   Button order follows the W3C Standard Gamepad layout, with the D-pad as
+//   discrete buttons 13..16 (no hat switch). Axes are currently sent neutral.
 // The Report ID is carried by the GATT Report Reference descriptor, not the notification.
 static const uint8_t hid_report_descriptor[] = {
     0x05, 0x01,              // USAGE_PAGE (Generic Desktop)
@@ -47,40 +49,36 @@ static const uint8_t hid_report_descriptor[] = {
     0xA1, 0x01,              // COLLECTION (Application)
     0x85, 0x01,              // REPORT_ID (1)
 
-    // ── 14 digital buttons + 2 padding bits (2 bytes total) ────────────────
-    // Button 1..8 = B1, B2, B3, B4, L1, R1, L2, R2
-    // Button 9..14 = S1, S2, L3, R3, A1, A2
+    // ── 18 digital buttons (Standard Gamepad order) ────────────────────────
+    // Button 1..8   = B1, B2, B3, B4, L1, R1, L2, R2
+    // Button 9..12  = S1, S2, L3, R3
+    // Button 13..16 = D-pad Up, Down, Left, Right
+    // Button 17..18 = A1, A2
     0x05, 0x09,              //   USAGE_PAGE (Button)
     0x19, 0x01,              //   USAGE_MINIMUM (Button 1)
-    0x29, 0x0E,              //   USAGE_MAXIMUM (Button 14)
+    0x29, 0x12,              //   USAGE_MAXIMUM (Button 18)
     0x15, 0x00,              //   LOGICAL_MINIMUM (0)
     0x25, 0x01,              //   LOGICAL_MAXIMUM (1)
     0x75, 0x01,              //   REPORT_SIZE (1)
-    0x95, 0x0E,              //   REPORT_COUNT (14)
+    0x95, 0x12,              //   REPORT_COUNT (18)
     0x81, 0x02,              //   INPUT (Data,Var,Abs)
 
-    // 2 padding bits to complete byte 1
+    // 6 padding bits to complete byte 2
     0x75, 0x01,              //   REPORT_SIZE (1)
-    0x95, 0x02,              //   REPORT_COUNT (2)
+    0x95, 0x06,              //   REPORT_COUNT (6)
     0x81, 0x03,              //   INPUT (Cnst,Var,Abs)
 
-    // ── D-pad as hat switch (1 byte total) ─────────────────────────────────
+    // ── Analog sticks: LX, LY, RX, RY (centered = 0x80) ─────────────────────
     0x05, 0x01,              //   USAGE_PAGE (Generic Desktop)
-    0x09, 0x39,              //   USAGE (Hat switch)
+    0x09, 0x30,              //   USAGE (X)
+    0x09, 0x31,              //   USAGE (Y)
+    0x09, 0x32,              //   USAGE (Z)
+    0x09, 0x35,              //   USAGE (Rz)
     0x15, 0x00,              //   LOGICAL_MINIMUM (0)
-    0x25, 0x07,              //   LOGICAL_MAXIMUM (7)
-    0x35, 0x00,              //   PHYSICAL_MINIMUM (0)
-    0x46, 0x3B, 0x01,        //   PHYSICAL_MAXIMUM (315 = 7×45 degrees)
-    0x65, 0x14,              //   UNIT (Eng Rot: Angular Position)
-    0x75, 0x04,              //   REPORT_SIZE (4)
-    0x95, 0x01,              //   REPORT_COUNT (1)
-    0x81, 0x42,              //   INPUT (Data,Var,Abs,Null)
-
-    // 4 padding bits to complete the hat byte
-    0x65, 0x00,              //   UNIT (None)
-    0x75, 0x04,              //   REPORT_SIZE (4)
-    0x95, 0x01,              //   REPORT_COUNT (1)
-    0x81, 0x03,              //   INPUT (Cnst,Var,Abs)
+    0x26, 0xFF, 0x00,        //   LOGICAL_MAXIMUM (255)
+    0x75, 0x08,              //   REPORT_SIZE (8)
+    0x95, 0x04,              //   REPORT_COUNT (4)
+    0x81, 0x02,              //   INPUT (Data,Var,Abs)
 
     0xC0,                    // END_COLLECTION
 };
@@ -627,10 +625,13 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
                                 firstSend    = false;
                                 lastSendLogMs = t;
                                 printf("[BLE] CAN_SEND_NOW: sent %u bytes"
-                                       " btns=[0x%02X 0x%02X] hat=0x%02X\n",
+                                       " btns=[0x%02X 0x%02X 0x%02X]"
+                                       " axes=[%u %u %u %u]\n",
                                         (unsigned)reportLen,
                                        mgr._reportQueue[readIndex][0], mgr._reportQueue[readIndex][1],
-                                       mgr._reportQueue[readIndex][2]);
+                                       mgr._reportQueue[readIndex][2],
+                                       mgr._reportQueue[readIndex][3], mgr._reportQueue[readIndex][4],
+                                       mgr._reportQueue[readIndex][5], mgr._reportQueue[readIndex][6]);
                             }
                         }
                         // _lastSentReport is only accessed here (IRQ context) so no volatile needed.
