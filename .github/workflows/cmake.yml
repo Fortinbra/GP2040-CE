@@ -1,159 +1,129 @@
-name: CMake
+name: GPBuilder Release
 
 on:
   push:
-    branches: ["main"]
-  pull_request:
-    branches: ["main"]
-  #  pull_request_target:
-  #    branches: [ "main" ]
+    branches: ["main", "gpbuilder-release"]
   workflow_dispatch:
-    inputs:
-      board_config:
-        description: "Board configuration to build (leave empty to build all)"
-        required: false
-        type: choice
-        options:
-          - ""
-          - ARCController
-          - ASiLVLABC
-          - ASiLVLWASD
-          - Blank
-          - Pico
-          - PicoW
-          - Pico2
-          - BentoBox
-          - FlatboxRev4
-          - FlatboxRev5
-          - FlatboxRev5RGB
-          - FlatboxRev5USBPassthrough
-          - FlatboxRev5Southpaw
-          - FlatboxRev8
-          - Granola
-          - GranolaBeacon
-          - AdafruitKB2040
-          - KeyboardConverter
-          - Haute42COSMOX
-          - Haute42COSMOXCAS
-          - Haute42COSMOXCAT
-          - Haute42COSMOXMLite
-          - Haute42COSMOXMUltra
-          - Haute42COSMOXXAnalog
-          - Liatris
-          - MavercadeRev1
-          - MavercadeRev2
-          - MavercadeRev3
-          - MiSTercadeV2
-          - OpenCore0
-          - OpenCore0MIXUP
-          - OpenCore0WASD
-          - OSUMGP-RP2040
-          - PicoFightingBoard
-          - PimoroniPicoPlus2
-          - PXPGamepad
-          - ReflexCtrlGenesis6
-          - ReflexCtrlNES
-          - ReflexCtrlSaturn
-          - ReflexCtrlSNES
-          - ReflexCtrlVB
-          - ReflexEncodeV1.2
-          - ReflexEncodeV2.0
-          - RP2040AdvancedBreakoutBoard
-          - RP2040AdvancedBreakoutBoardUSBPassthrough
-          - RP2040MiniBreakoutBoard
-          - RP2040MiniBreakoutBoardUSBPassthrough
-          - SeeedXIAORP2040
-          - SparkFunProMicro
-          - SparkFunProMicroRP2350
-          - WaveshareZero
-          - WaveshareRP2350BPlusW
-          - SGFDevices
-          - ZeroRhythm
 
 env:
-  BUILD_TYPE: Release
+  RELEASE_TAG: v0.8.0
+  RELEASE_VERSION: 0.8.0
 
 jobs:
-  call-node-workflow:
-    uses: ./.github/workflows/node.js.yml
-  build-config-list:
-    runs-on: ubuntu-latest
-    outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@v6.0.1
-      - id: set-matrix
-        run: |
-          CONFIG_DIRS=$(ls -d ./configs/*/ | cut -f3 -d'/' | jq -R -s -c 'split("\n")[:-1]')
-          echo "matrix=$CONFIG_DIRS" >> $GITHUB_OUTPUT
   build:
-    needs: [call-node-workflow, build-config-list]
-    # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
-    # You can convert this to a matrix build if you need cross-platform coverage.
-    # See: https://docs.github.com/en/free-pro-team@latest/actions/learn-github-actions/managing-complex-workflows#using-a-build-matrix
-    runs-on: ubuntu-22.04
+    name: Build ${{ matrix.board }}
+    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        GP2040_BOARDCONFIG: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.board_config != '' && fromJSON(format('["{0}"]', github.event.inputs.board_config)) || fromJSON(needs.build-config-list.outputs.matrix) }}
+        include:
+          - board: Pico
+            configs: firmware/configs
+          - board: OpenCore0
+            configs: registry/configs
     steps:
-      - name: Setup cmake
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: "3.31.x"
-      - name: Verify cmake
-        run: cmake --version
-
-      #Global Setup
-      - name: Checkout GP2040-CE
+      - name: Check out firmware
         uses: actions/checkout@v6.0.1
         with:
+          path: firmware
           fetch-depth: 0
-          fetch-tags: true
 
-      - name: arm-none-eabi-gcc GNU Arm Embedded Toolchain
-        uses: carlosperate/arm-none-eabi-gcc-action@v1
-
-      - name: Checkout pico-sdk/2.3.1
+      - name: Check out Board-Config-Registry
         uses: actions/checkout@v6.0.1
         with:
-          repository: raspberrypi/pico-sdk
-          ref: 2.3.1
-          path: pico-sdk
+          repository: Fortinbra/Board-Config-Registry
+          path: registry
 
-      - name: Checkout pico-sdk submodules
-        working-directory: ${{github.workspace}}/pico-sdk
-        run: git submodule update --init
+      - name: Tag firmware for UF2 naming
+        working-directory: firmware
+        run: |
+          if ! git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null; then
+            git tag "${RELEASE_TAG}"
+          fi
+          git describe --tags
 
-      - name: Download a Build Artifact
-        uses: actions/download-artifact@v7.0.0
+      - uses: actions/setup-python@v6
         with:
-          name: fsData
-          path: ${{github.workspace}}/lib/httpd/
+          python-version: "3.13"
 
-      - name: Get core count
-        id: core_count
-        run: cat /proc/cpuinfo  | grep processor | wc -l
-        #End Global Setup
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
 
-      - name: Pico Build Configure CMake
-        shell: bash
-        run: PICO_SDK_PATH=${{github.workspace}}/pico-sdk GP2040_BOARDCONFIG=${{ matrix.GP2040_BOARDCONFIG }} SKIP_WEBBUILD=TRUE cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+      - name: Cache Pico tools
+        id: pico-tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pico-sdk/cmake
+            ~/.pico-sdk/ninja
+            ~/.pico-sdk/toolchain
+          key: pico-tools-linux-cmake4.3.4-ninja1.13.2-arm15.2rel1
 
-      - name: Pico Build
-        shell: bash
-        run: GP2040_BOARDCONFIG=${{ matrix.GP2040_BOARDCONFIG }} cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel ${{steps.core_count.outputs.output}}
+      - name: Provision Pico tools
+        if: steps.pico-tools.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          root="$HOME/.pico-sdk"
+          mkdir -p "$root/cmake/v4.3.4" "$root/ninja/v1.13.2" "$root/toolchain/15_2_Rel1"
+          curl -fsSL https://github.com/Kitware/CMake/releases/download/v4.3.4/cmake-4.3.4-linux-x86_64.tar.gz \
+            | tar -xz --strip-components=1 -C "$root/cmake/v4.3.4"
+          curl -fsSL -o /tmp/ninja.zip https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-linux.zip
+          unzip -o /tmp/ninja.zip -d "$root/ninja/v1.13.2"
+          chmod +x "$root/ninja/v1.13.2/ninja"
+          curl -fsSL https://developer.arm.com/-/media/Files/downloads/gnu/15.2.rel1/binrel/arm-gnu-toolchain-15.2.rel1-x86_64-arm-none-eabi.tar.xz \
+            | tar -xJ --strip-components=1 -C "$root/toolchain/15_2_Rel1"
 
-      - name: Upload Pico Artifact
+      - name: Build firmware with GPBuilder
+        id: gpbuilder
+        uses: becauseimclever/GPBuilder@main
+        with:
+          command: build
+          firmware: ${{ github.workspace }}/firmware
+          release: main
+          board: ${{ matrix.board }}
+          configs: ${{ github.workspace }}/${{ matrix.configs }}
+
+      - name: Upload firmware
         uses: actions/upload-artifact@v6.0.0
         with:
-          name: GP2040-CE - ${{ matrix.GP2040_BOARDCONFIG }}
-          path: ${{github.workspace}}/build/GP2040-CE_*_${{ matrix.GP2040_BOARDCONFIG }}.uf2
+          name: firmware-${{ matrix.board }}
+          path: |
+            ${{ steps.gpbuilder.outputs.uf2-path }}
+            ${{ steps.gpbuilder.outputs.build-metadata-path }}
           if-no-files-found: error
 
-      - name: Upload .elf Artifact
-        if: ${{ matrix.GP2040_BOARDCONFIG == 'Pico'}}
-        uses: actions/upload-artifact@v6.0.0
+  release:
+    name: Publish release
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7.0.0
         with:
-          name: elf
-          path: ${{github.workspace}}/build/GP2040-CE_*_${{ matrix.GP2040_BOARDCONFIG }}.elf
-          if-no-files-found: error
+          pattern: firmware-*
+          path: downloads
+
+      - name: Rename release assets
+        run: |
+          set -euo pipefail
+          mkdir -p assets
+          for dir in downloads/firmware-*; do
+            board="${dir#downloads/firmware-}"
+            uf2="$(find "$dir" -name '*.uf2' -print -quit)"
+            cp "$uf2" "assets/GP2040-CE_${RELEASE_VERSION}_${board}.uf2"
+          done
+          ls -l assets
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" assets/*.uf2 --clobber
+          else
+            gh release create "${RELEASE_TAG}" assets/*.uf2 --target "${GITHUB_SHA}" --title "${RELEASE_TAG}" --generate-notes
+          fi
