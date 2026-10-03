@@ -3015,6 +3015,19 @@ static void writeBLEHIDStatus(DynamicJsonDocument& doc)
     writeDoc(doc, "hasBondedPeers", status.bondCount > 0);
     writeDoc(doc, "bondCount", status.bondCount);
     writeDoc(doc, "deviceName", BLEHIDManager::DEVICE_NAME);
+    JsonObject diagnostics = doc.createNestedObject("diagnostics");
+    diagnostics["connectionEvents"] = status.diagnostics.connectionEvents;
+    diagnostics["rejectedConnections"] = status.diagnostics.rejectedConnections;
+    diagnostics["pairingAttempts"] = status.diagnostics.pairingAttempts;
+    diagnostics["justWorksRequests"] = status.diagnostics.justWorksRequests;
+    diagnostics["pairingDeclines"] = status.diagnostics.pairingDeclines;
+    diagnostics["disconnections"] = status.diagnostics.disconnections;
+    diagnostics["lastConnectionEvent"] = status.diagnostics.lastConnectionEvent;
+    diagnostics["lastConnectionStatus"] = status.diagnostics.lastConnectionStatus;
+    diagnostics["lastPairingStatus"] = status.diagnostics.lastPairingStatus;
+    diagnostics["lastPairingReason"] = status.diagnostics.lastPairingReason;
+    diagnostics["lastDisconnectReason"] = status.diagnostics.lastDisconnectReason;
+    diagnostics["lastEncryptionStatus"] = status.diagnostics.lastEncryptionStatus;
 #else
     writeDoc(doc, "supported", false);
     writeDoc(doc, "enabled", false);
@@ -3031,7 +3044,7 @@ static void writeBLEHIDStatus(DynamicJsonDocument& doc)
 
 std::string getBLEHIDStatus()
 {
-    DynamicJsonDocument doc(JSON_OBJECT_SIZE(16) + 64);
+    DynamicJsonDocument doc(JSON_OBJECT_SIZE(16) + JSON_OBJECT_SIZE(12) + 64);
     writeBLEHIDStatus(doc);
     return serialize_json(doc);
 }
@@ -3039,7 +3052,7 @@ std::string getBLEHIDStatus()
 std::string setBLEHIDControls()
 {
     const DynamicJsonDocument request = get_post_data();
-    DynamicJsonDocument doc(JSON_OBJECT_SIZE(16) + 128);
+    DynamicJsonDocument doc(JSON_OBJECT_SIZE(16) + JSON_OBJECT_SIZE(12) + 128);
     const bool pairingCommand = request["pairingMode"].is<bool>();
     const bool clearCommand = request["clearBonds"].is<bool>() && request["clearBonds"].as<bool>();
     const char* error = nullptr;

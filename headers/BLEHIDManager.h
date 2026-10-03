@@ -20,6 +20,22 @@ enum class BLEPowerState : uint8_t {
     IDLE        = 2,
 };
 
+struct BLEHIDDiagnostics {
+    uint32_t connectionEvents = 0;
+    uint32_t rejectedConnections = 0;
+    uint32_t pairingAttempts = 0;
+    uint32_t justWorksRequests = 0;
+    uint32_t pairingDeclines = 0;
+    uint32_t disconnections = 0;
+    uint8_t lastConnectionEvent = 0;
+    // 255 means no result has been received since boot/start of pairing.
+    uint8_t lastConnectionStatus = 255;
+    uint8_t lastPairingStatus = 255;
+    uint8_t lastPairingReason = 0;
+    uint8_t lastDisconnectReason = 0;
+    uint8_t lastEncryptionStatus = 255;
+};
+
 struct BLEHIDStatus {
     bool ready;
     bool initFailed;
@@ -28,6 +44,7 @@ struct BLEHIDStatus {
     bool notifying;
     bool pairing;
     uint8_t bondCount;
+    BLEHIDDiagnostics diagnostics;
 };
 
 class BLEHIDManager {
@@ -93,6 +110,7 @@ private:
     volatile bool _pairingMode     = false;
     bool     _initFailed           = false;
     bool     _bondSaveFailed       = false;
+    BLEHIDDiagnostics _diagnostics;
     uint32_t _bootTimeMs           = 0;
     uint32_t _initDelayMs          = 3000;
     uint32_t _retryTimeMs          = 0;

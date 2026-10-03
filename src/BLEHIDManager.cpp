@@ -345,11 +345,11 @@ bool BLEHIDManager::sendReport(const uint8_t* report, uint16_t len) {
 BLEHIDStatus BLEHIDManager::getStatus() {
     if (!_initialized) {
         return {false, _initFailed, _bondSaveFailed, false, false, false,
-                static_cast<uint8_t>(le_device_db_count())};
+                static_cast<uint8_t>(le_device_db_count()), _diagnostics};
     }
     BTstackLock lock;
     return {_ready, _initFailed, _bondSaveFailed, _connected, _notificationsEnabled, _pairingMode,
-            static_cast<uint8_t>(le_device_db_count())};
+            static_cast<uint8_t>(le_device_db_count()), _diagnostics};
 }
 
 bool BLEHIDManager::setPairingMode(bool enabled) {
@@ -541,11 +541,37 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
 
         case HCI_EVENT_DISCONNECTION_COMPLETE: {
             uint8_t reason = hci_event_disconnection_complete_get_reason(packet);
+            mgr._diagnostics.disconnections++;
+            mgr._diagnostics.lastDisconnectReason = reason;
             mgr._handleDisconnect(reason);
             break;
         }
 
+        case HCI_EVENT_ENCRYPTION_CHANGE:
+            mgr._diagnostics.lastEncryptionStatus =
+                hci_event_encryption_change_get_status(packet);
+            break;
+
+        case HCI_EVENT_META_GAP:
+            if (hci_event_gap_meta_get_subevent_code(packet) ==
+                    GAP_SUBEVENT_LE_CONNECTION_COMPLETE) {
+                mgr._diagnostics.connectionEvents++;
+                mgr._diagnostics.lastConnectionStatus =
+                    gap_subevent_le_connection_complete_get_status(packet);
+            }
+            break;
+
         case HCI_EVENT_LE_META:
+            switch (hci_event_le_meta_get_subevent_code(packet)) {
+                case HCI_SUBEVENT_LE_CONNECTION_COMPLETE:
+                case HCI_SUBEVENT_LE_ENHANCED_CONNECTION_COMPLETE_V1:
+                case HCI_SUBEVENT_LE_ENHANCED_CONNECTION_COMPLETE_V2:
+                    mgr._diagnostics.lastConnectionEvent =
+                        hci_event_le_meta_get_subevent_code(packet);
+                    break;
+                default:
+                    break;
+            }
             if (hci_event_le_meta_get_subevent_code(packet) ==
                     HCI_SUBEVENT_LE_CONNECTION_COMPLETE) {
                 if (hci_subevent_le_connection_complete_get_status(packet) != ERROR_CODE_SUCCESS) {
@@ -553,6 +579,7 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
                     break;
                 }
                 if (mgr._configMode && !mgr._pairingMode) {
+                    mgr._diagnostics.rejectedConnections++;
                     gap_disconnect(hci_subevent_le_connection_complete_get_connection_handle(packet));
                     break;
                 }
@@ -648,8 +675,15 @@ void BLEHIDManager::_smPacketHandler(uint8_t packetType, uint16_t channel,
     BLEHIDManager& mgr = getInstance();
 
     switch (hci_event_packet_get_type(packet)) {
+        case SM_EVENT_PAIRING_STARTED:
+            mgr._diagnostics.pairingAttempts++;
+            mgr._diagnostics.lastPairingStatus = 255;
+            mgr._diagnostics.lastPairingReason = 0;
+            break;
         case SM_EVENT_JUST_WORKS_REQUEST:
+            mgr._diagnostics.justWorksRequests++;
             if (mgr._configMode && !mgr._connected && !mgr._pairingMode) {
+                mgr._diagnostics.pairingDeclines++;
                 sm_bonding_decline(sm_event_just_works_request_get_handle(packet));
             } else {
                 sm_just_works_confirm(sm_event_just_works_request_get_handle(packet));
@@ -670,6 +704,8 @@ void BLEHIDManager::_smPacketHandler(uint8_t packetType, uint16_t channel,
         }
         case SM_EVENT_PAIRING_COMPLETE: {
             uint8_t status = sm_event_pairing_complete_get_status(packet);
+            mgr._diagnostics.lastPairingStatus = status;
+            mgr._diagnostics.lastPairingReason = sm_event_pairing_complete_get_reason(packet);
             if (status == ERROR_CODE_SUCCESS) {
                 mgr._hasBondedPeers = true;
                 // Re-verify bond was stored — 2 fast blinks = pairing+bond confirmed
