@@ -11,6 +11,7 @@ import useProfilesStore from '../Store/useProfilesStore';
 import { AppContext } from '../Contexts/AppContext';
 
 import ContextualHelpOverlay from '../Components/ContextualHelpOverlay';
+import BluetoothSettings from '../Components/BluetoothSettings';
 import KeyboardMapper from '../Components/KeyboardMapper';
 import Section from '../Components/Section';
 import WebApi, { baseButtonMappings } from '../Services/WebApi';
@@ -179,11 +180,13 @@ const INPUT_BOOT_MODES = [
 	{ labelKey: 'input-mode-options.astro', value: 10, group: 'mini' },
 	{ labelKey: 'input-mode-options.psclassic', value: 11, group: 'mini' },
 	{ labelKey: 'input-mode-options.sinput', value: 17, group: 'primary' },
+	{ labelKey: 'input-mode-options.ble', value: 18, group: 'wireless' },
 ];
 
 const INPUT_MODE_GROUPS = [
 	{ labelKey: 'input-mode-group.primary', value: 0, group: 'primary' },
 	{ labelKey: 'input-mode-group.mini', value: 1, group: 'mini' },
+	{ labelKey: 'input-mode-group.wireless', value: 2, group: 'wireless' },
 ];
 
 const DPAD_MODES = [
@@ -535,6 +538,7 @@ export default function SettingsPage() {
 	}, []);
 
 	const [saveMessage, setSaveMessage] = useState('');
+	const [bleSupported, setBleSupported] = useState(false);
 	const [warning, setWarning] = useState({ show: false, acceptText: '' });
 	const [validated, setValidated] = useState(false);
 	const [keyMappings, setKeyMappings] = useState(baseButtonMappings);
@@ -1345,6 +1349,8 @@ export default function SettingsPage() {
 				);
 			case 'input-mode-options.xbone':
 				return xboneModeSpecifics(values, errors, setFieldValue, handleChange);
+			case 'input-mode-options.ble':
+				return null;
 			default:
 				return (
 					<Row className="mb-3">
@@ -1379,6 +1385,10 @@ export default function SettingsPage() {
 	};
 
 	const onSubmit = async (values) => {
+		if (values.inputMode == 18 && !bleSupported) {
+			setSaveMessage(t('SettingsPage:ble-status.errors.not-ready'));
+			return;
+		}
 		const isKeyboardMode = values.inputMode === 3;
 
 		const data = {
@@ -1549,8 +1559,11 @@ export default function SettingsPage() {
 															handleChange,
 															translatedInputModeAuthentications,
 														)}
+														{values.inputMode == 18 ? (
+															<BluetoothSettings onSupportChange={setBleSupported} />
+														) : null}
 													</Form.Group>
-													<Button type="submit">
+													<Button type="submit" disabled={values.inputMode == 18 && !bleSupported}>
 														{t('Common:button-save-label')}
 													</Button>
 													{saveMessage ? (
