@@ -1,5 +1,9 @@
 import { set } from 'lodash';
 import Http from './Http';
+import {
+	parseBluetoothStatus,
+	parseBluetoothControlResponse,
+} from './BluetoothApi';
 import { hexToInt, rgbIntToHex } from './Utilities';
 
 export const baseUrl =
@@ -702,27 +706,12 @@ async function reboot(bootMode) {
 		.catch(console.error);
 }
 
-function validateBLEHIDStatus(status) {
-	const flags = [
-		'supported', 'enabled', 'initializationFailed', 'bondSaveFailed',
-		'connected', 'notifying', 'pairingMode',
-	];
-	if (
-		!status || flags.some((flag) => typeof status[flag] !== 'boolean') ||
-		!Number.isInteger(status.bondCount) || status.bondCount < 0 ||
-		typeof status.deviceName !== 'string'
-	) {
-		throw new Error('Invalid Bluetooth status response');
-	}
-	return status;
-}
-
 async function getBLEHIDStatus() {
 	try {
 		const response = await Http.get(`${baseUrl}/api/getBLEHIDStatus`, {
 			signal: AbortSignal.timeout(5000),
 		});
-		return validateBLEHIDStatus(response.data);
+		return parseBluetoothStatus(response.data);
 	} catch (error) {
 		console.error(error);
 		return null;
@@ -737,10 +726,7 @@ async function setBLEHIDControls(options) {
 			{},
 			AbortSignal.timeout(5000),
 		);
-		if (typeof response.data?.success !== 'boolean') {
-			throw new Error('Invalid Bluetooth control response');
-		}
-		return validateBLEHIDStatus(response.data);
+		return parseBluetoothControlResponse(response.data);
 	} catch (error) {
 		console.error(error);
 		return null;

@@ -169,6 +169,7 @@ export default function BluetoothSettings({ onSupportChange }: Props) {
 				{(phase === 'loading' || phase === 'initializing') && !statusError && (
 					<p className="text-muted">
 						<Spinner
+							as="span"
 							animation="border"
 							size="sm"
 							className="me-2"
@@ -188,6 +189,7 @@ export default function BluetoothSettings({ onSupportChange }: Props) {
 						{phase === 'pairing' && (
 							<Alert variant="info">
 								<Spinner
+									as="span"
 									animation="border"
 									size="sm"
 									className="me-2"
@@ -218,6 +220,7 @@ export default function BluetoothSettings({ onSupportChange }: Props) {
 						>
 							{busy && (
 								<Spinner
+									as="span"
 									animation="border"
 									size="sm"
 									className="me-2"
