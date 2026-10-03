@@ -20,8 +20,19 @@ enum class BLEPowerState : uint8_t {
     IDLE        = 2,
 };
 
+struct BLEHIDStatus {
+    bool ready;
+    bool initFailed;
+    bool bondSaveFailed;
+    bool connected;
+    bool notifying;
+    bool pairing;
+    uint8_t bondCount;
+};
+
 class BLEHIDManager {
 public:
+    static constexpr char DEVICE_NAME[] = "GP2040-CE Gamepad";
     static BLEHIDManager& getInstance() {
         static BLEHIDManager instance;
         return instance;
@@ -31,7 +42,7 @@ public:
     BLEHIDManager& operator=(const BLEHIDManager&) = delete;
 
     // Called once at startup to record boot time. Does NOT call cyw43_arch_init.
-    void init();
+    void init(bool configMode = false);
 
     // Called every main loop iteration.
     // Handles 3s deferred hardware init and drives cyw43_arch_poll.
@@ -42,10 +53,12 @@ public:
     bool sendReport(const uint8_t* report, uint16_t len);
 
     // Enable or disable BLE pairing (advertising with general discoverability).
-    void setPairingMode(bool enabled);
+    bool setPairingMode(bool enabled);
+    bool clearBonds();
+    BLEHIDStatus getStatus();
 
     bool isConnected() const    { return _connected; }
-    bool isEnabled() const      { return _initialized; }
+    bool isEnabled() const      { return _ready; }
     bool isNotifying() const    { return _notificationsEnabled; }
     bool hasBondedPeers() const { return _hasBondedPeers; }
     BLEPowerState getPowerState() const { return _powerState; }
@@ -62,9 +75,9 @@ private:
     BLEHIDManager() = default;
 
     void _doInit();
+    void _saveBonds();
     void _resetReportQueue();
     void _handleDisconnect(uint8_t reason);
-    void _ledBlink(uint32_t count, uint32_t onMs, uint32_t offMs);
     static uint8_t _readBatteryPercent();
 
     static void _hciPacketHandler(uint8_t packetType, uint16_t channel,
@@ -73,9 +86,13 @@ private:
                                  uint8_t* packet, uint16_t size);
 
     bool     _initialized          = false;
-    bool     _advStarted           = false;
-    bool     _pairingMode          = false;
+    bool     _initRequested        = false;
+    bool     _configMode           = false;
+    volatile bool _ready           = false;
+    volatile bool _advStarted      = false;
+    volatile bool _pairingMode     = false;
     bool     _initFailed           = false;
+    bool     _bondSaveFailed       = false;
     uint32_t _bootTimeMs           = 0;
     uint32_t _initDelayMs          = 3000;
     uint32_t _retryTimeMs          = 0;

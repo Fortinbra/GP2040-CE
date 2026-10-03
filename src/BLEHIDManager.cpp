@@ -29,6 +29,7 @@
 #include "pico/cyw43_arch.h"
 #include "pico/btstack_run_loop_async_context.h"
 #include "pico/unique_id.h"
+#include "pico/async_context.h"
 #include "hardware/adc.h"
 
 // BTstack core
@@ -97,9 +98,14 @@ static const uint8_t adv_data[] = {
 };
 
 // Scan response: complete local name
-static const uint8_t scan_resp_data[] = {
-    18, BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME,
-    'G','P','2','0','4','0','-','C','E',' ','G','a','m','e','p','a','d',
+static uint8_t scan_resp_data[2 + sizeof(BLEHIDManager::DEVICE_NAME) - 1];
+
+class BTstackLock {
+public:
+    BTstackLock() { async_context_acquire_lock_blocking(cyw43_arch_async_context()); }
+    ~BTstackLock() { async_context_release_lock(cyw43_arch_async_context()); }
+    BTstackLock(const BTstackLock&) = delete;
+    BTstackLock& operator=(const BTstackLock&) = delete;
 };
 
 // Static TLV context removed — bonding database is now backed by protobuf config.
@@ -130,8 +136,11 @@ static constexpr uint32_t DISCONNECT_REASON_BLINK_MS = 300;
 // Public API
 // ─────────────────────────────────────────────────────────────────────────────
 
-void BLEHIDManager::init() {
-    if (_initialized || _bootTimeMs != 0) return;
+void BLEHIDManager::init(bool configMode) {
+    if (_initRequested) return;
+    _initRequested = true;
+    _configMode = configMode;
+    _pairingMode = !configMode;
     _bootTimeMs = to_ms_since_boot(get_absolute_time());
 }
 
@@ -139,7 +148,7 @@ void BLEHIDManager::process() {
     uint32_t now = to_ms_since_boot(get_absolute_time());
 
     if (!_initialized) {
-        if (_bootTimeMs == 0) return;  // init() not called yet
+        if (!_initRequested) return;
 
         // Retry-delay after a failed cyw43_arch_init
         if (_initFailed) {
@@ -155,6 +164,9 @@ void BLEHIDManager::process() {
     }
 
     cyw43_arch_poll();
+    BTstackLock lock;
+    if (!_ready) return;
+    _saveBonds();
 
     // Periodic battery level reporting — throttled to once per 30 seconds.
     // Uses direct ADC read on GPIO29 (ADC3) via 3:1 voltage divider.
@@ -183,12 +195,12 @@ void BLEHIDManager::process() {
 
     // Deferred advertising restart — set by disconnect handler, executed here in main loop
     if (_needsAdvRestart && !_connected) {
-        gap_advertisements_enable(1);
-        _advStarted = true;
+        gap_advertisements_enable(_pairingMode ? 1 : 0);
+        _advStarted = _pairingMode;
         _needsAdvRestart = false;
     }
 
-    // Non-blocking LED blink state machine — replaces blocking _ledBlink() calls.
+    // Non-blocking LED status signals keep USB Web Config responsive.
     // _pendingBlinkType is set by the IRQ handler; we execute the blink here without sleep_ms().
     {
         static uint8_t         blinkRemaining = 0;
@@ -269,6 +281,8 @@ void BLEHIDManager::process() {
 }
 
 bool BLEHIDManager::sendReport(const uint8_t* report, uint16_t len) {
+    if (!_initialized) return false;
+    BTstackLock lock;
     if (!_connected || !_notificationsEnabled) {
         // Periodic "blocked" log — avoids flooding at frame rate
         static uint32_t lastBlockLogMs = 0;
@@ -328,25 +342,30 @@ bool BLEHIDManager::sendReport(const uint8_t* report, uint16_t len) {
     return true;
 }
 
-void BLEHIDManager::setPairingMode(bool enabled) {
-    _pairingMode = enabled;
-    if (_initialized) {
-        gap_advertisements_enable(enabled ? 1 : 0);
+BLEHIDStatus BLEHIDManager::getStatus() {
+    if (!_initialized) {
+        return {false, _initFailed, _bondSaveFailed, false, false, false,
+                static_cast<uint8_t>(le_device_db_count())};
     }
+    BTstackLock lock;
+    return {_ready, _initFailed, _bondSaveFailed, _connected, _notificationsEnabled, _pairingMode,
+            static_cast<uint8_t>(le_device_db_count())};
+}
+
+bool BLEHIDManager::setPairingMode(bool enabled) {
+    if (!_initialized) return false;
+    BTstackLock lock;
+    if (!_ready || _connected) return false;
+    _pairingMode = enabled;
+    _needsAdvRestart = false;
+    gap_advertisements_enable(enabled ? 1 : 0);
+    _advStarted = enabled;
+    return true;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Private helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-void BLEHIDManager::_ledBlink(uint32_t count, uint32_t onMs, uint32_t offMs) {
-    for (uint32_t i = 0; i < count; i++) {
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 1);
-        sleep_ms(onMs);
-        cyw43_arch_gpio_put(CYW43_WL_GPIO_LED_PIN, 0);
-        sleep_ms(offMs);
-    }
-}
 
 void BLEHIDManager::_resetReportQueue() {
     _reportPending    = false;
@@ -396,31 +415,19 @@ void BLEHIDManager::_doInit() {
     // Initialize CYW43 wireless chip
     int err = cyw43_arch_init();
     if (err != 0) {
+        printf("[BLE] CYW43 initialization failed: %d\n", err);
         _initFailed  = true;
         _retryTimeMs = to_ms_since_boot(get_absolute_time());
         return;
     }
 
-    // 2 fast blinks: CYW43 init succeeded
-    _ledBlink(2, 100, 100);
+    BTstackLock lock;
 
     // Initialize BTstack run loop integrated with the CYW43 async context
     btstack_run_loop_init(btstack_run_loop_async_context_get_instance(cyw43_arch_async_context()));
 
     // Check for previously bonded peers — used to skip re-pairing on reconnect
     _hasBondedPeers = (le_device_db_count() > 0);
-
-    // Bond-count diagnostic: blink count = number of stored bonds.
-    // 0 bonds → 5 slow blinks (obvious "no stored bonds" indicator).
-    // N bonds → N medium blinks (confirmed persistence).
-    // Watch carefully at boot — this runs before the 3-blink HCI power-on sequence.
-    {
-        int bondCount = le_device_db_count();
-        int blinkCount = (bondCount > 0) ? bondCount : 5;
-        uint32_t onMs  = (bondCount > 0) ? 200 : 400;
-        uint32_t offMs = (bondCount > 0) ? 200 : 400;
-        _ledBlink(blinkCount, onMs, offMs);
-    }
 
     // Core protocol layers — SM must be initialized before ATT/GATT services
     l2cap_init();
@@ -493,10 +500,10 @@ void BLEHIDManager::_doInit() {
     // Set up advertising parameters and data (adv_type = 0 = ADV_IND, undirected connectable)
     gap_advertisements_set_params(0x0030, 0x0060, 0, 0, NULL, 0x07, 0x00);
     gap_advertisements_set_data(sizeof(adv_data), (uint8_t*)adv_data);
-    gap_scan_response_set_data(sizeof(scan_resp_data), (uint8_t*)scan_resp_data);
-
-    // 3 fast blinks before powering on HCI
-    _ledBlink(3, 80, 80);
+    scan_resp_data[0] = sizeof(scan_resp_data) - 1;
+    scan_resp_data[1] = BLUETOOTH_DATA_TYPE_COMPLETE_LOCAL_NAME;
+    memcpy(scan_resp_data + 2, DEVICE_NAME, sizeof(scan_resp_data) - 2);
+    gap_scan_response_set_data(sizeof(scan_resp_data), scan_resp_data);
 
     // Power on the Bluetooth controller — advertising starts ONLY after
     // BTSTACK_EVENT_STATE / HCI_STATE_WORKING fires (see _hciPacketHandler)
@@ -523,8 +530,9 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
     switch (eventCode) {
         case BTSTACK_EVENT_STATE:
             if (btstack_event_state_get_state(packet) == HCI_STATE_WORKING) {
+                mgr._ready = true;
                 // Advertising starts ONLY here — not before hci_power_control returns
-                if (!mgr._advStarted) {
+                if (mgr._pairingMode && !mgr._advStarted) {
                     gap_advertisements_enable(1);
                     mgr._advStarted = true;
                 }
@@ -540,10 +548,19 @@ void BLEHIDManager::_hciPacketHandler(uint8_t packetType, uint16_t channel,
         case HCI_EVENT_LE_META:
             if (hci_event_le_meta_get_subevent_code(packet) ==
                     HCI_SUBEVENT_LE_CONNECTION_COMPLETE) {
+                if (hci_subevent_le_connection_complete_get_status(packet) != ERROR_CODE_SUCCESS) {
+                    mgr._needsAdvRestart = true;
+                    break;
+                }
+                if (mgr._configMode && !mgr._pairingMode) {
+                    gap_disconnect(hci_subevent_le_connection_complete_get_connection_handle(packet));
+                    break;
+                }
                 mgr._lastDisconnectReason = 0; // clear on new connection
                 mgr._conHandle  = hci_subevent_le_connection_complete_get_connection_handle(packet);
                 mgr._connected  = true;
                 mgr._advStarted = false;
+                if (mgr._configMode) mgr._pairingMode = false;
                 printf("[BLE] Connected handle=0x%04X\n", (unsigned)mgr._conHandle);
             }
             break;
@@ -632,7 +649,11 @@ void BLEHIDManager::_smPacketHandler(uint8_t packetType, uint16_t channel,
 
     switch (hci_event_packet_get_type(packet)) {
         case SM_EVENT_JUST_WORKS_REQUEST:
-            sm_just_works_confirm(sm_event_just_works_request_get_handle(packet));
+            if (mgr._configMode && !mgr._connected && !mgr._pairingMode) {
+                sm_bonding_decline(sm_event_just_works_request_get_handle(packet));
+            } else {
+                sm_just_works_confirm(sm_event_just_works_request_get_handle(packet));
+            }
             break;
         case SM_EVENT_IDENTITY_RESOLVING_SUCCEEDED:
             // BTstack recognized a reconnecting bonded peer via IRK resolution.
@@ -643,18 +664,8 @@ void BLEHIDManager::_smPacketHandler(uint8_t packetType, uint16_t channel,
             mgr._hasBondedPeers = true;
             break;
         case SM_EVENT_IDENTITY_RESOLVING_FAILED: {
-            // Cannot resolve the peer's address using stored IRKs — likely a stale bond
-            // on the host side. Clear all stored bonds so fresh pairing can succeed.
-            // CRITICAL: Do NOT call sm_request_pairing() here — sending an unsolicited
-            // pairing request to a host that believes it already has a valid bond will
-            // cause the host to DELETE its stored bond (Android behavior observed).
-            // Let the host either initiate re-pairing or allow the connection to proceed
-            // (some hosts use non-resolvable addresses that still work without IRK match).
-            int deviceCount = le_device_db_count();
-            for (int i = deviceCount - 1; i >= 0; i--) {
-                le_device_db_remove(i);
-            }
-            mgr._hasBondedPeers = false;
+            // New peers and non-resolvable addresses must not erase other saved devices.
+            mgr._hasBondedPeers = (le_device_db_count() > 0);
             break;
         }
         case SM_EVENT_PAIRING_COMPLETE: {
