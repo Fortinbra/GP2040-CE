@@ -1349,6 +1349,8 @@ export default function SettingsPage() {
 				);
 			case 'input-mode-options.xbone':
 				return xboneModeSpecifics(values, errors, setFieldValue, handleChange);
+			case 'input-mode-options.ble':
+				return null;
 			default:
 				return (
 					<Row className="mb-3">
