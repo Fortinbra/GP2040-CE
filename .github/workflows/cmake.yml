@@ -52,7 +52,7 @@ jobs:
 
       - name: Cache Pico tools
         id: pico-tools
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.pico-sdk/cmake
