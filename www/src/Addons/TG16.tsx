@@ -38,7 +38,7 @@ const TG16 = ({
 				<a
 					href="https://gp2040-ce.info/add-ons/tg16-input"
 					target="_blank"
-					className="text-reset text-decoration-none"
+					className="text-reset text-decoration-none" rel="noreferrer"
 				>
 					{t('AddonsConfig:tg16-extension-header-text')}
 				</a>

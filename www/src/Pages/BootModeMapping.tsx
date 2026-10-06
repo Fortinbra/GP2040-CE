@@ -111,7 +111,7 @@ function PinSelect({ mappingKey }: { mappingKey: string }) {
 	const { t } = useTranslation('');
 
 	const pinField = (value: number) => {
-		let s = '0' + value;
+		const s = '0' + value;
 		return 'pin' + s.substring(s.length - 2);
 	};
 

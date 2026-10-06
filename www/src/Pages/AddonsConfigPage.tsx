@@ -193,14 +193,14 @@ const sanitizeData = (values) => {
 };
 
 function flattenObject(object) {
-	var toReturn = {};
+	const toReturn = {};
 
-	for (var i in object) {
+	for (const i in object) {
 		if (!object.hasOwnProperty(i)) continue;
 
 		if (typeof object[i] == 'object' && object[i] !== null) {
-			var flatObject = flattenObject(object[i]);
-			for (var x in flatObject) {
+			const flatObject = flattenObject(object[i]);
+			for (const x in flatObject) {
 				if (!flatObject.hasOwnProperty(x)) continue;
 
 				toReturn[i + '.' + x] = flatObject[x];
@@ -228,7 +228,7 @@ export default function AddonsConfigPage() {
 		const valuesSchema = schema.cast(values); // Strip invalid values
 
 		// Compare what's changed and set it to resultObject
-		let resultObject = {};
+		const resultObject = {};
 		Object.entries(flattened)?.map((entry) => {
 			const [key, oldVal] = entry;
 			const newVal = get(valuesSchema, key);

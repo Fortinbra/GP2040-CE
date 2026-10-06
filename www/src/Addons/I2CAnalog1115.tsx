@@ -86,7 +86,7 @@ const I2CAnalog1115 = ({
 		useContext(AppContext);
 
 	const handlePeripheralChange = (e) => {
-		let device = getSelectedPeripheral('i2c', e.target.value);
+		const device = getSelectedPeripheral('i2c', e.target.value);
 		handleChange(e);
 	};
 
@@ -96,7 +96,7 @@ const I2CAnalog1115 = ({
 				<a
 					href="https://gp2040-ce.info/add-ons/i2c-analog-ads1115"
 					target="_blank"
-					className="text-reset text-decoration-none"
+					className="text-reset text-decoration-none" rel="noreferrer"
 				>
 					{t('AddonsConfig:i2c-analog-ads1115-header-text')}
 				</a>

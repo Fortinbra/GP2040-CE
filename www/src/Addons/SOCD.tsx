@@ -36,7 +36,7 @@ const SOCD = ({
 				<a
 					href="https://gp2040-ce.info/add-ons/socd-selection-slider"
 					target="_blank"
-					className="text-reset text-decoration-none"
+					className="text-reset text-decoration-none" rel="noreferrer"
 				>
 					{t('AddonsConfig:socd-cleaning-mode-selection-slider-header-text')}
 				</a>

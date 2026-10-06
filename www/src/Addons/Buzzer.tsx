@@ -49,7 +49,7 @@ const Buzzer = ({
 				<a
 					href="https://gp2040-ce.info/add-ons/buzzer-speaker"
 					target="_blank"
-					className="text-reset text-decoration-none"
+					className="text-reset text-decoration-none" rel="noreferrer"
 				>
 					{t('AddonsConfig:buzzer-speaker-header-text')}
 				</a>

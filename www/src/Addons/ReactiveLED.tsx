@@ -99,7 +99,7 @@ const ReactiveLED = ({
 				<a
 					href="https://gp2040-ce.info/add-ons/reactive-led"
 					target="_blank"
-					className="text-reset text-decoration-none"
+					className="text-reset text-decoration-none" rel="noreferrer"
 				>
 					{t('ReactiveLED:header-text')}
 				</a>

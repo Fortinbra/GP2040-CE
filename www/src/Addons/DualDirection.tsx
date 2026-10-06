@@ -53,7 +53,7 @@ const DualDirection = ({
 				<a
 					href="https://gp2040-ce.info/add-ons/dual-direction-input"
 					target="_blank"
-					className="text-reset text-decoration-none"
+					className="text-reset text-decoration-none" rel="noreferrer"
 				>
 					{t('AddonsConfig:dual-directional-input-header-text')}
 				</a>

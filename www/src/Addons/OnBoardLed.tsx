@@ -43,7 +43,7 @@ const OnBoardLed = ({
 				<a
 					href="https://gp2040-ce.info/add-ons/on-board-led"
 					target="_blank"
-					className="text-reset text-decoration-none"
+					className="text-reset text-decoration-none" rel="noreferrer"
 				>
 					{t('AddonsConfig:on-board-led-configuration-label')}
 				</a>

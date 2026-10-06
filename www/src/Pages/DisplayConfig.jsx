@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState, useRef } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Form, Row, Col, FormLabel, Tab, Tabs } from 'react-bootstrap';
 import { Formik, useFormikContext, Field } from 'formik';
 import chunk from 'lodash/chunk';
@@ -85,16 +85,19 @@ const defaultValues = {
 	displayContrast: 255,
 };
 
-let buttonLayoutDefinitions = { buttonLayout: {}, buttonLayoutRight: {} };
+const createValidationSchema = (buttonLayoutDefinitions) => {
+	const buttonLayoutSchema = yup
+		.number()
+		.required()
+		.oneOf(Object.values(buttonLayoutDefinitions.buttonLayout))
+		.label('Button Layout Left');
+	const buttonLayoutRightSchema = yup
+		.number()
+		.required()
+		.oneOf(Object.values(buttonLayoutDefinitions.buttonLayoutRight))
+		.label('Button Layout Right');
 
-const buttonLayoutSchemaBase = yup.number().required();
-
-let buttonLayoutSchema = buttonLayoutSchemaBase.label('Button Layout Left');
-let buttonLayoutRightSchema = buttonLayoutSchemaBase.label(
-	'Button Layout Right',
-);
-
-const schema = yup.object().shape({
+	return yup.object().shape({
 	enabled: yup
 		.number()
 		.oneOf(ON_OFF_OPTIONS.map((o) => o.value))
@@ -170,7 +173,8 @@ const schema = yup.object().shape({
 	inputHistoryLength: yup.number().label('Input History Length'),
 	inputHistoryCol: yup.number().label('Input History Column Position'),
 	inputHistoryRow: yup.number().label('Input History Row Position'),
-});
+	});
+};
 
 const FormContext = () => {
 	const { values, setValues } = useFormikContext();
@@ -191,28 +195,43 @@ const isButtonLayoutCustom = (values) =>
 
 export default function DisplayConfigPage() {
 	const [loadingValues, setLoadingValues] = useState(true);
+	const [loadingError, setLoadingError] = useState(false);
 	const [values, setValues] = useState(defaultValues);
+	const [buttonLayoutDefinitions, setButtonLayoutDefinitions] = useState({
+		buttonLayout: {},
+		buttonLayoutRight: {},
+	});
 
 	const { updateUsedPins, getAvailablePeripherals, updatePeripherals } =
 		useContext(AppContext);
 	const [saveMessage, setSaveMessage] = useState('');
 
 	const { t } = useTranslation('');
+	const validationSchema = useMemo(
+		() => createValidationSchema(buttonLayoutDefinitions),
+		[buttonLayoutDefinitions],
+	);
 
 	useEffect(() => {
 		async function fetchData() {
-			const data = await WebApi.getDisplayOptions();
-			const splashImageResponse = await WebApi.getSplashImage();
-			data.splashImage = splashImageResponse.splashImage;
-			buttonLayoutDefinitions = await WebApi.getButtonLayoutDefs();
-			buttonLayoutSchema = buttonLayoutSchema.oneOf(
-				Object.values(buttonLayoutDefinitions.buttonLayout),
-			);
-			buttonLayoutRightSchema = buttonLayoutRightSchema.oneOf(
-				Object.values(buttonLayoutDefinitions.buttonLayoutRight),
-			);
-			setValues(data);
-			setLoadingValues(false);
+			try {
+				const [data, splashImageResponse, layoutDefinitions] =
+					await Promise.all([
+						WebApi.getDisplayOptions(),
+						WebApi.getSplashImage(),
+						WebApi.getButtonLayoutDefs(),
+					]);
+				setButtonLayoutDefinitions(layoutDefinitions);
+				setValues({
+					...data,
+					splashImage: splashImageResponse.splashImage,
+				});
+			} catch (error) {
+				console.error('Failed to load display configuration', error);
+				setLoadingError(true);
+			} finally {
+				setLoadingValues(false);
+			}
 		}
 		updatePeripherals();
 		fetchData();
@@ -246,9 +265,19 @@ export default function DisplayConfigPage() {
 		);
 	}
 
+	if (loadingError) {
+		return (
+			<Section title={t('DisplayConfig:header-text')}>
+				<div className="alert alert-danger" role="alert">
+					{t('DisplayConfig:load-error')}
+				</div>
+			</Section>
+		);
+	}
+
 	return (
 		<Formik
-			validationSchema={schema}
+			validationSchema={validationSchema}
 			onSubmit={onSuccess}
 			initialValues={values}
 		>
@@ -382,7 +411,7 @@ export default function DisplayConfigPage() {
 										eventKey="displayLayoutOptions"
 										title={t('DisplayConfig:section.layout-header')}
 									>
-										<h1>{t('DisplayConfig:section.button-layout-header')}</h1>
+										<h2>{t('DisplayConfig:section.button-layout-header')}</h2>
 										<Row className="mb-4">
 											<FormSelect
 												label={t('DisplayConfig:form.button-layout-label')}
@@ -656,7 +685,7 @@ export default function DisplayConfigPage() {
 												</Col>
 											</Row>
 										)}
-										<h1>{t('DisplayConfig:section.status-layout-header')}</h1>
+										<h2>{t('DisplayConfig:section.status-layout-header')}</h2>
 										<Row className="mb-4">
 											<div className="col-sm-2 mb-3">
 												<Form.Check
@@ -761,10 +790,9 @@ export default function DisplayConfigPage() {
 												/>
 											</div>
 										</Row>
-										<h1>{t('DisplayConfig:section.history-layout-header')}</h1>
+										<h2>{t('DisplayConfig:section.history-layout-header')}</h2>
 										<Row className="mb-4">
 											<div className="col-sm-2 mb-3">
-												<label></label>
 												<Form.Check
 													label={t('DisplayConfig:form.input-history-label')}
 													type="switch"
@@ -977,7 +1005,7 @@ const Canvas = ({ value: bitsArray, onChange }) => {
 		);
 		canvasContext.drawImage(image, offsetX, offsetY, newWidth, newHeight);
 
-		var imgPixels = canvasContext.getImageData(
+		const imgPixels = canvasContext.getImageData(
 			0,
 			0,
 			canvasContext.canvas.width,
@@ -985,8 +1013,8 @@ const Canvas = ({ value: bitsArray, onChange }) => {
 		);
 
 		// Convert to monochrome
-		for (var i = 0; i < imgPixels.data.length; i = i + 4) {
-			var avg =
+		for (let i = 0; i < imgPixels.data.length; i += 4) {
+			let avg =
 				(imgPixels.data[i] + imgPixels.data[i + 1] + imgPixels.data[i + 2]) / 3;
 			if (avg > 123) avg = 255;
 			else avg = 0;
@@ -1037,16 +1065,18 @@ const Canvas = ({ value: bitsArray, onChange }) => {
 	}, [bitsArray, canvasContext]);
 
 	const onImageAdd = (ev) => {
-		var file = ev.target.files[0];
-		var fr = new FileReader();
-		fr.onload = () => {
+		const file = ev.target.files?.[0];
+		if (!file) return;
+
+		const reader = new FileReader();
+		reader.onload = () => {
 			const img = new Image();
 			img.onload = () => {
 				setImage(img);
 			};
-			img.src = fr.result;
+			img.src = reader.result;
 		};
-		fr.readAsDataURL(file);
+		reader.readAsDataURL(file);
 	};
 
 	const toggleInverted = () => {

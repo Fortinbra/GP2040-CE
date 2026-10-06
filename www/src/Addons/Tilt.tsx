@@ -75,7 +75,7 @@ const Tilt = ({
 				<a
 					href="https://gp2040-ce.info/add-ons/tilt-input"
 					target="_blank"
-					className="text-reset text-decoration-none"
+					className="text-reset text-decoration-none" rel="noreferrer"
 				>
 					{t('AddonsConfig:tilt-header-text')}
 				</a>

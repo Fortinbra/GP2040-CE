@@ -51,7 +51,7 @@ type APIResponseData = {
 };
 
 function maskToSet(mask: number, maxPins: number) {
-	let s = new Set<number>();
+	const s = new Set<number>();
 	if (mask === -1) {
 		return s;
 	}
@@ -71,9 +71,9 @@ function setToMask(pins: Set<number>) {
 }
 
 function findDuplicates(bootModes: { [key: string]: BootModeMapping }) {
-	let seen: { [key: number]: string[] } = {};
+	const seen: { [key: number]: string[] } = {};
 	for (const [key, mapping] of Object.entries(bootModes)) {
-		let mask = setToMask(mapping.pins);
+		const mask = setToMask(mapping.pins);
 		if (mask == -1) {
 			continue;
 		}
@@ -129,7 +129,7 @@ export const useBootModeStore = create<State & { actions: Actions }>()(
 
 			removeBootMode: (key: string) => {
 				set((state) => {
-					let newModes = { ...state.bootModes };
+					const newModes = { ...state.bootModes };
 					delete newModes[key];
 					return {
 						...state,
@@ -148,7 +148,7 @@ export const useBootModeStore = create<State & { actions: Actions }>()(
 
 				const NUM_PINS = boardDefinition.maxPin + 1;
 				try {
-					let { data } = await WebApi.getBootModeOptions();
+					const { data } = await WebApi.getBootModeOptions();
 					response = data;
 				} catch (error) {
 					console.error(error);
@@ -159,10 +159,10 @@ export const useBootModeStore = create<State & { actions: Actions }>()(
 					return;
 				}
 
-				let { enabled, webConfigPinMask, usbModePinMask, inputModeMappings } =
+				const { enabled, webConfigPinMask, usbModePinMask, inputModeMappings } =
 					response;
 
-				let inputModes: { [key: string]: BootModeMapping } = {};
+				const inputModes: { [key: string]: BootModeMapping } = {};
 				for (const m of inputModeMappings) {
 					if (m.inputMode == -1) {
 						continue;
@@ -221,8 +221,8 @@ export const useBootModeStore = create<State & { actions: Actions }>()(
 
 			addPin: (key: string, pin: number) => {
 				set((state) => {
-					let newModes = { ...state.bootModes };
-					let newPins = new Set([...newModes[key].pins, pin]);
+					const newModes = { ...state.bootModes };
+					const newPins = new Set([...newModes[key].pins, pin]);
 					newModes[key].pins = newPins;
 					return { ...state, bootModes: newModes };
 				});
@@ -230,8 +230,8 @@ export const useBootModeStore = create<State & { actions: Actions }>()(
 
 			removePin: (key: string, pin: number) => {
 				set((state) => {
-					let newModes = { ...state.bootModes };
-					let newPins = new Set([...newModes[key].pins]);
+					const newModes = { ...state.bootModes };
+					const newPins = new Set([...newModes[key].pins]);
 					newPins.delete(pin);
 					newModes[key].pins = newPins;
 					return { ...state, bootModes: newModes };
@@ -240,7 +240,7 @@ export const useBootModeStore = create<State & { actions: Actions }>()(
 
 			setInputMode: (key: string, inputMode?: InputMode) => {
 				set((state) => {
-					let newModes = { ...state.bootModes };
+					const newModes = { ...state.bootModes };
 					newModes[key].inputMode = inputMode;
 					return { ...state, bootModes: newModes };
 				});
@@ -248,7 +248,7 @@ export const useBootModeStore = create<State & { actions: Actions }>()(
 
 			setProfileIndex: (key: string, profileIndex?: number) => {
 				set((state) => {
-					let newModes = { ...state.bootModes };
+					const newModes = { ...state.bootModes };
 					newModes[key].profileIndex = profileIndex;
 					return { ...state, bootModes: newModes };
 				});
