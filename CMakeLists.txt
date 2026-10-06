@@ -238,6 +238,7 @@ src/drivers/xinput/XInputDriver.cpp
 src/interfaces/i2c/i2cdevicebase.cpp
 src/interfaces/i2c/pcf8575/pcf8575.cpp
 src/interfaces/i2c/ssd1306/tiny_ssd1306.cpp
+src/interfaces/spi/st7735.cpp
 src/display/ui/elements/GPWidget.cpp
 src/display/ui/elements/GPButton.cpp
 src/display/ui/elements/GPLever.cpp
@@ -360,6 +361,7 @@ headers/interfaces/i2c/ads1115
 headers/interfaces/i2c/ads1219
 headers/interfaces/i2c/pcf8575
 headers/interfaces/i2c/ssd1306
+headers/interfaces/spi
 headers/interfaces/i2c/wiiextension
 headers/gamepad
 headers/display

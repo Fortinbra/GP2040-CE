@@ -44,8 +44,8 @@ class GPGFX_TinySSD1306 : public GPGFX_DisplayBase {
             return {0x3C, 0x3D};
         }
 
-        bool isSPI() { return this->_isSPI; }
-        bool isI2C() { return this->_isI2C; }
+        bool isSPI() const override { return this->_isSPI; }
+        bool isI2C() const override { return this->_isI2C; }
     private:
         typedef enum {
             SET_LOW_COLUMN = 0x00,
@@ -89,8 +89,6 @@ class GPGFX_TinySSD1306 : public GPGFX_DisplayBase {
         static const uint16_t MAX_SCREEN_HEIGHT = 64;
         static const uint16_t MAX_SCREEN_SIZE = (MAX_SCREEN_WIDTH * MAX_SCREEN_HEIGHT / 8);
 
-        GPGFX_DisplayTypeOptions _options;
-
         void sendCommand(uint8_t command);
         void sendCommands(uint8_t* commands, uint16_t length);
 
@@ -102,6 +100,8 @@ class GPGFX_TinySSD1306 : public GPGFX_DisplayBase {
         bool _isI2C = true;
 
         void rotatePoint(double cx, double cy, double &x, double &y, double angle);
+    protected:
+        GPGFX_DisplayTypeOptions _options;
 };
 
 #endif

@@ -71,9 +71,12 @@ public:
     }
 
     bool configured = false;
-    bool initialized = true;
+    bool initialized = false;
 
     spi_inst_t* getController() { return _SPI; }
+    bool hasChipSelect() const {
+        return _CS >= 0 && static_cast<unsigned int>(_CS) < NUM_BANK0_GPIOS;
+    }
 
     // Set the configuration for this SPI peripheral instance
     void setConfig(uint8_t block, uint8_t tx, uint8_t rx, uint8_t sck, uint8_t cs);
@@ -105,24 +108,24 @@ public:
 private:
     const uint32_t SPI_DEFAULT_SPEED = 1000000; // 1Mhz
 
-    uint8_t _RX; // MISO/POCI gpio pin
-    uint8_t _TX; // MOSI/PICO gpio pin
-    uint8_t _SCK;
-    int _CS; // The HW CS pin
-    int _CSActive; // The active CS pin, negative value indicates no selected pin
+    uint8_t _RX = 0xFF; // MISO/POCI gpio pin
+    uint8_t _TX = 0xFF; // MOSI/PICO gpio pin
+    uint8_t _SCK = 0xFF;
+    int _CS = -1; // The HW CS pin
+    int _CSActive = -1; // The active CS pin, negative value indicates no selected pin
 
-    spi_inst_t *_SPI; // The RP2040 SPI instance
-    uint32_t _Speed;
-    SPIMode _SpiMode;
-    spi_order_t _BitOrder;
-    spi_cpol_t _Cpol;
-    spi_cpha_t _Cpha;
+    spi_inst_t *_SPI = nullptr; // The RP2040 SPI instance
+    uint32_t _Speed = SPI_DEFAULT_SPEED;
+    SPIMode _SpiMode = SPI_MODE0;
+    spi_order_t _BitOrder = SPI_MSB_FIRST;
+    spi_cpol_t _Cpol = SPI_CPOL_0;
+    spi_cpha_t _Cpha = SPI_CPHA_0;
 
-    bool _UseDMA;
-    int _dmaRxChannel;
-    int _dmaTxChannel;
-    uint8_t *_dmaRxBuf;
-    uint8_t *_dmaTxBuf;
+    bool _UseDMA = false;
+    int _dmaRxChannel = -1;
+    int _dmaTxChannel = -1;
+    uint8_t *_dmaRxBuf = nullptr;
+    uint8_t *_dmaTxBuf = nullptr;
 
     spi_inst_t* _hardwareBlocks[NUM_SPIS] = {spi0,spi1};
 

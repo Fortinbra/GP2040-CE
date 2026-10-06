@@ -12,7 +12,7 @@ class GPGFX {
 
         void init(GPGFX_DisplayTypeOptions options);
 
-        GPGFX_DisplayTypeOptions getAvailableDisplay(GPGFX_DisplayType displayType);
+        GPGFX_DisplayTypeOptions getAvailableDisplay(GPGFX_DisplayType displayType, uint8_t spiBlock = 0, uint8_t dcPin = 0, int8_t resetPin = -1);
 
         GPGFX_DisplayBase* getDriver() { return displayDriver; }
 
@@ -33,7 +33,7 @@ class GPGFX {
     private:
         GPGFX_DisplayBase* displayDriver = nullptr;
 
-        bool detectDisplay(GPGFX_DisplayTypeOptions* display, GPGFX_DisplayType displayType);
+        bool detectDisplay(GPGFX_DisplayTypeOptions* display, GPGFX_DisplayType displayType, uint8_t spiBlock, uint8_t dcPin, int8_t resetPin, bool autoDetect);
 };
 
 #endif

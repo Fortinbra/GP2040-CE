@@ -1,9 +1,11 @@
 export default {
 	'header-text': 'Display Configuration',
 	'sub-header-text':
-		'A monochrome display can be used to show controller status and button activity. Ensure your display module has the following attributes:',
+		'Displays can be used to show controller status and button activity. Ensure your display module is wired to an enabled peripheral and operates at 3.3V:',
 	'list-text':
 		'<1>Monochrome display with 128x64 resolution</1> <1>Uses I2C with a SSD1306, SH1106, SH1107 or other compatible display IC</1> <1>Supports 3.3v operation</1>',
+	'spi-display-help':
+		'The ST7735 driver supports 80x160 RGB displays over SPI. Enable and configure SPI0 or SPI1 in Peripheral Mapping, then select the display data/command pin below. The reset pin is optional.',
 	section: {
 		'hardware-header': 'Hardware Options',
 		'screen-header': 'Screen Options',
@@ -20,6 +22,15 @@ export default {
 		'i2c-block-header': 'I2C Block',
 	},
 	form: {
+		'display-driver-label': 'Display Driver',
+		unset: 'Unset',
+		'display-drivers': {
+			'auto-i2c': 'Auto-detect I2C display',
+			st7735: 'ST7735 80x160 SPI',
+		},
+		'spi-block-label': 'SPI Block',
+		'dc-pin-label': 'Data/Command Pin',
+		'reset-pin-label': 'Reset Pin',
 		'i2c-block-label': 'I2C Block',
 		'sda-pin-label': 'SDA Pin',
 		'scl-pin-label': 'SCL Pin',

@@ -11,10 +11,16 @@ import FormControl from '../Components/FormControl';
 import FormSelect from '../Components/FormSelect';
 import Section from '../Components/Section';
 import WebApi from '../Services/WebApi';
+import { SPI_BLOCKS } from '../Data/Peripherals';
 
 const ON_OFF_OPTIONS = [
 	{ label: 'form.display-state.disabled', value: 0 },
 	{ label: 'form.display-state.enabled', value: 1 },
+];
+
+const DISPLAY_DRIVER_OPTIONS = [
+	{ label: 'form.display-drivers.auto-i2c', value: 0 },
+	{ label: 'form.display-drivers.st7735', value: 2 },
 ];
 
 const SPLASH_MODES = [
@@ -83,6 +89,10 @@ const defaultValues = {
 	inputHistoryRow: 7,
 	turnOffWhenSuspended: 0,
 	displayContrast: 255,
+	displayDriver: 0,
+	displaySPIBlock: 0,
+	displayDCPin: -1,
+	displayResetPin: -1,
 };
 
 let buttonLayoutDefinitions = { buttonLayout: {}, buttonLayoutRight: {} };
@@ -108,6 +118,14 @@ const schema = yup.object().shape({
 		.oneOf(ON_OFF_OPTIONS.map((o) => o.value))
 		.label('Invert Display'),
 	displayContrast: yup.number().min(38).max(255).label('Display Contrast'),
+	displayDriver: yup.number().oneOf(DISPLAY_DRIVER_OPTIONS.map((o) => o.value)),
+	displaySPIBlock: yup.number().oneOf(SPI_BLOCKS.map((o) => o.value)),
+	displayDCPin: yup.number().when('displayDriver', {
+		is: 2,
+		then: (field) => field.required().min(0).max(47),
+		otherwise: (field) => field.min(-1).max(47),
+	}),
+	displayResetPin: yup.number().min(-1).max(47),
 	turnOffWhenSuspended: yup.number().label('Turn Off When Suspended'),
 	buttonLayout: buttonLayoutSchema,
 	buttonLayoutRight: buttonLayoutRightSchema,
@@ -193,11 +211,17 @@ export default function DisplayConfigPage() {
 	const [loadingValues, setLoadingValues] = useState(true);
 	const [values, setValues] = useState(defaultValues);
 
-	const { updateUsedPins, getAvailablePeripherals, updatePeripherals } =
+	const { updateUsedPins, getAvailablePeripherals, updatePeripherals, boardDefinition } =
 		useContext(AppContext);
 	const [saveMessage, setSaveMessage] = useState('');
 
 	const { t } = useTranslation('');
+	const availableI2C = getAvailablePeripherals('i2c') || [];
+	const availableSPI = getAvailablePeripherals('spi') || [];
+	const availablePins = Array.from(
+		{ length: (boardDefinition?.maxPin ?? 29) + 1 },
+		(_, pin) => pin,
+	);
 
 	useEffect(() => {
 		async function fetchData() {
@@ -254,19 +278,24 @@ export default function DisplayConfigPage() {
 		>
 			{({ handleSubmit, handleChange, values, errors, setFieldValue }) => (
 				<Section title={t('DisplayConfig:header-text')}>
-					{getAvailablePeripherals('i2c') ? (
+					{availableI2C.length || availableSPI.length ? (
 						<div>
 							<p>{t('DisplayConfig:sub-header-text')}</p>
-							<ul>
-								<Trans ns="DisplayConfig" i18nKey="list-text">
-									<li>Monochrome display with 128x64 resolution</li>
-									<li>
-										Uses I2C with a SSD1306, SH1106, SH1107 or other compatible
-										display IC
-									</li>
-									<li>Supports 3.3v operation</li>
-								</Trans>
-							</ul>
+							{availableI2C.length ? (
+								<ul>
+									<Trans ns="DisplayConfig" i18nKey="list-text">
+										<li>Monochrome display with 128x64 resolution</li>
+										<li>
+											Uses I2C with a SSD1306, SH1106, SH1107 or other compatible
+											display IC
+										</li>
+										<li>Supports 3.3v operation</li>
+									</Trans>
+								</ul>
+							) : null}
+							{availableSPI.length ? (
+								<p>{t('DisplayConfig:spi-display-help')}</p>
+							) : null}
 							<Form noValidate onSubmit={handleSubmit}>
 								<Tabs
 									defaultActiveKey="defaultHardwareOptions"
@@ -296,6 +325,76 @@ export default function DisplayConfigPage() {
 													</option>
 												))}
 											</FormSelect>
+											<FormSelect
+												label={t('DisplayConfig:form.display-driver-label')}
+												name="displayDriver"
+												className="form-select-sm"
+												groupClassName="col-sm-3 mb-3"
+												value={values.displayDriver}
+												error={errors.displayDriver}
+												isInvalid={errors.displayDriver}
+												onChange={handleChange}
+											>
+												{DISPLAY_DRIVER_OPTIONS.map((o) => (
+													<option key={`display-driver-${o.value}`} value={o.value}>
+														{t(`DisplayConfig:${o.label}`)}
+													</option>
+												))}
+											</FormSelect>
+											{Number(values.displayDriver) === 2 ? (
+												<>
+													<FormSelect
+														label={t('DisplayConfig:form.spi-block-label')}
+														name="displaySPIBlock"
+														className="form-select-sm"
+														groupClassName="col-sm-3 mb-3"
+														value={values.displaySPIBlock}
+														error={errors.displaySPIBlock}
+														isInvalid={errors.displaySPIBlock}
+														onChange={handleChange}
+													>
+														{availableSPI.map(({ label, value }) => (
+															<option key={`display-spi-${value}`} value={value}>
+																{label.toUpperCase()}
+															</option>
+														))}
+													</FormSelect>
+													<FormSelect
+														label={t('DisplayConfig:form.dc-pin-label')}
+														name="displayDCPin"
+														className="form-select-sm"
+														groupClassName="col-sm-3 mb-3"
+														value={values.displayDCPin}
+														error={errors.displayDCPin}
+														isInvalid={errors.displayDCPin}
+														onChange={handleChange}
+													>
+														<option value="-1">{t('DisplayConfig:form.unset')}</option>
+														{availablePins.map((pin) => (
+															<option key={`display-dc-${pin}`} value={pin}>
+																{pin}
+															</option>
+														))}
+													</FormSelect>
+													<FormSelect
+														label={t('DisplayConfig:form.reset-pin-label')}
+														name="displayResetPin"
+														className="form-select-sm"
+														groupClassName="col-sm-3 mb-3"
+														value={values.displayResetPin}
+														error={errors.displayResetPin}
+														isInvalid={errors.displayResetPin}
+														onChange={handleChange}
+													>
+														<option value="-1">{t('DisplayConfig:form.unset')}</option>
+														{availablePins.map((pin) => (
+															<option key={`display-reset-${pin}`} value={pin}>
+																{pin}
+															</option>
+														))}
+													</FormSelect>
+												</>
+											) : null}
 										</Row>
 									</Tab>
 									<Tab
@@ -927,7 +1026,7 @@ export default function DisplayConfigPage() {
 							<Trans
 								ns="PeripheralMapping"
 								i18nKey="peripheral-toggle-unavailable"
-								values={{ name: 'I2C' }}
+								values={{ name: 'I2C or SPI' }}
 							>
 								<NavLink exact="true" to="/peripheral-mapping">
 									{t('PeripheralMapping:header-text')}

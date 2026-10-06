@@ -19,6 +19,7 @@ typedef enum {
 typedef enum {
     DISPLAY_TYPE_NONE,
     DISPLAY_TYPE_SSD1306,
+    DISPLAY_TYPE_ST7735,
     DISPLAY_TYPE_COUNT
 } GPGFX_DisplayType;
 
@@ -44,6 +45,8 @@ typedef struct {
     bool inverted;
     GPGFX_DisplayFont font;
     uint8_t contrast;
+    uint8_t dcPin;
+    int8_t resetPin;
 } GPGFX_DisplayTypeOptions;
 
 #endif

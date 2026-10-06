@@ -3,11 +3,11 @@
 
 #include <string>
 #include <string.h>
+#include <vector>
 #include "pico/stdlib.h"
 #include "GPGFX_types.h"
-#include "i2cdevicebase.h"
 
-class GPGFX_DisplayBase : public I2CDeviceBase {
+class GPGFX_DisplayBase {
     public:
         GPGFX_DisplayBase() {}
         virtual ~GPGFX_DisplayBase() {}
@@ -43,12 +43,12 @@ class GPGFX_DisplayBase : public I2CDeviceBase {
         void setMetrics(GPGFX_DisplayMetrics* metrics) { this->_metrics = metrics; }
         GPGFX_DisplayMetrics* getMetrics() { return this->_metrics; }
 
-        std::vector<uint8_t> getDeviceAddresses() const override {
+        virtual std::vector<uint8_t> getDeviceAddresses() const {
             return {};
         }
 
-        virtual bool isSPI() { return false; }
-        virtual bool isI2C() { return false; }
+        virtual bool isSPI() const { return false; }
+        virtual bool isI2C() const { return false; }
     private:
         GPGFX_DisplayMetrics* _metrics = nullptr;
 };

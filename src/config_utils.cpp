@@ -529,6 +529,14 @@ void ConfigUtils::initUnsetPropertiesWithDefaults(Config& config)
     INIT_UNSET_PROPERTY(config.displayOptions, displaySaverMode, DISPLAY_SAVER_MODE);
     INIT_UNSET_PROPERTY(config.displayOptions, buttonLayoutOrientation, DISPLAY_LAYOUT_ORIENTATION);
     INIT_UNSET_PROPERTY(config.displayOptions, contrast, DISPLAY_CONTRAST);
+    INIT_UNSET_PROPERTY(config.displayOptions, displayDriver, GPGFX_DisplayType::DISPLAY_TYPE_NONE);
+    INIT_UNSET_PROPERTY(config.displayOptions, displaySPIBlock, 0);
+    INIT_UNSET_PROPERTY(config.displayOptions, displayDCPin, -1);
+    INIT_UNSET_PROPERTY(config.displayOptions, displayResetPin, -1);
+    if (config.displayOptions.displayDriver < GPGFX_DisplayType::DISPLAY_TYPE_NONE ||
+        config.displayOptions.displayDriver >= GPGFX_DisplayType::DISPLAY_TYPE_COUNT) {
+        config.displayOptions.displayDriver = GPGFX_DisplayType::DISPLAY_TYPE_NONE;
+    }
 
     // peripheralOptions
     PeripheralOptions& peripheralOptions = config.peripheralOptions;

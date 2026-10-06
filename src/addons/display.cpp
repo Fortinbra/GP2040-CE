@@ -21,7 +21,12 @@ bool DisplayAddon::available() {
 
     // create the gfx interface
     gpDisplay = new GPGFX();
-    gpOptions = gpDisplay->getAvailableDisplay(GPGFX_DisplayType::DISPLAY_TYPE_NONE);
+    gpOptions = gpDisplay->getAvailableDisplay(
+        static_cast<GPGFX_DisplayType>(options.displayDriver),
+        options.displaySPIBlock,
+        options.displayDCPin,
+        options.displayResetPin
+    );
     if ( gpOptions.displayType != GPGFX_DisplayType::DISPLAY_TYPE_NONE ) {
         if ( options.enabled ) {
             result = true;

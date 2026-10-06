@@ -454,6 +454,10 @@ std::string setDisplayOptions(DisplayOptions& displayOptions)
     readDoc(displayOptions.inputHistoryCol, doc, "inputHistoryCol");
     readDoc(displayOptions.inputHistoryRow, doc, "inputHistoryRow");
     readDoc(displayOptions.contrast, doc, "displayContrast");
+    readDoc(displayOptions.displayDriver, doc, "displayDriver");
+    readDoc(displayOptions.displaySPIBlock, doc, "displaySPIBlock");
+    readDoc(displayOptions.displayDCPin, doc, "displayDCPin");
+    readDoc(displayOptions.displayResetPin, doc, "displayResetPin");
 
     readDoc(displayOptions.buttonLayoutCustomOptions.paramsLeft.layout, doc, "buttonLayoutCustomOptions", "params", "layout");
     readDoc(displayOptions.buttonLayoutCustomOptions.paramsLeft.common.startX, doc, "buttonLayoutCustomOptions", "params", "startX");
@@ -511,6 +515,10 @@ std::string getDisplayOptions() // Manually set Document Attributes for the disp
     writeDoc(doc, "inputHistoryCol", displayOptions.inputHistoryCol);
     writeDoc(doc, "inputHistoryRow", displayOptions.inputHistoryRow);
     writeDoc(doc, "displayContrast", displayOptions.contrast);
+    writeDoc(doc, "displayDriver", displayOptions.displayDriver);
+    writeDoc(doc, "displaySPIBlock", displayOptions.displaySPIBlock);
+    writeDoc(doc, "displayDCPin", displayOptions.displayDCPin);
+    writeDoc(doc, "displayResetPin", displayOptions.displayResetPin);
 
     writeDoc(doc, "buttonLayoutCustomOptions", "params", "layout", displayOptions.buttonLayoutCustomOptions.paramsLeft.layout);
     writeDoc(doc, "buttonLayoutCustomOptions", "params", "startX", displayOptions.buttonLayoutCustomOptions.paramsLeft.common.startX);

@@ -19,12 +19,12 @@ PeripheralSPI::PeripheralSPI()
 }
 
 void PeripheralSPI::setConfig(uint8_t block, uint8_t tx, uint8_t rx, uint8_t sck, uint8_t cs) {
-    if (block < NUM_SPIS) {
+    if (block < NUM_SPIS && tx < NUM_BANK0_GPIOS && sck < NUM_BANK0_GPIOS) {
         _SPI = _hardwareBlocks[block];
         _TX = tx;
         _RX = rx;
         _SCK = sck;
-        _CS = cs;
+        _CS = cs < NUM_BANK0_GPIOS ? cs : -1;
         configured = true;
         setup();
     }
@@ -43,8 +43,16 @@ void PeripheralSPI::setup() {
 
     gpio_set_function(_SCK, GPIO_FUNC_SPI);
     gpio_set_function(_TX, GPIO_FUNC_SPI);
-    gpio_set_function(_RX, GPIO_FUNC_SPI);
-    gpio_pull_up(_RX);
+    if (static_cast<unsigned int>(_RX) < NUM_BANK0_GPIOS) {
+        gpio_set_function(_RX, GPIO_FUNC_SPI);
+        gpio_pull_up(_RX);
+    }
+
+    if (_CS >= 0) {
+        gpio_init(_CS);
+        gpio_set_dir(_CS, GPIO_OUT);
+        gpio_put(_CS, 1);
+    }
 
     if (_UseDMA) {
         // DMA configuration - 2 channels (TX/RX)
@@ -118,12 +126,16 @@ uint16_t PeripheralSPI::transfer16(uint16_t tx) {
 
 void PeripheralSPI::select(int8_t cs) {
     _CSActive = cs > -1 ? cs : _CS;
-    gpio_pull_down(_CSActive);
+    if (_CSActive >= 0) {
+        gpio_init(_CSActive);
+        gpio_set_dir(_CSActive, GPIO_OUT);
+        gpio_put(_CSActive, 0);
+    }
 }
 
 void PeripheralSPI::deselect() {
     if (_CSActive > -1) {
-        gpio_pull_up(_CSActive);
+        gpio_put(_CSActive, 1);
         _CSActive = -1;
     }
 }

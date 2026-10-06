@@ -5,6 +5,7 @@
 
 #include "peripheralmanager.h"
 #include "tiny_ssd1306.h"
+#include "st7735.h"
 
 std::map<GPGFX_DisplayType, std::map<GPGFX_DisplaySize, GPGFX_DisplayMetrics>> GPGFX_DisplayModes = {
     {
@@ -12,6 +13,12 @@ std::map<GPGFX_DisplayType, std::map<GPGFX_DisplaySize, GPGFX_DisplayMetrics>> G
         {
             {SIZE_128x32,{128,32,1}},
             {SIZE_128x64,{128,64,1}},
+        },
+    },
+    {
+        {DISPLAY_TYPE_ST7735},
+        {
+            {SIZE_128x64,{128,64,16}},
         },
     },
 };
@@ -25,39 +32,51 @@ void GPGFX::init(GPGFX_DisplayTypeOptions options) {
         case GPGFX_DisplayType::DISPLAY_TYPE_SSD1306:
             this->displayDriver = new GPGFX_TinySSD1306();
             break;
+        case GPGFX_DisplayType::DISPLAY_TYPE_ST7735:
+            this->displayDriver = new GPGFX_ST7735();
+            break;
         default:
             options.displayType = GPGFX_DisplayType::DISPLAY_TYPE_NONE;
     }
 
     if (options.displayType != GPGFX_DisplayType::DISPLAY_TYPE_NONE) {
-        this->displayDriver->setMetrics(&GPGFX_DisplayModes[options.displayType][(GPGFX_DisplaySize)options.size]);
+        GPGFX_DisplaySize size = options.displayType == GPGFX_DisplayType::DISPLAY_TYPE_ST7735
+            ? SIZE_128x64
+            : static_cast<GPGFX_DisplaySize>(options.size);
+        this->displayDriver->setMetrics(&GPGFX_DisplayModes[options.displayType][size]);
         this->displayDriver->init(options);
     }
 }
 
-GPGFX_DisplayTypeOptions GPGFX::getAvailableDisplay(GPGFX_DisplayType displayType) {
+GPGFX_DisplayTypeOptions GPGFX::getAvailableDisplay(GPGFX_DisplayType displayType, uint8_t spiBlock, uint8_t dcPin, int8_t resetPin) {
     GPGFX_DisplayTypeOptions display;
 
     display.displayType = displayType;
+    display.spi = nullptr;
+    display.i2c = nullptr;
+    display.dcPin = dcPin;
+    display.resetPin = resetPin;
 
     if (display.displayType == GPGFX_DisplayType::DISPLAY_TYPE_NONE) {
         // autoscan for device
-        for (uint16_t i = GPGFX_DisplayType::DISPLAY_TYPE_NONE; i < GPGFX_DisplayType::DISPLAY_TYPE_COUNT; i++) {
-            if (detectDisplay(&display, (GPGFX_DisplayType)i)) break;
+        for (uint16_t i = GPGFX_DisplayType::DISPLAY_TYPE_SSD1306; i < GPGFX_DisplayType::DISPLAY_TYPE_COUNT; i++) {
+            if (detectDisplay(&display, static_cast<GPGFX_DisplayType>(i), spiBlock, dcPin, resetPin, true)) break;
         }
     } else {
-        if (!detectDisplay(&display, display.displayType)) {
+        if (!detectDisplay(&display, display.displayType, spiBlock, dcPin, resetPin, false)) {
             display.displayType = GPGFX_DisplayType::DISPLAY_TYPE_NONE;
         }
     }
     return display;
 }
 
-bool GPGFX::detectDisplay(GPGFX_DisplayTypeOptions* display, GPGFX_DisplayType displayType) {
+bool GPGFX::detectDisplay(GPGFX_DisplayTypeOptions* display, GPGFX_DisplayType displayType, uint8_t spiBlock, uint8_t dcPin, int8_t resetPin, bool autoDetect) {
     GPGFX_DisplayBase* driver = nullptr;
 
     if (displayType == GPGFX_DisplayType::DISPLAY_TYPE_SSD1306) {
         driver = new GPGFX_TinySSD1306();
+    } else if (displayType == GPGFX_DisplayType::DISPLAY_TYPE_ST7735) {
+        driver = new GPGFX_ST7735();
     } else {
         driver = nullptr;
     }
@@ -73,8 +92,20 @@ bool GPGFX::detectDisplay(GPGFX_DisplayTypeOptions* display, GPGFX_DisplayType d
                 return true;
             }
         }
-        if (driver->isSPI()) {
-            // NYI: check if SPI display exists
+        if (driver->isSPI() && !autoDetect) {
+            PeripheralSPI* spi = PeripheralManager::getInstance().getSPI(spiBlock);
+            if (spiBlock < NUM_SPIS && PeripheralManager::getInstance().isSPIEnabled(spiBlock) &&
+                spi->hasChipSelect() && static_cast<unsigned int>(dcPin) < NUM_BANK0_GPIOS &&
+                resetPin >= -1 &&
+                (resetPin == -1 || static_cast<unsigned int>(resetPin) < NUM_BANK0_GPIOS) &&
+                resetPin != dcPin) {
+                display->displayType = displayType;
+                display->spi = PeripheralManager::getInstance().getSPI(spiBlock);
+                display->dcPin = dcPin;
+                display->resetPin = resetPin;
+                delete driver;
+                return true;
+            }
         }
         delete driver;
     }
