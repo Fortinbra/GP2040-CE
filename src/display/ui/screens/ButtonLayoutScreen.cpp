@@ -615,38 +615,34 @@ void ButtonLayoutScreen::handleLEDChange(GPEvent* e) {
     if ( ledEvent->bChangeProfile ) {
         if(options.baseProfileIndex != -1) {
             bannerMessage = "    LED Profile #";
-            bannerMessage +=  std::to_string(options.baseProfileIndex+1); //add 1 so its from 1-x not from 0-x
+            bannerMessage += std::to_string(options.baseProfileIndex + 1);
         } else {
             bannerMessage = "    LED Profile OFF";
         }
         addCustomHeader(bannerMessage, "led");
     } else if ( ledEvent->bChangeBase ) {
-        int8_t baseCycleNumber = options.profiles[options.baseProfileIndex].baseCycleTime + 1;
         bannerMessage = "LED Idle Rate: ";
-        bannerMessage +=  std::to_string(baseCycleNumber); //add 1 so its from 1-x not from 0-x
+        bannerMessage += std::to_string(options.profiles[options.baseProfileIndex].baseCycleTime + 1);
         bannerMessage += "/";
-        bannerMessage +=  std::to_string(CYCLE_STEPS); //add 1 so its from 1-x not from 0-x
+        bannerMessage += std::to_string(CYCLE_STEPS);
         addCustomHeader(bannerMessage, "ledBaseCycle");
     } else if ( ledEvent->bChangeCase ) {
-        int8_t baseCaseCycleNumber = options.profiles[options.baseProfileIndex].baseCaseCycleTime + 1;
         bannerMessage = "LED Case Rate: ";
-        bannerMessage +=  std::to_string(baseCaseCycleNumber); //add 1 so its from 1-x not from 0-x
+        bannerMessage += std::to_string(options.profiles[options.baseProfileIndex].baseCaseCycleTime + 1);
         bannerMessage += "/";
-        bannerMessage +=  std::to_string(CYCLE_STEPS); //add 1 so its from 1-x not from 0-x
+        bannerMessage += std::to_string(CYCLE_STEPS);
         addCustomHeader(bannerMessage, "ledBaseCaseCycle");
     } else if ( ledEvent->bChangePressed ) {
-        int8_t basePressedCycleNumber = options.profiles[options.baseProfileIndex].basePressedCycleTime + 1;
         bannerMessage = "LED Press Rate: ";
-        bannerMessage +=  std::to_string(basePressedCycleNumber); //add 1 so its from 1-x not from 0-x
+        bannerMessage += std::to_string(options.profiles[options.baseProfileIndex].basePressedCycleTime + 1);
         bannerMessage += "/";
-        bannerMessage +=  std::to_string(CYCLE_STEPS); //add 1 so its from 1-x not from 0-x
+        bannerMessage += std::to_string(CYCLE_STEPS);
         addCustomHeader(bannerMessage, "ledBasePressedCycle");
     } else if ( ledEvent->bChangeBrightness ) {
-        int8_t brightness = options.brightness;
         bannerMessage = "Brightness: ";
-        bannerMessage +=  std::to_string(brightness); //add 1 so its from 1-x not from 0-x
+        bannerMessage += std::to_string(options.brightness);
         bannerMessage += "/";
-        bannerMessage +=  std::to_string(10); //add 1 so its from 1-x not from 0-x
+        bannerMessage += std::to_string(10);
         addCustomHeader(bannerMessage, "ledBrightness");
     }
 }
