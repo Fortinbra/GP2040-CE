@@ -142,9 +142,8 @@ void UsbdSecXSM3AuthenticationMac(const uint8_t *key, uint8_t *salt, uint8_t *in
 void UsbdSecXSMAuthenticationAcr(const uint8_t *console_id, const uint8_t *input, const uint8_t *key, uint8_t *output) {
 	uint8_t block[8];
 	uint8_t iv[8];
-	uint32_t ab[2];
-	uint32_t cd[2];
-	uint32_t output_words[2];
+	uint8_t ab[8];
+	uint8_t cd[8];
 	uint64_t xor_temp;
 
 	// fill in the input block with the first 4 bytes of input data and the first 4 bytes of the console ID
@@ -154,10 +153,9 @@ void UsbdSecXSMAuthenticationAcr(const uint8_t *console_id, const uint8_t *input
 	memcpy(block+4, console_id, 4);
 	// run custom "parve" crypto algorithms. idk whar they do
 	ExCryptParveEcb(key, UsbdSecSboxData, input + 0x10, iv);
-	ExCryptParveEcb(key, UsbdSecSboxData, block, (uint8_t *)cd);
-	ExCryptParveCbcMac(key, UsbdSecSboxData, iv, UsbdSecPlainTextData.bytes, 0x80, (uint8_t *)ab);
-	ExCryptChainAndSumMac(cd, ab, UsbdSecPlainTextData.words, 0x20, output_words);
-	memcpy(output, output_words, sizeof(output_words));
+	ExCryptParveEcb(key, UsbdSecSboxData, block, cd);
+	ExCryptParveCbcMac(key, UsbdSecSboxData, iv, UsbdSecPlainTextData.bytes, 0x80, ab);
+	ExCryptChainAndSumMac(cd, ab, UsbdSecPlainTextData.bytes, 0x20, output);
 	uint64_t current;
 	memcpy(&current, output, sizeof(current));
 	memcpy(&xor_temp, ab, sizeof(xor_temp));

@@ -104,13 +104,13 @@ void MainMenuScreen::init() {
     GpioMappingInfo* pinMappings = Storage::getInstance().getProfilePinMappings();
     for (Pin_t pin = 0; pin < (Pin_t)NUM_BANK0_GPIOS; pin++) {
         switch (pinMappings[pin].action) {
-            case GpioAction::MENU_NAVIGATION_UP: mapMenuUp->pinMask |= 1 << pin; break;
-            case GpioAction::MENU_NAVIGATION_DOWN: mapMenuDown->pinMask |= 1 << pin; break;
-            case GpioAction::MENU_NAVIGATION_LEFT: mapMenuLeft->pinMask |= 1 << pin; break;
-            case GpioAction::MENU_NAVIGATION_RIGHT: mapMenuRight->pinMask |= 1 << pin; break;
-            case GpioAction::MENU_NAVIGATION_SELECT: mapMenuSelect->pinMask |= 1 << pin; break;
-            case GpioAction::MENU_NAVIGATION_BACK: mapMenuBack->pinMask |= 1 << pin; break;
-            case GpioAction::MENU_NAVIGATION_TOGGLE: mapMenuToggle->pinMask |= 1 << pin; break;
+            case GpioAction::MENU_NAVIGATION_UP: mapMenuUp->pinMask |= Mask_t{1} << pin; break;
+            case GpioAction::MENU_NAVIGATION_DOWN: mapMenuDown->pinMask |= Mask_t{1} << pin; break;
+            case GpioAction::MENU_NAVIGATION_LEFT: mapMenuLeft->pinMask |= Mask_t{1} << pin; break;
+            case GpioAction::MENU_NAVIGATION_RIGHT: mapMenuRight->pinMask |= Mask_t{1} << pin; break;
+            case GpioAction::MENU_NAVIGATION_SELECT: mapMenuSelect->pinMask |= Mask_t{1} << pin; break;
+            case GpioAction::MENU_NAVIGATION_BACK: mapMenuBack->pinMask |= Mask_t{1} << pin; break;
+            case GpioAction::MENU_NAVIGATION_TOGGLE: mapMenuToggle->pinMask |= Mask_t{1} << pin; break;
             default:    break;
         }
     }
@@ -140,6 +140,13 @@ void MainMenuScreen::init() {
 
 void MainMenuScreen::shutdown() {
     clearElements();
+    delete mapMenuUp;
+    delete mapMenuDown;
+    delete mapMenuLeft;
+    delete mapMenuRight;
+    delete mapMenuSelect;
+    delete mapMenuBack;
+    delete mapMenuToggle;
     exitToScreen = -1;
 }
 

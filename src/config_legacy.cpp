@@ -113,7 +113,6 @@ namespace ConfigLegacy
         BUTTON_LAYOUT_STICKLESS_13,
         BUTTON_LAYOUT_STICKLESS_16,
         BUTTON_LAYOUT_STICKLESS_14,
-        BUTTON_LAYOUT_STICKLESS_R16,        
     };
 
     enum ButtonLayoutRight
@@ -140,7 +139,6 @@ namespace ConfigLegacy
         BUTTON_LAYOUT_STICKLESS_13B,
         BUTTON_LAYOUT_STICKLESS_16B,
         BUTTON_LAYOUT_STICKLESS_14B,
-        BUTTON_LAYOUT_STICKLESS_R16B,
     };
 
     enum SplashMode
@@ -831,9 +829,9 @@ bool ConfigUtils::fromLegacyStorage(Config& config)
 
         const ConfigLegacy::ButtonLayoutParams& legacyParamsRight = legacyBoardOptions.buttonLayoutCustomOptions.paramsRight;
         ButtonLayoutParamsRight& paramsRight = displayOptions.buttonLayoutCustomOptions.paramsRight;
-        if (isValidButtonLayoutRight(legacyParams.layoutRight))
+        if (isValidButtonLayoutRight(legacyParamsRight.layoutRight))
         {
-            SET_PROPERTY(paramsRight, layout, static_cast<ButtonLayoutRight>(legacyParams.layoutRight));
+            SET_PROPERTY(paramsRight, layout, static_cast<ButtonLayoutRight>(legacyParamsRight.layoutRight));
         }
         SET_PROPERTY(paramsRight.common, startX, legacyParamsRight.startX);
         SET_PROPERTY(paramsRight.common, startY, legacyParamsRight.startY);

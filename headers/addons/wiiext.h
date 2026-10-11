@@ -91,7 +91,7 @@ public:
 private:
     WiiExtensionDevice * wii;
     uint32_t uIntervalMS;
-    uint32_t nextTimer;
+    uint32_t lastPoll;
 
     std::unordered_map<uint16_t, WiiExtensionConfig> extensionConfigs;
     WiiExtensionConfig* currentConfig = NULL;
