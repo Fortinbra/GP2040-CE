@@ -14,11 +14,12 @@ void SplashScreen::shutdown() {
 }
 
 void SplashScreen::drawScreen() {
-	if (getDisplayOptions().splashMode == static_cast<SplashMode>(SPLASH_MODE_NONE)) {
+    const DisplayOptions& options = getDisplayOptions();
+	if (options.splashMode == static_cast<SplashMode>(SPLASH_MODE_NONE)) {
 		getRenderer()->drawText(0, 4, " Splash NOT enabled.");
     } else {
             // Default, display static or custom image
-            getRenderer()->drawSprite((uint8_t*) getDisplayOptions().splashImage.bytes, 128, 64, 16, 0, 0, 1);
+            getRenderer()->drawSprite((uint8_t*) options.splashImage.bytes, 128, 64, 16, 0, 0, 1);
 	}
 }
 

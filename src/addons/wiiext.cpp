@@ -5,6 +5,198 @@
 #include "helper.h"
 #include "config.pb.h"
 
+#include <initializer_list>
+#include <utility>
+
+namespace {
+
+WiiExtensionConfig makeWiiExtensionConfig(
+    std::initializer_list<std::pair<uint16_t, uint32_t>> buttonMappings,
+    std::initializer_list<std::pair<uint16_t, WiiAnalogAxis>> analogMappings
+) {
+    WiiExtensionConfig config;
+    config.buttonMap.reserve(buttonMappings.size());
+    config.analogMap.reserve(analogMappings.size());
+
+    for (const auto& [button, mask] : buttonMappings) {
+        config.buttonMap.emplace(button, mask);
+    }
+    for (const auto& [analog, axis] : analogMappings) {
+        config.analogMap.emplace(analog, axis);
+    }
+
+    return config;
+}
+
+}
+
+WiiExtensionInput::WiiExtensionInput() {
+    extensionConfigs.emplace(
+        WiiExtensionController::WII_EXTENSION_NUNCHUCK,
+        makeWiiExtensionConfig(
+            {
+                {WiiButtons::WII_BUTTON_C, GAMEPAD_MASK_B1},
+                {WiiButtons::WII_BUTTON_Z, GAMEPAD_MASK_B2},
+            },
+            {
+                {WiiAnalogs::WII_ANALOG_LEFT_X, {WiiAnalogType::WII_ANALOG_TYPE_LEFT_STICK_X, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_LEFT_Y, {WiiAnalogType::WII_ANALOG_TYPE_LEFT_STICK_Y, 0, 0}},
+            }
+        )
+    );
+    extensionConfigs.emplace(
+        WiiExtensionController::WII_EXTENSION_CLASSIC,
+        makeWiiExtensionConfig(
+            {
+                {WiiButtons::WII_BUTTON_B, GAMEPAD_MASK_B1},
+                {WiiButtons::WII_BUTTON_A, GAMEPAD_MASK_B2},
+                {WiiButtons::WII_BUTTON_X, GAMEPAD_MASK_B4},
+                {WiiButtons::WII_BUTTON_Y, GAMEPAD_MASK_B3},
+                {WiiButtons::WII_BUTTON_L, GAMEPAD_MASK_L2},
+                {WiiButtons::WII_BUTTON_ZL, GAMEPAD_MASK_L1},
+                {WiiButtons::WII_BUTTON_R, GAMEPAD_MASK_R2},
+                {WiiButtons::WII_BUTTON_ZR, GAMEPAD_MASK_R1},
+                {WiiButtons::WII_BUTTON_MINUS, GAMEPAD_MASK_S1},
+                {WiiButtons::WII_BUTTON_PLUS, GAMEPAD_MASK_S2},
+                {WiiButtons::WII_BUTTON_HOME, GAMEPAD_MASK_A1},
+                {WiiButtons::WII_BUTTON_UP, GAMEPAD_MASK_DU},
+                {WiiButtons::WII_BUTTON_DOWN, GAMEPAD_MASK_DD},
+                {WiiButtons::WII_BUTTON_LEFT, GAMEPAD_MASK_DL},
+                {WiiButtons::WII_BUTTON_RIGHT, GAMEPAD_MASK_DR},
+            },
+            {
+                {WiiAnalogs::WII_ANALOG_LEFT_X, {WiiAnalogType::WII_ANALOG_TYPE_LEFT_STICK_X, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_LEFT_Y, {WiiAnalogType::WII_ANALOG_TYPE_LEFT_STICK_Y, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_RIGHT_X, {WiiAnalogType::WII_ANALOG_TYPE_RIGHT_STICK_X, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_RIGHT_Y, {WiiAnalogType::WII_ANALOG_TYPE_RIGHT_STICK_Y, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_LEFT_TRIGGER, {WiiAnalogType::WII_ANALOG_TYPE_LEFT_TRIGGER, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_RIGHT_TRIGGER, {WiiAnalogType::WII_ANALOG_TYPE_RIGHT_TRIGGER, 0, 0}},
+            }
+        )
+    );
+    extensionConfigs.emplace(
+        WiiExtensionController::WII_EXTENSION_TAIKO,
+        makeWiiExtensionConfig(
+            {
+                {TaikoButtons::TATA_KAT_LEFT, GAMEPAD_MASK_L2},
+                {TaikoButtons::TATA_KAT_RIGHT, GAMEPAD_MASK_R2},
+                {TaikoButtons::TATA_DON_RIGHT, GAMEPAD_MASK_B1},
+                {TaikoButtons::TATA_DON_LEFT, GAMEPAD_MASK_DL},
+            },
+            {}
+        )
+    );
+    extensionConfigs.emplace(
+        WiiExtensionController::WII_EXTENSION_GUITAR,
+        makeWiiExtensionConfig(
+            {
+                {GuitarButtons::GUITAR_RED, GAMEPAD_MASK_B2},
+                {GuitarButtons::GUITAR_GREEN, GAMEPAD_MASK_B1},
+                {GuitarButtons::GUITAR_YELLOW, GAMEPAD_MASK_B4},
+                {GuitarButtons::GUITAR_BLUE, GAMEPAD_MASK_B3},
+                {GuitarButtons::GUITAR_ORANGE, GAMEPAD_MASK_L2},
+                {GuitarButtons::GUITAR_PEDAL, GAMEPAD_MASK_R2},
+                {WiiButtons::WII_BUTTON_MINUS, GAMEPAD_MASK_S1},
+                {WiiButtons::WII_BUTTON_PLUS, GAMEPAD_MASK_S2},
+                {WiiButtons::WII_BUTTON_UP, GAMEPAD_MASK_DU},
+                {WiiButtons::WII_BUTTON_DOWN, GAMEPAD_MASK_DD},
+            },
+            {
+                {WiiAnalogs::WII_ANALOG_LEFT_X, {WiiAnalogType::WII_ANALOG_TYPE_LEFT_STICK_X, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_LEFT_Y, {WiiAnalogType::WII_ANALOG_TYPE_LEFT_STICK_Y, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_RIGHT_X, {WiiAnalogType::WII_ANALOG_TYPE_RIGHT_STICK_X, 0, 0}},
+            }
+        )
+    );
+    extensionConfigs.emplace(
+        WiiExtensionController::WII_EXTENSION_DRUMS,
+        makeWiiExtensionConfig(
+            {
+                {DrumButtons::DRUM_RED, GAMEPAD_MASK_B2},
+                {DrumButtons::DRUM_GREEN, GAMEPAD_MASK_B1},
+                {DrumButtons::DRUM_BLUE, GAMEPAD_MASK_B4},
+                {DrumButtons::DRUM_YELLOW, GAMEPAD_MASK_B3},
+                {DrumButtons::DRUM_ORANGE, GAMEPAD_MASK_L2},
+                {DrumButtons::DRUM_PEDAL, GAMEPAD_MASK_R2},
+                {WiiButtons::WII_BUTTON_MINUS, GAMEPAD_MASK_S1},
+                {WiiButtons::WII_BUTTON_PLUS, GAMEPAD_MASK_S2},
+            },
+            {
+                {WiiAnalogs::WII_ANALOG_LEFT_X, {WiiAnalogType::WII_ANALOG_TYPE_LEFT_STICK_X, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_LEFT_Y, {WiiAnalogType::WII_ANALOG_TYPE_LEFT_STICK_Y, 0, 0}},
+            }
+        )
+    );
+    extensionConfigs.emplace(
+        WiiExtensionController::WII_EXTENSION_TURNTABLE,
+        makeWiiExtensionConfig(
+            {
+                {TurntableButtons::TURNTABLE_RIGHT_GREEN, GAMEPAD_MASK_B3},
+                {TurntableButtons::TURNTABLE_RIGHT_RED, GAMEPAD_MASK_B4},
+                {TurntableButtons::TURNTABLE_RIGHT_BLUE, GAMEPAD_MASK_B2},
+                {TurntableButtons::TURNTABLE_EUPHORIA, GAMEPAD_MASK_R1},
+                {TurntableButtons::TURNTABLE_LEFT_GREEN, GAMEPAD_MASK_DL},
+                {TurntableButtons::TURNTABLE_LEFT_RED, GAMEPAD_MASK_DU},
+                {TurntableButtons::TURNTABLE_LEFT_BLUE, GAMEPAD_MASK_DR},
+                {WiiButtons::WII_BUTTON_MINUS, GAMEPAD_MASK_S1},
+                {WiiButtons::WII_BUTTON_PLUS, GAMEPAD_MASK_S2},
+            },
+            {
+                {WiiAnalogs::WII_ANALOG_LEFT_X, {WiiAnalogType::WII_ANALOG_TYPE_LEFT_STICK_X, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_LEFT_Y, {WiiAnalogType::WII_ANALOG_TYPE_LEFT_STICK_Y, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_RIGHT_X, {WiiAnalogType::WII_ANALOG_TYPE_RIGHT_STICK_X, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_RIGHT_Y, {WiiAnalogType::WII_ANALOG_TYPE_RIGHT_STICK_Y, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_LEFT_TRIGGER, {WiiAnalogType::WII_ANALOG_TYPE_RIGHT_STICK_X, 0, 0}},
+                {WiiAnalogs::WII_ANALOG_RIGHT_TRIGGER, {WiiAnalogType::WII_ANALOG_TYPE_RIGHT_STICK_X, 0, 0}},
+            }
+        )
+    );
+    extensionConfigs.emplace(
+        WiiExtensionController::WII_EXTENSION_DRAWSOME,
+        makeWiiExtensionConfig(
+            {
+                {WiiButtons::WII_BUTTON_A, GAMEPAD_MASK_B2},
+                {WiiButtons::WII_BUTTON_L, GAMEPAD_MASK_L2},
+                {WiiButtons::WII_BUTTON_R, GAMEPAD_MASK_R2},
+            },
+            {}
+        )
+    );
+    extensionConfigs.emplace(
+        WiiExtensionController::WII_EXTENSION_UDRAW,
+        makeWiiExtensionConfig(
+            {
+                {WiiButtons::WII_BUTTON_A, GAMEPAD_MASK_B2},
+                {WiiButtons::WII_BUTTON_L, GAMEPAD_MASK_L2},
+                {WiiButtons::WII_BUTTON_R, GAMEPAD_MASK_R2},
+            },
+            {}
+        )
+    );
+
+    constexpr uint16_t analogTypes[] = {
+        WII_ANALOG_TYPE_LEFT_STICK_X,
+        WII_ANALOG_TYPE_LEFT_STICK_Y,
+        WII_ANALOG_TYPE_RIGHT_STICK_X,
+        WII_ANALOG_TYPE_RIGHT_STICK_Y,
+        WII_ANALOG_TYPE_DPAD_X,
+        WII_ANALOG_TYPE_DPAD_Y,
+        WII_ANALOG_TYPE_LEFT_TRIGGER,
+        WII_ANALOG_TYPE_RIGHT_TRIGGER,
+        WII_ANALOG_TYPE_LEFT_STICK_X_PLUS,
+        WII_ANALOG_TYPE_LEFT_STICK_X_MINUS,
+        WII_ANALOG_TYPE_LEFT_STICK_Y_PLUS,
+        WII_ANALOG_TYPE_LEFT_STICK_Y_MINUS,
+        WII_ANALOG_TYPE_RIGHT_STICK_X_PLUS,
+        WII_ANALOG_TYPE_RIGHT_STICK_X_MINUS,
+        WII_ANALOG_TYPE_RIGHT_STICK_Y_PLUS,
+        WII_ANALOG_TYPE_RIGHT_STICK_Y_MINUS,
+    };
+    for (uint16_t analogType : analogTypes) {
+        analogChanges.emplace(analogType, std::vector<WiiAnalogChange>{});
+    }
+}
+
 bool WiiExtensionInput::available() {
     const WiiOptions& options = Storage::getInstance().getAddonOptions().wiiOptions;
     if (options.enabled) {

@@ -361,58 +361,59 @@ void GPGFX_TinySSD1306::drawRectangle(uint16_t x, uint16_t y, uint16_t width, ui
 }
 
 void GPGFX_TinySSD1306::drawPolygon(uint16_t x, uint16_t y, uint16_t radius, uint16_t sides, uint32_t color, uint8_t filled, double rotation) {
+    if (sides < 3 || sides > MAX_SCREEN_WIDTH) {
+        return;
+    }
+
     // Calculate the angle increment between each vertex
     double angleIncrement = 2 * M_PI / sides;
 
     // Calculate vertices
-    uint16_t xVertices[sides];
-    uint16_t yVertices[sides];
     for (int i = 0; i < sides; i++) {
         double angle = i * angleIncrement + rotation;
-        xVertices[i] = x + round(radius * cos(angle));
-        yVertices[i] = y + round(radius * sin(angle));
+        polygonXVertices[i] = x + round(radius * cos(angle));
+        polygonYVertices[i] = y + round(radius * sin(angle));
     }
 
     // Draw lines between vertices
     for (int i = 0; i < sides - 1; i++) {
-        drawLine(xVertices[i], yVertices[i], xVertices[i + 1], yVertices[i + 1], color, false);
+        drawLine(polygonXVertices[i], polygonYVertices[i], polygonXVertices[i + 1], polygonYVertices[i + 1], color, false);
     }
-    drawLine(xVertices[sides - 1], yVertices[sides - 1], xVertices[0], yVertices[0], color, false);
+    drawLine(polygonXVertices[sides - 1], polygonYVertices[sides - 1], polygonXVertices[0], polygonYVertices[0], color, false);
 
     if (filled) {
         // Find the minimum and maximum y coordinates to scan
-        uint16_t minY = yVertices[0], maxY = yVertices[0];
+        uint16_t minY = polygonYVertices[0], maxY = polygonYVertices[0];
         for (int i = 1; i < sides; i++) {
-            if (yVertices[i] < minY) minY = yVertices[i];
-            if (yVertices[i] > maxY) maxY = yVertices[i];
+            if (polygonYVertices[i] < minY) minY = polygonYVertices[i];
+            if (polygonYVertices[i] > maxY) maxY = polygonYVertices[i];
         }
 
         // Scan horizontally and draw lines between intersections
         for (int scanY = minY + 1; scanY < maxY; scanY++) {
             int intersections = 0;
-            double intersectPoints[sides];
 
             for (int i = 0; i < sides; i++) {
                 int next = (i + 1) % sides;
-                if ((yVertices[i] < scanY && yVertices[next] >= scanY) || (yVertices[next] < scanY && yVertices[i] >= scanY)) {
-                    intersectPoints[intersections++] = xVertices[i] + (scanY - yVertices[i]) * (xVertices[next] - xVertices[i]) / (yVertices[next] - yVertices[i]);
+                if ((polygonYVertices[i] < scanY && polygonYVertices[next] >= scanY) || (polygonYVertices[next] < scanY && polygonYVertices[i] >= scanY)) {
+                    polygonIntersections[intersections++] = polygonXVertices[i] + (scanY - polygonYVertices[i]) * (polygonXVertices[next] - polygonXVertices[i]) / (polygonYVertices[next] - polygonYVertices[i]);
                 }
             }
 
             // Sort the intersection points by x coordinate
             for (int i = 0; i < intersections - 1; i++) {
                 for (int j = 0; j < intersections - i - 1; j++) {
-                    if (intersectPoints[j] > intersectPoints[j + 1]) {
-                        double temp = intersectPoints[j];
-                        intersectPoints[j] = intersectPoints[j + 1];
-                        intersectPoints[j + 1] = temp;
+                    if (polygonIntersections[j] > polygonIntersections[j + 1]) {
+                        double temp = polygonIntersections[j];
+                        polygonIntersections[j] = polygonIntersections[j + 1];
+                        polygonIntersections[j + 1] = temp;
                     }
                 }
             }
 
             // Draw lines between pairs of intersection points
             for (int i = 0; i < intersections; i += 2) {
-                drawLine(intersectPoints[i], scanY, intersectPoints[i + 1], scanY, color, false);
+                drawLine(polygonIntersections[i], scanY, polygonIntersections[i + 1], scanY, color, false);
             }
         }
     }
@@ -546,7 +547,8 @@ void GPGFX_TinySSD1306::drawSprite(uint8_t* image, uint16_t width, uint16_t heig
 
 void GPGFX_TinySSD1306::drawBuffer(uint8_t* pBuffer) {
 	uint16_t bufferSize = MAX_SCREEN_SIZE;
-	uint8_t buffer[bufferSize+1] = {SET_START_LINE};
+	uint8_t* buffer = transferBuffer;
+	buffer[0] = SET_START_LINE;
 
 	if (this->screenType == ScreenAlternatives::SCREEN_132x64) {
         uint16_t x = 0;

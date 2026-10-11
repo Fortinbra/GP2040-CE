@@ -320,6 +320,18 @@ ${PROTO_OUTPUT_DIR}/enums.pb.c
 ${PROTO_OUTPUT_DIR}/config.pb.c
 )
 
+# Keep the firmware warning cleanup scoped away from webconfig for this pass.
+set_source_files_properties(src/webconfig.cpp PROPERTIES COMPILE_OPTIONS "-Wno-error")
+
+# The bundled Pico SDK's mDNS implementation exceeds the firmware's 500-byte stack diagnostic threshold.
+set_source_files_properties(
+  "${PICO_SDK_PATH}/lib/lwip/src/apps/mdns/mdns.c"
+  "${PICO_SDK_PATH}/lib/lwip/src/apps/mdns/mdns_out.c"
+  PROPERTIES COMPILE_OPTIONS "-Wno-error=stack-usage="
+)
+
+target_compile_options(${PROJECT_NAME} PRIVATE -Werror)
+
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME ${PROJECT_NAME}_${CMAKE_PROJECT_VERSION}_${GP2040_BOARDCONFIG})
 
 pico_set_program_name(GP2040-CE "GP2040-CE")

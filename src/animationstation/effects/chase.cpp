@@ -37,7 +37,7 @@ Chase::Chase(Lights& InRGBLights, EButtonCaseEffectType InButtonCaseEffectType, 
       MinYCoord = RGBLights->AllLights[lightIndex].Position.YPosition;   
 
     //save types
-    int lastLed = RGBLights->AllLights[lightIndex].FirstLedIndex + RGBLights->AllLights[lightIndex].LedsPerLight;
+    unsigned int lastLed = RGBLights->AllLights[lightIndex].FirstLedIndex + RGBLights->AllLights[lightIndex].LedsPerLight;
     for(unsigned int ledIndex = RGBLights->AllLights[lightIndex].FirstLedIndex ; ledIndex < lastLed; ++ledIndex)
       ChaseBlendType[ledIndex] = RGBLights->AllLights[lightIndex].Type;
 
@@ -133,38 +133,15 @@ void Chase::OrderLights()
 
   if(ChaseTypeInUse == ChaseTypes::CHASETYPES_INDEX || ChaseTypeInUse == ChaseTypes::CHASETYPES_INDEX_PINGPONG)
   {
-    int sortedLights[FRAME_MAX];
-    unsigned int lightsFound = 0;
+    const unsigned int lightLimit = static_cast<unsigned int>(
+        std::min(RGBLights->AllLights.size(), static_cast<size_t>(FRAME_MAX)));
 
-    for(unsigned int lightIndex = 0; lightIndex < RGBLights->AllLights.size() && lightIndex < FRAME_MAX; ++lightIndex)
+    for(unsigned int lightIndex = 0; lightIndex < lightLimit; ++lightIndex)
     {
       if(LightTypeIsForAnimation(RGBLights->AllLights[lightIndex].Type))
       {
-        for(unsigned int sortIndex = 0; sortIndex <= lightsFound; ++sortIndex)
-        {
-          if(sortIndex == lightsFound)
-          {
-            sortedLights[sortIndex] = lightIndex;
-            break;
-          }
-          else if(lightIndex < sortedLights[sortIndex])
-          {
-            for(unsigned int offsetIndex = lightsFound; offsetIndex > sortIndex; --offsetIndex)
-            {
-              sortedLights[offsetIndex] = sortedLights[offsetIndex - 1];
-            }
-            sortedLights[sortIndex] = lightIndex;
-            break;
-          }
-        }
-
-        lightsFound++;
+        OrderedLights.push_back(lightIndex);
       }  
-    }
-
-    for(unsigned int sortedIndex = 0; sortedIndex < lightsFound; ++sortedIndex)
-    {
-      OrderedLights.push_back(sortedLights[sortedIndex]);
     }
   }
   else if(!bIsCircleBased)
@@ -185,12 +162,19 @@ void Chase::OrderLights()
   }
   else //circle based
   {
+    struct LightAngle
+    {
+      float angle;
+      uint32_t index;
+    };
+
     float midX = MinXCoord + (MaxXCoord - MinXCoord) / 2;
     float midY = MinYCoord + (MaxYCoord - MinYCoord) / 2;
-    float angleResult[FRAME_MAX];
-    float resultIndex[FRAME_MAX];
-    unsigned int lightsFound = 0;
-    for(unsigned int lightIndex = 0; lightIndex < RGBLights->AllLights.size() && lightIndex < FRAME_MAX; ++lightIndex)
+    const unsigned int lightLimit = static_cast<unsigned int>(
+        std::min(RGBLights->AllLights.size(), static_cast<size_t>(FRAME_MAX)));
+    std::vector<LightAngle> angleResults;
+    angleResults.reserve(lightLimit);
+    for(unsigned int lightIndex = 0; lightIndex < lightLimit; ++lightIndex)
     {
       if(LightTypeIsForAnimation(RGBLights->AllLights[lightIndex].Type) == false)
         continue;
@@ -202,35 +186,16 @@ void Chase::OrderLights()
       float thisDet = (xOffset * -1) - (yOffset * 0);
       float angle = atan2(thisDet, thisDot);
 
-      //Slot it into array
-      for(unsigned int sortIndex = 0; sortIndex <= lightsFound; ++sortIndex)
-      {
-        if(sortIndex == lightsFound)
-        {
-          angleResult[sortIndex] = angle;
-          resultIndex[sortIndex] = lightIndex;
-          break;
-        }
-        else if(angle < angleResult[sortIndex])
-        {
-          for(unsigned int offsetIndex = lightsFound; offsetIndex > sortIndex; --offsetIndex)
-          {
-            angleResult[offsetIndex] = angleResult[offsetIndex - 1];
-            resultIndex[offsetIndex] = resultIndex[offsetIndex - 1];
-          }
-          angleResult[sortIndex] = angle;
-          resultIndex[sortIndex] = lightIndex;
-          break;
-        }
-      }
-
-      lightsFound++;
+      auto insertionPoint = angleResults.begin();
+      while(insertionPoint != angleResults.end() && !(angle < insertionPoint->angle))
+        ++insertionPoint;
+      angleResults.insert(insertionPoint, LightAngle{angle, lightIndex});
     }
 
     //Now build the ordered list
-    for(unsigned int sortedIndex = 0; sortedIndex < lightsFound; ++sortedIndex)
+    for(const LightAngle& lightAngle : angleResults)
     {
-      OrderedLights.push_back(resultIndex[sortedIndex]);
+      OrderedLights.push_back(lightAngle.index);
     }
   }
 }
@@ -327,7 +292,7 @@ void Chase::AssignThisFrameValues()
     case SingleChaseTypes::SINGLECHASETYPES_RIGHT_TO_LEFT:
       //reverse the order and fall through
       currentLightReverseAdjusted = (MaxXCoord) - (CurrentLight - MinXCoord);
-      //Fall through (no break)
+      [[fallthrough]];
     case SingleChaseTypes::SINGLECHASETYPES_LEFT_TO_RIGHT:
     { 
       for(unsigned int lightIndex = 0; lightIndex < OrderedLights.size(); ++lightIndex)
@@ -347,7 +312,7 @@ void Chase::AssignThisFrameValues()
     case SingleChaseTypes::SINGLECHASETYPES_BOTTOM_TO_TOP:
       //reverse the order and fall through
       currentLightReverseAdjusted = (MaxYCoord) - (CurrentLight - MinYCoord);
-      //Fall through (no break)
+      [[fallthrough]];
     case SingleChaseTypes::SINGLECHASETYPES_TOP_TO_BOTTOM:
     { 
       for(unsigned int lightIndex = 0; lightIndex < OrderedLights.size(); ++lightIndex)
@@ -367,7 +332,7 @@ void Chase::AssignThisFrameValues()
     case SingleChaseTypes::SINGLECHASETYPES_CIRCLE_ANTICLOCKWISE:
       //reverse the order and fall through
       currentLightReverseAdjusted = (OrderedLights.size()-1) - CurrentLight;
-      //Fall through (no break)
+      [[fallthrough]];
     case SingleChaseTypes::SINGLECHASETYPES_CIRCLE_CLOCKWISE:
     {
       uint8_t firstLightIndex = RGBLights->AllLights[OrderedLights[currentLightReverseAdjusted]].FirstLedIndex;

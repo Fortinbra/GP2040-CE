@@ -2,6 +2,8 @@
 #include "storagemanager.h"
 #include "enums.pb.h"
 
+#include <cstring>
+
 void EventManager::init() {
     clearEventHandlers();
 }
@@ -24,8 +26,12 @@ void EventManager::unregisterEventHandler(GPEventType eventType, EventFunction h
     // Verify we have this event in our pair list
     if (it != eventList.end()) {
         // Verify we have this function in our function vector
-        for(std::vector<EventFunction>::iterator funcIt = it->second.begin(); funcIt != it->second.end(); it++){
-            if(*(uint32_t *)(uint8_t *)&handler == *(uint32_t *)(uint8_t *)&(*funcIt)) {
+        for (std::vector<EventFunction>::iterator funcIt = it->second.begin(); funcIt != it->second.end(); ++funcIt) {
+            uint32_t handlerId;
+            uint32_t registeredId;
+            std::memcpy(&handlerId, &handler, sizeof(handlerId));
+            std::memcpy(&registeredId, &*funcIt, sizeof(registeredId));
+            if (handlerId == registeredId) {
                 it->second.erase(funcIt);
                 break;
             }

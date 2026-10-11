@@ -4,6 +4,54 @@
 
 extern uint32_t getMillis();
 
+MainMenuScreen::MainMenuScreen() {
+    initializeMenus();
+}
+
+MainMenuScreen::MainMenuScreen(GPGFX* renderer) : MainMenuScreen() {
+    setRenderer(renderer);
+}
+
+void MainMenuScreen::initializeMenus() {
+    inputModeMenu.reserve(19);
+#define INPUT_MODE_ENTRIES(name, value) addMenuEntry(inputModeMenu, name##_NAME, value, &MainMenuScreen::currentInputMode, &MainMenuScreen::selectInputMode);
+    InputMode_VALUELIST(INPUT_MODE_ENTRIES)
+#undef INPUT_MODE_ENTRIES
+
+    dpadModeMenu.reserve(3);
+#define DPAD_MODE_ENTRIES(name, value) addMenuEntry(dpadModeMenu, name##_NAME, value, &MainMenuScreen::currentDpadMode, &MainMenuScreen::selectDPadMode);
+    DpadMode_VALUELIST(DPAD_MODE_ENTRIES)
+#undef DPAD_MODE_ENTRIES
+
+    socdModeMenu.reserve(5);
+#define SOCD_MODE_ENTRIES(name, value) addMenuEntry(socdModeMenu, name##_NAME, value, &MainMenuScreen::currentSOCDMode, &MainMenuScreen::selectSOCDMode);
+    SOCDMode_VALUELIST(SOCD_MODE_ENTRIES)
+#undef SOCD_MODE_ENTRIES
+
+    focusModeMenu.reserve(2);
+    turboModeMenu.reserve(2);
+    saveMenu.reserve(2);
+    mainMenu.reserve(6);
+    addMenuEntry(focusModeMenu, "Off", 0, &MainMenuScreen::currentFocusMode, &MainMenuScreen::selectFocusMode);
+    addMenuEntry(focusModeMenu, "On", 1, &MainMenuScreen::currentFocusMode, &MainMenuScreen::selectFocusMode);
+    addMenuEntry(turboModeMenu, "Off", 0, &MainMenuScreen::currentTurboMode, &MainMenuScreen::selectTurboMode);
+    addMenuEntry(turboModeMenu, "On", 1, &MainMenuScreen::currentTurboMode, &MainMenuScreen::selectTurboMode);
+    addMenuEntry(saveMenu, "Save & Exit", 1, &MainMenuScreen::modeValue, &MainMenuScreen::saveAndExit);
+    addMenuEntry(saveMenu, "Exit", 0, &MainMenuScreen::modeValue, &MainMenuScreen::exitOnly);
+
+    addMenuEntry(mainMenu, "Input Mode", -1, &MainMenuScreen::modeValue, &MainMenuScreen::testMenu, &inputModeMenu);
+    addMenuEntry(mainMenu, "D-Pad Mode", -1, &MainMenuScreen::modeValue, &MainMenuScreen::testMenu, &dpadModeMenu);
+    addMenuEntry(mainMenu, "SOCD Mode", -1, &MainMenuScreen::modeValue, &MainMenuScreen::testMenu, &socdModeMenu);
+    addMenuEntry(mainMenu, "Profile", -1, &MainMenuScreen::modeValue, &MainMenuScreen::testMenu, &profilesMenu);
+    addMenuEntry(mainMenu, "Turbo", -1, &MainMenuScreen::modeValue, &MainMenuScreen::testMenu, &turboModeMenu);
+    addMenuEntry(mainMenu, "Exit", -1, &MainMenuScreen::modeValue, &MainMenuScreen::testMenu, &saveMenu);
+}
+
+void MainMenuScreen::addMenuEntry(std::vector<MenuEntry>& menu, const char* label, int32_t optionValue,
+    int32_t (MainMenuScreen::*currentValue)(), void (MainMenuScreen::*action)(), std::vector<MenuEntry>* submenu) {
+    menu.emplace_back(MenuEntry{label, nullptr, submenu, std::bind(currentValue, this), std::bind(action, this), optionValue});
+}
+
 void MainMenuScreen::init() {
     getRenderer()->clearScreen();
     currentMenu = &mainMenu;

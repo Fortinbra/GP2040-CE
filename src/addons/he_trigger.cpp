@@ -20,8 +20,10 @@ void HETriggerAddon::setup() {
     muxPinArray[1] = options.muxADCPin1;
     muxPinArray[2] = options.muxADCPin2;
     muxPinArray[3] = options.muxADCPin3;
+    constexpr int32_t adcPinStart = static_cast<int32_t>(ADC_BASE_PIN);
+    constexpr int32_t adcPinEnd = adcPinStart + static_cast<int32_t>(NUM_ADC_CHANNELS) - 1;
     for(int i = 0; i < muxTotal; i++) {
-        if (muxPinArray[i] >= ADC_BASE_PIN && muxPinArray[i] < ADC_BASE_PIN + NUM_ADC_CHANNELS - 1) {
+        if (muxPinArray[i] >= adcPinStart && muxPinArray[i] < adcPinEnd) {
             adc_gpio_init(muxPinArray[i]);
         }
     }

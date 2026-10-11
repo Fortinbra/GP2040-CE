@@ -545,59 +545,61 @@ static bool isValidButtonLayout(ConfigLegacy::ButtonLayout buttonLayout)
 {
     switch (buttonLayout)
     {
-        case BUTTON_LAYOUT_STICK:
-        case BUTTON_LAYOUT_STICKLESS:
-        case BUTTON_LAYOUT_BUTTONS_ANGLED:
-        case BUTTON_LAYOUT_BUTTONS_BASIC:
-        case BUTTON_LAYOUT_KEYBOARD_ANGLED:
-        case BUTTON_LAYOUT_KEYBOARDA:
-        case BUTTON_LAYOUT_DANCEPADA:
-        case BUTTON_LAYOUT_TWINSTICKA:
-        case BUTTON_LAYOUT_BLANKA:
-        case BUTTON_LAYOUT_VLXA:
-        case BUTTON_LAYOUT_FIGHTBOARD_STICK:
-        case BUTTON_LAYOUT_FIGHTBOARD_MIRRORED:
-        case BUTTON_LAYOUT_CUSTOMA:
-        case BUTTON_LAYOUT_OPENCORE0WASDA:
-        case BUTTON_LAYOUT_STICKLESS_13:
-        case BUTTON_LAYOUT_STICKLESS_16:
-        case BUTTON_LAYOUT_STICKLESS_R16:
-        case BUTTON_LAYOUT_STICKLESS_14:
+        case ConfigLegacy::BUTTON_LAYOUT_STICK:
+        case ConfigLegacy::BUTTON_LAYOUT_STICKLESS:
+        case ConfigLegacy::BUTTON_LAYOUT_BUTTONS_ANGLED:
+        case ConfigLegacy::BUTTON_LAYOUT_BUTTONS_BASIC:
+        case ConfigLegacy::BUTTON_LAYOUT_KEYBOARD_ANGLED:
+        case ConfigLegacy::BUTTON_LAYOUT_KEYBOARDA:
+        case ConfigLegacy::BUTTON_LAYOUT_DANCEPADA:
+        case ConfigLegacy::BUTTON_LAYOUT_TWINSTICKA:
+        case ConfigLegacy::BUTTON_LAYOUT_BLANKA:
+        case ConfigLegacy::BUTTON_LAYOUT_VLXA:
+        case ConfigLegacy::BUTTON_LAYOUT_FIGHTBOARD_STICK:
+        case ConfigLegacy::BUTTON_LAYOUT_FIGHTBOARD_MIRRORED:
+        case ConfigLegacy::BUTTON_LAYOUT_CUSTOMA:
+        case ConfigLegacy::BUTTON_LAYOUT_OPENCORE0WASDA:
+        case ConfigLegacy::BUTTON_LAYOUT_STICKLESS_13:
+        case ConfigLegacy::BUTTON_LAYOUT_STICKLESS_16:
+        case ConfigLegacy::BUTTON_LAYOUT_STICKLESS_14:
+        case ConfigLegacy::BUTTON_LAYOUT_STICKLESS_R16:
             return true;
+        default:
+            return false;
     }
-    return false;
 }
 
 static bool isValidButtonLayoutRight(ConfigLegacy::ButtonLayoutRight buttonLayoutRight)
 {
     switch (buttonLayoutRight)
     {
-        case BUTTON_LAYOUT_ARCADE:
-        case BUTTON_LAYOUT_STICKLESSB:
-        case BUTTON_LAYOUT_BUTTONS_ANGLEDB:
-        case BUTTON_LAYOUT_VEWLIX:
-        case BUTTON_LAYOUT_VEWLIX7:
-        case BUTTON_LAYOUT_CAPCOM:
-        case BUTTON_LAYOUT_CAPCOM6:
-        case BUTTON_LAYOUT_SEGA2P:
-        case BUTTON_LAYOUT_NOIR8:
-        case BUTTON_LAYOUT_KEYBOARDB:
-        case BUTTON_LAYOUT_DANCEPADB:
-        case BUTTON_LAYOUT_TWINSTICKB:
-        case BUTTON_LAYOUT_BLANKB:
-        case BUTTON_LAYOUT_VLXB:
-        case BUTTON_LAYOUT_FIGHTBOARD:
-        case BUTTON_LAYOUT_FIGHTBOARD_STICK_MIRRORED:
-        case BUTTON_LAYOUT_CUSTOMB:
-        case BUTTON_LAYOUT_KEYBOARD8B:
-        case BUTTON_LAYOUT_OPENCORE0WASDB:
-        case BUTTON_LAYOUT_STICKLESS_13B:
-        case BUTTON_LAYOUT_STICKLESS_16B: 
-        case BUTTON_LAYOUT_STICKLESS_R16B:
-        case BUTTON_LAYOUT_STICKLESS_14B:
+        case ConfigLegacy::BUTTON_LAYOUT_ARCADE:
+        case ConfigLegacy::BUTTON_LAYOUT_STICKLESSB:
+        case ConfigLegacy::BUTTON_LAYOUT_BUTTONS_ANGLEDB:
+        case ConfigLegacy::BUTTON_LAYOUT_VEWLIX:
+        case ConfigLegacy::BUTTON_LAYOUT_VEWLIX7:
+        case ConfigLegacy::BUTTON_LAYOUT_CAPCOM:
+        case ConfigLegacy::BUTTON_LAYOUT_CAPCOM6:
+        case ConfigLegacy::BUTTON_LAYOUT_SEGA2P:
+        case ConfigLegacy::BUTTON_LAYOUT_NOIR8:
+        case ConfigLegacy::BUTTON_LAYOUT_KEYBOARDB:
+        case ConfigLegacy::BUTTON_LAYOUT_DANCEPADB:
+        case ConfigLegacy::BUTTON_LAYOUT_TWINSTICKB:
+        case ConfigLegacy::BUTTON_LAYOUT_BLANKB:
+        case ConfigLegacy::BUTTON_LAYOUT_VLXB:
+        case ConfigLegacy::BUTTON_LAYOUT_FIGHTBOARD:
+        case ConfigLegacy::BUTTON_LAYOUT_FIGHTBOARD_STICK_MIRRORED:
+        case ConfigLegacy::BUTTON_LAYOUT_CUSTOMB:
+        case ConfigLegacy::BUTTON_LAYOUT_KEYBOARD8B:
+        case ConfigLegacy::BUTTON_LAYOUT_OPENCORE0WASDB:
+        case ConfigLegacy::BUTTON_LAYOUT_STICKLESS_13B:
+        case ConfigLegacy::BUTTON_LAYOUT_STICKLESS_16B:
+        case ConfigLegacy::BUTTON_LAYOUT_STICKLESS_14B:
+        case ConfigLegacy::BUTTON_LAYOUT_STICKLESS_R16B:
             return true;
+        default:
+            return false;
     }
-    return false;
 }
 
 static bool isValidLEDFormat(LEDFormat ledFormat)

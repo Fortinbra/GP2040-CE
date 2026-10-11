@@ -341,7 +341,7 @@
 
 void ConfigUtils::initUnsetPropertiesWithDefaults(Config& config)
 {
-    const uint8_t emptyByteArray[0] = {};
+    static const uint8_t emptyByteArray[0] = {};
 
     INIT_UNSET_PROPERTY_STR(config, boardVersion, GP2040VERSION);
     INIT_UNSET_PROPERTY_STR(config, boardConfig, GP2040_BOARDCONFIG);
@@ -520,7 +520,7 @@ void ConfigUtils::initUnsetPropertiesWithDefaults(Config& config)
     INIT_UNSET_PROPERTY(config.displayOptions, splashMode, SPLASH_MODE);
     INIT_UNSET_PROPERTY(config.displayOptions, splashChoice, SPLASH_CHOICE);
     INIT_UNSET_PROPERTY(config.displayOptions, splashDuration, SPLASH_DURATION);
-	const unsigned char defaultSplash[] = { DEFAULT_SPLASH };
+	static const unsigned char defaultSplash[] = { DEFAULT_SPLASH };
     INIT_UNSET_PROPERTY_BYTES(config.displayOptions, splashImage, defaultSplash);
     INIT_UNSET_PROPERTY(config.displayOptions, size, DISPLAY_SIZE);
     INIT_UNSET_PROPERTY(config.displayOptions, flip, DISPLAY_FLIP);
@@ -2116,7 +2116,8 @@ static bool loadConfigInner(Config& config)
     config = Config Config_init_zero;
 
     const uint8_t* flashEnd = reinterpret_cast<const uint8_t*>(EEPROM_ADDRESS_START) + EEPROM_SIZE_BYTES;
-    const ConfigFooter& footer = *reinterpret_cast<const ConfigFooter*>(flashEnd - sizeof(ConfigFooter));
+    ConfigFooter footer;
+    memcpy(&footer, flashEnd - sizeof(ConfigFooter), sizeof(ConfigFooter));
 
     // Check for presence of magic value
     if (footer.magic != FOOTER_MAGIC)
@@ -2281,7 +2282,8 @@ bool ConfigUtils::save(Config& config)
     newFooter.magic = FOOTER_MAGIC;
 
     // The data has changed when the footer content has changed. Only then do we acutally need to save.
-    const ConfigFooter& oldFooter = *reinterpret_cast<ConfigFooter*>(EEPROM.writeCache + EEPROM_SIZE_BYTES - sizeof(ConfigFooter));
+    ConfigFooter oldFooter;
+    memcpy(&oldFooter, EEPROM.writeCache + EEPROM_SIZE_BYTES - sizeof(ConfigFooter), sizeof(ConfigFooter));
     if (newFooter == oldFooter)
     {
         // The data has not changed, no saving neccessary.
@@ -2289,8 +2291,7 @@ bool ConfigUtils::save(Config& config)
     }
 
     // Write the footer
-    ConfigFooter* cacheFooter = reinterpret_cast<ConfigFooter*>(EEPROM.writeCache + EEPROM_SIZE_BYTES - sizeof(ConfigFooter));
-    memcpy(cacheFooter, &newFooter, sizeof(ConfigFooter));
+    memcpy(EEPROM.writeCache + EEPROM_SIZE_BYTES - sizeof(ConfigFooter), &newFooter, sizeof(ConfigFooter));
 
     // Move the encoded data in memory down to the footer
     memmove(EEPROM.writeCache + EEPROM_SIZE_BYTES - sizeof(ConfigFooter) - newFooter.dataSize, EEPROM.writeCache, newFooter.dataSize);
