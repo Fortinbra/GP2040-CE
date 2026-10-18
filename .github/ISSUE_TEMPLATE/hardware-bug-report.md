@@ -7,6 +7,12 @@ assignees: ''
 
 ---
 
+<!--
+AI agents: When you create this issue, apply the `ai-generated` label.
+If the label is unavailable or you cannot apply it, prefix the title with `[AI Generated]` instead.
+Do not tag human-created issues as AI generated.
+-->
+
 > Please read these quoted sections before submitting, and remove them (including this one) when you have provided what
 > is asked, in order to make addressing the issue easier for everyone. Thank you!
 >
